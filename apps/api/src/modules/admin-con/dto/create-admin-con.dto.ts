@@ -1,0 +1,12 @@
+import { IsString, Length, MinLength } from 'class-validator';
+
+/** Payload for a Host creating a new Admin(Con). */
+export class CreateAdminConDto {
+  @IsString()
+  @Length(3, 64)
+  username: string;
+
+  @IsString()
+  @MinLength(6)
+  password: string;
+}
