@@ -11,6 +11,7 @@ Thực hiện đúng thứ tự sau, KHÔNG bỏ bước nào:
    thay đổi và mô tả sau đây: "$ARGUMENTS". Đặt tên branch dạng kebab-case,
    tiền tố theo loại thay đổi, ví dụ: `feat/admin-con-crud`, `fix/points-guard`.
    Nếu đã ở một feature branch rồi thì dùng branch hiện tại, không tạo branch mới.
+   Nếu đang ở trên nhánh của feature khác thì chủ động checkout về  main + pull, rồi mới tạo nhánh mới.
 3. `git add` các file liên quan tới thay đổi (không add file rác như node_modules,
    .env, file build).
 4. Viết commit message theo Conventional Commits (feat/fix/chore/refactor/docs...),
