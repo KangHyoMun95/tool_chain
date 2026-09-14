@@ -32,4 +32,5 @@ jobs:
             trong file .claude/skills/security-review/SKILL.md trước khi review.
             Tập trung vào phần thay đổi giữa PR_BASE_SHA và PR_HEAD_SHA, đăng inline
             comment cho từng vấn đề tìm được và một comment tổng hợp lên PR.
+          show_full_output: true
           claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Bash(git diff:*),Read,Glob,Grep"'
