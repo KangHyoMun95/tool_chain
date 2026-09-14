@@ -23,7 +23,6 @@ Thực hiện đúng thứ tự sau, KHÔNG bỏ bước nào:
    - `--body` tóm tắt: thay đổi gì, vì sao, có ảnh hưởng tới phần RBAC/migration
      nào không (dựa theo CLAUDE.md), và cách test đã làm (nếu có)
 7. Sau khi tạo xong, in ra link PR để người dùng bấm vào review — KHÔNG tự merge.
-8. KHÔNG được thay đổi các repository khác.
 
 Nếu có lỗi ở bất kỳ bước nào (vd conflict, chưa có remote, chưa auth `gh`),
 dừng lại và báo rõ lỗi thay vì cố xử lý bằng lệnh phá hoại (không dùng
