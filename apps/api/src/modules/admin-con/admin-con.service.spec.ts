@@ -8,6 +8,8 @@ import { AdminConService } from './admin-con.service';
  * hostId is always part of the lookup.
  */
 describe('AdminConService (host scoping)', () => {
+  const pointsMock = () => ({ adjust: jest.fn().mockResolvedValue({}) });
+
   const hostA = 'host-A';
   const hostB = 'host-B';
 
@@ -40,7 +42,7 @@ describe('AdminConService (host scoping)', () => {
       { id: 'c1', hostId: hostA, username: 'a1', status: AccountStatus.ACTIVE },
       { id: 'c2', hostId: hostB, username: 'b1', status: AccountStatus.ACTIVE },
     ]);
-    const svc = new AdminConService(repo);
+    const svc = new AdminConService(repo, pointsMock() as any);
     const list = await svc.findAll(hostA);
     expect(list.map((x) => x.id)).toEqual(['c1']);
     expect(repo.calls[0]).toEqual({ hostId: hostA });
@@ -48,7 +50,7 @@ describe('AdminConService (host scoping)', () => {
 
   it('findOne of another Host\'s Admin(Con) throws NotFound (no cross-host access)', async () => {
     const repo = makeRepo([{ id: 'c2', hostId: hostB, username: 'b1' }]);
-    const svc = new AdminConService(repo);
+    const svc = new AdminConService(repo, pointsMock() as any);
     await expect(svc.findOne(hostA, 'c2')).rejects.toBeInstanceOf(
       NotFoundException,
     );
@@ -58,7 +60,7 @@ describe('AdminConService (host scoping)', () => {
 
   it('update/deactivate of another Host\'s Admin(Con) throws NotFound', async () => {
     const repo = makeRepo([{ id: 'c2', hostId: hostB, username: 'b1' }]);
-    const svc = new AdminConService(repo);
+    const svc = new AdminConService(repo, pointsMock() as any);
     await expect(svc.update(hostA, 'c2', { username: 'x' })).rejects.toBeInstanceOf(
       NotFoundException,
     );
@@ -69,7 +71,7 @@ describe('AdminConService (host scoping)', () => {
 
   it('create assigns hostId and sets points to 0', async () => {
     const repo = makeRepo([]);
-    const svc = new AdminConService(repo);
+    const svc = new AdminConService(repo, pointsMock() as any);
     const created: any = await svc.create(hostA, {
       username: 'newcon',
       password: 'secret123',
@@ -82,7 +84,7 @@ describe('AdminConService (host scoping)', () => {
 
   it('create rejects duplicate username', async () => {
     const repo = makeRepo([{ id: 'c1', hostId: hostA, username: 'dup' }]);
-    const svc = new AdminConService(repo);
+    const svc = new AdminConService(repo, pointsMock() as any);
     await expect(
       svc.create(hostA, { username: 'dup', password: 'secret123' }),
     ).rejects.toBeInstanceOf(ConflictException);

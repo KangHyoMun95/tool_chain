@@ -90,10 +90,9 @@ export function useDeactivateAdminCon() {
 }
 
 /**
- * Grant/deduct points for an Admin(Con).
- * NOTE: the backend points endpoint does not exist yet — this targets
- * POST /admin-cons/:id/points, which the future PointsService must implement
- * (writing a PointTransaction per CLAUDE.md). Until then this call will 404.
+ * Grant/deduct points for an Admin(Con) via POST /admin-cons/:id/points.
+ * The backend routes this through PointsService, which updates the balance and
+ * writes a PointTransaction audit record in one transaction (per CLAUDE.md).
  */
 export function useGrantPoints() {
   const qc = useQueryClient();
