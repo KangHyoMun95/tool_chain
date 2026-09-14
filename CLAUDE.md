@@ -111,3 +111,4 @@ pnpm --filter api test
 - Khi sinh API, luôn có middleware/guard kiểm tra scope dữ liệu (Admin Con A không được thấy/sửa User của Admin Con B).
 - Trang chủ (`homepage-config`) là dữ liệu do Host quản lý nhưng được User của Admin Con tương ứng đọc — thiết kế API cho 2 chiều: ghi (Host only) và đọc (User, theo đúng Admin Con của mình).
 - Chưa quyết định cơ chế thiết kế nội dung trang chủ (page builder, template, v.v.) — phần này "sẽ được thiết kế sau", nên khi implement, để interface/schema đủ mở (vd JSON config) thay vì hard-code cấu trúc cứng.
+- Không sử dụng tiếng việt để đặt tên cho biến, tên api, và các code liên quan.

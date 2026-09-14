@@ -1,0 +1,166 @@
+'use client';
+
+import { useRef, useState } from 'react';
+import {
+  ProTable,
+  type ActionType,
+  type ProColumns,
+} from '@ant-design/pro-components';
+import { App, Button } from 'antd';
+import { useQueryClient } from '@tanstack/react-query';
+import { AccountStatus } from '@toolhackchain/shared';
+import {
+  loadAdminCons,
+  useDeactivateAdminCon,
+  type AdminConRow,
+} from '@/lib/api/admin-con';
+import { CreateAdminConModal } from './create-admin-con-modal';
+import { EditAdminConModal } from './edit-admin-con-modal';
+import { GrantPointsModal } from './grant-points-modal';
+
+export function AdminConTable() {
+  const actionRef = useRef<ActionType>();
+  const queryClient = useQueryClient();
+  const { message, modal } = App.useApp();
+  const deactivate = useDeactivateAdminCon();
+
+  const [editing, setEditing] = useState<AdminConRow | null>(null);
+  const [granting, setGranting] = useState<AdminConRow | null>(null);
+
+  const reload = () => actionRef.current?.reload();
+
+  const confirmDeactivate = (record: AdminConRow) => {
+    modal.confirm({
+      title: 'Deactive Admin Con',
+      content: `Vô hiệu hoá "${record.username}"? Admin Con sẽ không đăng nhập được.`,
+      okText: 'Deactive',
+      okButtonProps: { danger: true },
+      cancelText: 'Huỷ',
+      onOk: async () => {
+        try {
+          await deactivate.mutateAsync(record.id);
+          message.success('Đã deactive');
+          reload();
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : 'Deactive thất bại');
+          throw err; // keep the modal open on failure
+        }
+      },
+    });
+  };
+
+  const columns: ProColumns<AdminConRow>[] = [
+    { title: 'Tên', dataIndex: 'username', ellipsis: true },
+    {
+      title: 'Email',
+      dataIndex: 'email',
+      ellipsis: true,
+      renderText: (value) => value || '—',
+    },
+    {
+      title: 'Trạng thái',
+      dataIndex: 'status',
+      search: false,
+      valueEnum: {
+        [AccountStatus.ACTIVE]: { text: 'Active', status: 'Success' },
+        [AccountStatus.INACTIVE]: { text: 'Deactive', status: 'Default' },
+      },
+    },
+    {
+      title: 'Điểm hiện có',
+      dataIndex: 'points',
+      valueType: 'digit',
+      search: false,
+      sorter: (a, b) => a.points - b.points,
+    },
+    {
+      title: 'Ngày tạo',
+      dataIndex: 'createdAt',
+      valueType: 'dateTime',
+      search: false,
+      sorter: (a, b) => a.createdAt.localeCompare(b.createdAt),
+    },
+    {
+      title: 'Thao tác',
+      valueType: 'option',
+      key: 'option',
+      render: (_dom, record) => {
+        const actions = [
+          <a key="edit" onClick={() => setEditing(record)}>
+            Sửa
+          </a>,
+          <a key="grant" onClick={() => setGranting(record)}>
+            Cấp điểm
+          </a>,
+        ];
+        if (record.status === AccountStatus.ACTIVE) {
+          actions.push(
+            <a
+              key="deactivate"
+              style={{ color: '#cf1322' }}
+              onClick={() => confirmDeactivate(record)}
+            >
+              Deactive
+            </a>,
+          );
+        }
+        return actions;
+      },
+    },
+  ];
+
+  return (
+    <>
+      <ProTable<AdminConRow>
+        actionRef={actionRef}
+        rowKey="id"
+        columns={columns}
+        // Search (tên/email) + pagination are applied client-side over the
+        // cached ['admin-cons'] list, so no page state is managed by hand.
+        request={async (params) => {
+          const all = await loadAdminCons(queryClient);
+          const byName = (params.username ?? '').toString().toLowerCase();
+          const byEmail = (params.email ?? '').toString().toLowerCase();
+          let rows = all;
+          if (byName) {
+            rows = rows.filter((r) =>
+              r.username.toLowerCase().includes(byName),
+            );
+          }
+          if (byEmail) {
+            rows = rows.filter((r) =>
+              (r.email ?? '').toLowerCase().includes(byEmail),
+            );
+          }
+          const current = params.current ?? 1;
+          const pageSize = params.pageSize ?? 10;
+          const start = (current - 1) * pageSize;
+          return {
+            data: rows.slice(start, start + pageSize),
+            total: rows.length,
+            success: true,
+          };
+        }}
+        search={{ labelWidth: 'auto' }}
+        pagination={{ pageSize: 10, showSizeChanger: true }}
+        headerTitle="Danh sách Admin Con"
+        toolBarRender={() => [
+          <CreateAdminConModal key="create" onSuccess={reload} />,
+        ]}
+      />
+
+      <EditAdminConModal
+        record={editing}
+        open={editing !== null}
+        onOpenChange={(o) => !o && setEditing(null)}
+        onSuccess={reload}
+      />
+      <GrantPointsModal
+        record={granting}
+        open={granting !== null}
+        onOpenChange={(o) => !o && setGranting(null)}
+        onSuccess={reload}
+      />
+    </>
+  );
+}
