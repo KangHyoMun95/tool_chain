@@ -24,4 +24,5 @@ jobs:
             PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
             PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
             /security-review --comment
+          show_full_output: true
           claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api*),Read,Glob,Grep"'
