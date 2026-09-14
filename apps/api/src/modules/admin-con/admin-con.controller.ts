@@ -12,6 +12,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AdminConService } from './admin-con.service';
 import { CreateAdminConDto } from './dto/create-admin-con.dto';
+import { GrantPointsDto } from './dto/grant-points.dto';
 import { UpdateAdminConDto } from './dto/update-admin-con.dto';
 
 /**
@@ -65,5 +66,14 @@ export class AdminConController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.service.activate(host.sub, id);
+  }
+
+  @Post(':id/points')
+  grantPoints(
+    @CurrentUser() host: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: GrantPointsDto,
+  ) {
+    return this.service.grantPoints(host.sub, id, dto);
   }
 }

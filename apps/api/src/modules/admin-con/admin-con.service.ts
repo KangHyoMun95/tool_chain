@@ -5,10 +5,12 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AccountStatus, Role } from '@toolhackchain/shared';
+import { AccountStatus, PointTargetType, Role } from '@toolhackchain/shared';
 import { hashPassword } from '../../common/utils/password';
 import { AdminCon } from '../../database/entities/admin-con.entity';
+import { PointsService } from '../points/points.service';
 import { CreateAdminConDto } from './dto/create-admin-con.dto';
+import { GrantPointsDto } from './dto/grant-points.dto';
 import { UpdateAdminConDto } from './dto/update-admin-con.dto';
 
 /** Public shape of an Admin(Con) — never exposes passwordHash. */
@@ -27,6 +29,7 @@ export class AdminConService {
   constructor(
     @InjectRepository(AdminCon)
     private readonly adminCons: Repository<AdminCon>,
+    private readonly pointsService: PointsService,
   ) {}
 
   async create(
@@ -93,6 +96,28 @@ export class AdminConService {
 
   async activate(hostId: string, id: string): Promise<AdminConView> {
     return this.setStatus(hostId, id, AccountStatus.ACTIVE);
+  }
+
+  /**
+   * Grant/deduct points for an owned Admin(Con). Ownership is verified first
+   * (host scope), then the balance change + audit record go through the central
+   * PointsService in one transaction — never mutate `points` directly here.
+   */
+  async grantPoints(
+    hostId: string,
+    id: string,
+    dto: GrantPointsDto,
+  ): Promise<AdminConView> {
+    await this.getOwned(hostId, id); // 404 if not this Host's Admin(Con)
+    await this.pointsService.adjust({
+      fromAdminId: hostId,
+      targetType: PointTargetType.ADMIN_CON,
+      targetId: id,
+      amount: dto.amount,
+      direction: dto.direction,
+      reason: dto.reason,
+    });
+    return this.findOne(hostId, id);
   }
 
   private async setStatus(
