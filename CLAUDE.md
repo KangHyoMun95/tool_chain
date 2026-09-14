@@ -84,32 +84,23 @@ toolhackchain/
 # Cài đặt
 pnpm install
 
-# Chạy dev cả BE + FE song song (root chạy `pnpm -r --parallel dev`)
+# Chạy dev cả BE + FE (nếu cấu hình turbo/concurrently)
 pnpm dev
 
-# Chỉ chạy backend / frontend
-pnpm dev:api          # = pnpm --filter @toolhackchain/api dev
-pnpm dev:web          # = pnpm --filter @toolhackchain/web dev
+# Chỉ chạy backend
+pnpm --filter api start:dev
 
-# Build toàn bộ (shared -> api -> web)
-pnpm build
+# Chỉ chạy frontend
+pnpm --filter web dev
+
+# Tạo migration mới
+pnpm --filter api typeorm migration:generate -- -n TenMigration
+
+# Chạy migration
+pnpm --filter api typeorm migration:run
 
 # Test
-pnpm test             # = pnpm --filter @toolhackchain/api test
-```
-
-### Database & migration (TypeORM 0.3, apps/api)
-
-Kết nối đọc từ `apps/api/.env` (`DB_HOST`, `DB_PORT`, `DB_USER`, `DB_PASSWORD`, `DB_NAME`; xem `.env.example`). CLI DataSource ở `apps/api/src/database/data-source.ts`, options build từ `src/config/typeorm.config.ts`. **`synchronize` luôn = false** — mọi thay đổi schema phải qua migration.
-
-```bash
-# Sinh migration mới (TypeORM 0.3: truyền PATH, không dùng cờ -n; cần DB đang chạy để diff)
-pnpm --filter @toolhackchain/api migration:generate src/migrations/TenMigration
-
-# Chạy / revert / xem trạng thái migration
-pnpm --filter @toolhackchain/api migration:run
-pnpm --filter @toolhackchain/api migration:revert
-pnpm --filter @toolhackchain/api migration:show
+pnpm --filter api test
 ```
 
 > `migration:generate` cần một PostgreSQL đang chạy để so sánh schema hiện tại với entity. Entity có PK kiểu uuid nên cần extension `uuid-ossp` — TypeORM tự tạo khi chạy migration nếu DB user có quyền `CREATE EXTENSION` (managed DB có thể phải bật thủ công).
