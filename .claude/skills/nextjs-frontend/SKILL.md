@@ -60,10 +60,6 @@ apps/web/components/
 - Component trong `ui/` không được biết gì về domain (không import type `User`, `AdminCon`...).
 - Form dùng `react-hook-form` + `zod` để validate, schema đặt cạnh file form hoặc trong `lib/schemas/`.
 
-## Framework UI:
-
-- Sử dụng thư viện Antd Degin component
-
 ## Khi review code frontend
 
 Tự kiểm tra và báo nếu phát hiện:
