@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install)",
+      "Bash(pnpm dev)",
+      "Bash(pnpm --filter api *)",
+      "Bash(pnpm --filter web *)",
+      "Bash(pnpm --filter api typeorm migration:generate*)",
+      "Bash(git status)",
+      "Bash(git diff*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git checkout -b*)",
+      "Bash(git push -u origin*)",
+      "Bash(gh pr create*)"
+    ],
+    "ask": [
+      "Bash(pnpm --filter api typeorm migration:run*)",
+      "Bash(pnpm --filter api typeorm migration:revert*)",
+      "Bash(gh pr merge*)"
+    ],
+    "deny": [
+      "Bash(rm -rf*)",
+      "Bash(git push --force*)",
+      "Read(./.env)",
+      "Read(./apps/api/.env)"
+    ]
+  }
+}
