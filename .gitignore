@@ -3,7 +3,7 @@ dist/
 .next/
 out/
 *.log
-.env
-.env.local
+# Environment files — never commit, including examples
+.env*
 coverage/
 .DS_Store
