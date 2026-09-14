@@ -18,10 +18,18 @@ jobs:
       - uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          # Natural-language prompt on purpose: do NOT start with /security-review.
+          # "/security-review" collides with Claude Code's built-in command (and
+          # the project skill of the same name) and aborts the run before any
+          # model turn. Instead we point Claude at the project skill file.
           prompt: |
             REPO: ${{ github.repository }}
             PR NUMBER: ${{ github.event.pull_request.number }}
             PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
             PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-            /security-review --comment
-          claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api*),Read,Glob,Grep"'
+
+            Bạn là reviewer bảo mật cho PR này. Hãy đọc và làm theo đúng quy trình
+            trong file .claude/skills/security-review/SKILL.md trước khi review.
+            Tập trung vào phần thay đổi giữa PR_BASE_SHA và PR_HEAD_SHA, đăng inline
+            comment cho từng vấn đề tìm được và một comment tổng hợp lên PR.
+          claude_args: '--allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr comment:*),Bash(gh pr diff:*),Bash(gh pr view:*),Bash(gh api:*),Bash(git diff:*),Read,Glob,Grep"'
