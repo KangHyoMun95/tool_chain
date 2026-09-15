@@ -6,7 +6,13 @@ import {
   type ActionType,
   type ProColumns,
 } from '@ant-design/pro-components';
-import { App } from 'antd';
+import { App, Button, Tooltip } from 'antd';
+import {
+  DeleteOutlined,
+  DollarOutlined,
+  EditOutlined,
+  StopOutlined,
+} from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { AccountStatus } from '@toolhackchain/shared';
 import {
@@ -103,24 +109,45 @@ export function UserTable() {
       key: 'option',
       render: (_dom, record) => {
         const actions = [
-          <a key="edit" onClick={() => setEditing(record)}>
-            Sửa
-          </a>,
-          <a key="grant" onClick={() => setGranting(record)}>
-            Cấp điểm
-          </a>,
+          <Tooltip key="edit" title="Sửa">
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => setEditing(record)}
+            />
+          </Tooltip>,
+          <Tooltip key="grant" title="Cấp điểm">
+            <Button
+              type="text"
+              size="small"
+              icon={<DollarOutlined />}
+              onClick={() => setGranting(record)}
+            />
+          </Tooltip>,
         ];
         if (record.status === AccountStatus.ACTIVE) {
           actions.push(
-            <a key="deactivate" style={{ color: '#d46b08' }} onClick={() => confirmDeactivate(record)}>
-              Deactive
-            </a>,
+            <Tooltip key="deactivate" title="Deactive">
+              <Button
+                type="text"
+                size="small"
+                icon={<StopOutlined style={{ color: '#d46b08' }} />}
+                onClick={() => confirmDeactivate(record)}
+              />
+            </Tooltip>,
           );
         }
         actions.push(
-          <a key="delete" style={{ color: '#cf1322' }} onClick={() => confirmDelete(record)}>
-            Xoá
-          </a>,
+          <Tooltip key="delete" title="Xoá">
+            <Button
+              type="text"
+              size="small"
+              danger
+              icon={<DeleteOutlined />}
+              onClick={() => confirmDelete(record)}
+            />
+          </Tooltip>,
         );
         return actions;
       },
