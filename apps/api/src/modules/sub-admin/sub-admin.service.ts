@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { AccountStatus, PointTargetType, Role } from '@toolhackchain/shared';
 import { hashPassword } from '../../common/utils/password';
 import { SubAdmin } from '../../database/entities/sub-admin.entity';
+import { User } from '../../database/entities/user.entity';
 import { PointsService } from '../points/points.service';
 import { CreateSubAdminDto } from './dto/create-sub-admin.dto';
 import { GrantPointsDto } from './dto/grant-points.dto';
@@ -29,8 +30,25 @@ export class SubAdminService {
   constructor(
     @InjectRepository(SubAdmin)
     private readonly subAdmins: Repository<SubAdmin>,
+    @InjectRepository(User)
+    private readonly users: Repository<User>,
     private readonly pointsService: PointsService,
   ) {}
+
+  /**
+   * Host reads the Users managed by one of its own Admin(Con)s. Ownership of
+   * the Admin(Con) is verified first (host scope), so a Host cannot read Users
+   * under another Host's Admin(Con).
+   */
+  async listUsers(hostId: string, subAdminId: string) {
+    await this.getOwned(hostId, subAdminId); // 404 if not this Host's Admin(Con)
+    const rows = await this.users.find({
+      where: { managedBySubAdminId: subAdminId },
+      order: { createdAt: 'DESC' },
+    });
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    return rows.map(({ passwordHash, managedBySubAdmin, ...view }) => view);
+  }
 
   async create(
     hostId: string,

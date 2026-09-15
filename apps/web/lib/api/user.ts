@@ -7,6 +7,7 @@ import {
 } from '@tanstack/react-query';
 import { AccountStatus, PointDirection, Role } from '@toolhackchain/shared';
 import { apiFetch } from './client';
+import { ME_KEY } from './profile';
 
 /**
  * Query key for the current Admin(Con)'s users. The backend scopes GET /users
@@ -99,6 +100,11 @@ export function useGrantUserPoints() {
         method: 'POST',
         body: JSON.stringify(input),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
+    onSuccess: () => {
+      // Refresh the user list AND the header balance (points were deducted
+      // from the Admin(Con) that funded the grant).
+      qc.invalidateQueries({ queryKey: USERS_KEY });
+      qc.invalidateQueries({ queryKey: ME_KEY });
+    },
   });
 }

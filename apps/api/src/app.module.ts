@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { buildDataSourceOptions } from './config/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
 import { SubAdminModule } from './modules/sub-admin/sub-admin.module';
+import { UserModule } from './modules/user/user.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -16,6 +17,7 @@ import { AppService } from './app.service';
     }),
     AuthModule,
     SubAdminModule,
+    UserModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -6,6 +6,7 @@ import {
   AccountStatus,
   AuthTokenResponse,
   JwtPayload,
+  ProfileResponse,
   Role,
 } from '@toolhackchain/shared';
 import { verifyPassword } from '../../common/utils/password';
@@ -45,6 +46,23 @@ export class AuthService {
     const payload: JwtPayload = { sub: account.id, role: account.role };
     const accessToken = await this.jwtService.signAsync(payload);
     return { accessToken, role: account.role };
+  }
+
+  /** Current account profile (id, role, username, points) for GET /auth/me. */
+  async getProfile(payload: JwtPayload): Promise<ProfileResponse> {
+    const account =
+      payload.role === Role.HOST
+        ? await this.admins.findOne({ where: { id: payload.sub } })
+        : payload.role === Role.ADMIN_CON
+          ? await this.subAdmins.findOne({ where: { id: payload.sub } })
+          : await this.users.findOne({ where: { id: payload.sub } });
+    if (!account) throw new UnauthorizedException('Account not found');
+    return {
+      sub: account.id,
+      role: account.role,
+      username: account.username,
+      points: account.points,
+    };
   }
 
   /**

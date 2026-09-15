@@ -1,5 +1,9 @@
 import { Body, Controller, Get, HttpCode, Post } from '@nestjs/common';
-import { AuthTokenResponse, JwtPayload } from '@toolhackchain/shared';
+import {
+  AuthTokenResponse,
+  JwtPayload,
+  ProfileResponse,
+} from '@toolhackchain/shared';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
@@ -16,9 +20,9 @@ export class AuthController {
     return this.authService.login(dto);
   }
 
-  /** Returns the authenticated caller's JWT claims. */
+  /** Returns the authenticated caller's profile (id, role, username, points). */
   @Get('me')
-  me(@CurrentUser() user: JwtPayload): JwtPayload {
-    return user;
+  me(@CurrentUser() user: JwtPayload): Promise<ProfileResponse> {
+    return this.authService.getProfile(user);
   }
 }
