@@ -6,34 +6,35 @@ import {
   type ActionType,
   type ProColumns,
 } from '@ant-design/pro-components';
-import { App, Button } from 'antd';
-import Link from 'next/link';
+import { App } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { AccountStatus } from '@toolhackchain/shared';
 import {
-  loadSubAdmins,
-  useDeactivateSubAdmin,
-  type SubAdminRow,
-} from '@/lib/api/sub-admin';
-import { CreateSubAdminModal } from './create-sub-admin-modal';
-import { EditSubAdminModal } from './edit-sub-admin-modal';
-import { GrantPointsModal } from './grant-points-modal';
+  loadUsers,
+  useDeactivateUser,
+  useDeleteUser,
+  type UserRow,
+} from '@/lib/api/user';
+import { CreateUserModal } from './create-user-modal';
+import { EditUserModal } from './edit-user-modal';
+import { GrantUserPointsModal } from './grant-user-points-modal';
 
-export function SubAdminTable() {
+export function UserTable() {
   const actionRef = useRef<ActionType>();
   const queryClient = useQueryClient();
   const { message, modal } = App.useApp();
-  const deactivate = useDeactivateSubAdmin();
+  const deactivate = useDeactivateUser();
+  const remove = useDeleteUser();
 
-  const [editing, setEditing] = useState<SubAdminRow | null>(null);
-  const [granting, setGranting] = useState<SubAdminRow | null>(null);
+  const [editing, setEditing] = useState<UserRow | null>(null);
+  const [granting, setGranting] = useState<UserRow | null>(null);
 
   const reload = () => actionRef.current?.reload();
 
-  const confirmDeactivate = (record: SubAdminRow) => {
+  const confirmDeactivate = (record: UserRow) => {
     modal.confirm({
-      title: 'Deactive Admin Con',
-      content: `Vô hiệu hoá "${record.username}"? Admin Con sẽ không đăng nhập được.`,
+      title: 'Deactive User',
+      content: `Vô hiệu hoá "${record.username}"? User sẽ không đăng nhập được.`,
       okText: 'Deactive',
       okButtonProps: { danger: true },
       cancelText: 'Huỷ',
@@ -44,20 +45,35 @@ export function SubAdminTable() {
           reload();
         } catch (err) {
           message.error(err instanceof Error ? err.message : 'Deactive thất bại');
-          throw err; // keep the modal open on failure
+          throw err;
         }
       },
     });
   };
 
-  const columns: ProColumns<SubAdminRow>[] = [
+  const confirmDelete = (record: UserRow) => {
+    modal.confirm({
+      title: 'Xoá User',
+      content: `Xoá vĩnh viễn "${record.username}"? Hành động không thể hoàn tác.`,
+      okText: 'Xoá',
+      okButtonProps: { danger: true },
+      cancelText: 'Huỷ',
+      onOk: async () => {
+        try {
+          await remove.mutateAsync(record.id);
+          message.success('Đã xoá User');
+          reload();
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : 'Xoá thất bại');
+          throw err;
+        }
+      },
+    });
+  };
+
+  const columns: ProColumns<UserRow>[] = [
     { title: 'Tên', dataIndex: 'username', ellipsis: true },
-    {
-      title: 'Email',
-      dataIndex: 'email',
-      ellipsis: true,
-      renderText: (value) => value || '—',
-    },
+    { title: 'Email', dataIndex: 'email', ellipsis: true, renderText: (v) => v || '—' },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
@@ -87,9 +103,6 @@ export function SubAdminTable() {
       key: 'option',
       render: (_dom, record) => {
         const actions = [
-          <Link key="detail" href={`/host/admins/${record.id}`}>
-            Chi tiết
-          </Link>,
           <a key="edit" onClick={() => setEditing(record)}>
             Sửa
           </a>,
@@ -99,15 +112,16 @@ export function SubAdminTable() {
         ];
         if (record.status === AccountStatus.ACTIVE) {
           actions.push(
-            <a
-              key="deactivate"
-              style={{ color: '#cf1322' }}
-              onClick={() => confirmDeactivate(record)}
-            >
+            <a key="deactivate" style={{ color: '#d46b08' }} onClick={() => confirmDeactivate(record)}>
               Deactive
             </a>,
           );
         }
+        actions.push(
+          <a key="delete" style={{ color: '#cf1322' }} onClick={() => confirmDelete(record)}>
+            Xoá
+          </a>,
+        );
         return actions;
       },
     },
@@ -115,51 +129,38 @@ export function SubAdminTable() {
 
   return (
     <>
-      <ProTable<SubAdminRow>
+      <ProTable<UserRow>
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
-        // Search (tên/email) + pagination are applied client-side over the
-        // cached ['sub-admins'] list, so no page state is managed by hand.
+        // The backend already scopes /users to the current Admin(Con); the
+        // frontend just fetches. Search/pagination are applied client-side over
+        // the cached ['users'] list.
         request={async (params) => {
-          const all = await loadSubAdmins(queryClient);
+          const all = await loadUsers(queryClient);
           const byName = (params.username ?? '').toString().toLowerCase();
           const byEmail = (params.email ?? '').toString().toLowerCase();
           let rows = all;
-          if (byName) {
-            rows = rows.filter((r) =>
-              r.username.toLowerCase().includes(byName),
-            );
-          }
-          if (byEmail) {
-            rows = rows.filter((r) =>
-              (r.email ?? '').toLowerCase().includes(byEmail),
-            );
-          }
+          if (byName) rows = rows.filter((r) => r.username.toLowerCase().includes(byName));
+          if (byEmail) rows = rows.filter((r) => (r.email ?? '').toLowerCase().includes(byEmail));
           const current = params.current ?? 1;
           const pageSize = params.pageSize ?? 10;
           const start = (current - 1) * pageSize;
-          return {
-            data: rows.slice(start, start + pageSize),
-            total: rows.length,
-            success: true,
-          };
+          return { data: rows.slice(start, start + pageSize), total: rows.length, success: true };
         }}
         search={{ labelWidth: 'auto' }}
         pagination={{ pageSize: 10, showSizeChanger: true }}
-        headerTitle="Danh sách Admin Con"
-        toolBarRender={() => [
-          <CreateSubAdminModal key="create" onSuccess={reload} />,
-        ]}
+        headerTitle="Danh sách User"
+        toolBarRender={() => [<CreateUserModal key="create" onSuccess={reload} />]}
       />
 
-      <EditSubAdminModal
+      <EditUserModal
         record={editing}
         open={editing !== null}
         onOpenChange={(o) => !o && setEditing(null)}
         onSuccess={reload}
       />
-      <GrantPointsModal
+      <GrantUserPointsModal
         record={granting}
         open={granting !== null}
         onOpenChange={(o) => !o && setGranting(null)}
