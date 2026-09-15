@@ -177,7 +177,6 @@ export class SubAdminService {
       entityId: id,
       actorBy: hostId,
       actorRole: this.ACTOR_ROLE,
-      reason: `${dto.direction} ${dto.amount}${dto.reason ? ` — ${dto.reason}` : ''}`,
       changes: [{ columnName: 'points', oldValue: before.points, newValue: view.points }],
     });
     return view;

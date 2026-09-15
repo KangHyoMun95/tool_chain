@@ -25,7 +25,6 @@ export interface AuditInput {
   entityId?: string | null;
   actorBy?: string | null;
   actorRole?: string | null;
-  reason?: string | null;
   /** Field-level changes; when omitted a single summary row is written. */
   changes?: AuditChange[];
 }
@@ -53,7 +52,6 @@ export class AuditService {
       entityId: input.entityId ?? null,
       actorBy: input.actorBy ?? null,
       actorRole: input.actorRole ?? null,
-      reason: input.reason ?? null,
     };
     const rows =
       input.changes && input.changes.length

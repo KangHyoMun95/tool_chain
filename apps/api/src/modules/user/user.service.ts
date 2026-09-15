@@ -161,7 +161,6 @@ export class UserService {
       entityId: id,
       actorBy: adminConId,
       actorRole: this.ACTOR_ROLE,
-      reason: `${dto.direction} ${dto.amount}${dto.reason ? ` — ${dto.reason}` : ''}`,
       changes: [{ columnName: 'points', oldValue: before.points, newValue: view.points }],
     });
     return view;

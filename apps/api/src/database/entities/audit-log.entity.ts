@@ -49,9 +49,6 @@ export class AuditLog {
   @Column({ name: 'actor_role', type: 'varchar', length: 32, nullable: true })
   actorRole: string | null;
 
-  @Column({ type: 'varchar', length: 255, nullable: true })
-  reason: string | null;
-
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 }
