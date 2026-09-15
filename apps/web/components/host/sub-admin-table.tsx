@@ -24,6 +24,7 @@ import {
 import { CreateSubAdminModal } from './create-sub-admin-modal';
 import { EditSubAdminModal } from './edit-sub-admin-modal';
 import { GrantPointsModal } from './grant-points-modal';
+import { SubAdminUsersPanel } from './sub-admin-users-panel';
 
 export function SubAdminTable() {
   const actionRef = useRef<ActionType>();
@@ -139,6 +140,13 @@ export function SubAdminTable() {
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
+        // Expandable row: children are the Users managed by this Admin(Con),
+        // loaded lazily when the row is expanded.
+        expandable={{
+          expandedRowRender: (record) => (
+            <SubAdminUsersPanel subAdminId={record.id} />
+          ),
+        }}
         // Search (tên/email) + pagination are applied client-side over the
         // cached ['sub-admins'] list, so no page state is managed by hand.
         request={async (params) => {
