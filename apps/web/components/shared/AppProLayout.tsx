@@ -1,7 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { ProLayout, type MenuDataItem } from '@ant-design/pro-components';
-import { Dropdown, Tag } from 'antd';
+import { Dropdown, Spin, Tag } from 'antd';
 import {
   LogoutOutlined,
   SafetyCertificateOutlined,
@@ -42,6 +43,14 @@ export function AppProLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { user } = useCurrentUser();
   const logout = useLogout();
+  // Keeps a full-screen spinner up while clearing the session and navigating
+  // to the login screen.
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  const handleLogout = () => {
+    setLoggingOut(true);
+    logout();
+  };
 
   const role = user?.role ?? Role.USER;
 
@@ -74,7 +83,7 @@ export function AppProLayout({ children }: { children: React.ReactNode }) {
                   key: 'logout',
                   icon: <LogoutOutlined />,
                   label: 'Đăng xuất',
-                  onClick: logout,
+                  onClick: handleLogout,
                 },
               ],
             }}
@@ -84,6 +93,7 @@ export function AppProLayout({ children }: { children: React.ReactNode }) {
         ),
       }}
     >
+      <Spin spinning={loggingOut} fullscreen tip="Đang đăng xuất..." />
       {children}
     </ProLayout>
   );

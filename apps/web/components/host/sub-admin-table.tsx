@@ -6,7 +6,13 @@ import {
   type ActionType,
   type ProColumns,
 } from '@ant-design/pro-components';
-import { App, Button } from 'antd';
+import { App, Button, Tooltip } from 'antd';
+import {
+  DollarOutlined,
+  EditOutlined,
+  EyeOutlined,
+  StopOutlined,
+} from '@ant-design/icons';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
 import { AccountStatus } from '@toolhackchain/shared';
@@ -87,25 +93,39 @@ export function SubAdminTable() {
       key: 'option',
       render: (_dom, record) => {
         const actions = [
-          <Link key="detail" href={`/host/admins/${record.id}`}>
-            Chi tiết
-          </Link>,
-          <a key="edit" onClick={() => setEditing(record)}>
-            Sửa
-          </a>,
-          <a key="grant" onClick={() => setGranting(record)}>
-            Cấp điểm
-          </a>,
+          <Tooltip key="detail" title="Chi tiết">
+            <Link href={`/host/admins/${record.id}`}>
+              <Button type="text" size="small" icon={<EyeOutlined />} />
+            </Link>
+          </Tooltip>,
+          <Tooltip key="edit" title="Sửa">
+            <Button
+              type="text"
+              size="small"
+              icon={<EditOutlined />}
+              onClick={() => setEditing(record)}
+            />
+          </Tooltip>,
+          <Tooltip key="grant" title="Cấp điểm">
+            <Button
+              type="text"
+              size="small"
+              icon={<DollarOutlined />}
+              onClick={() => setGranting(record)}
+            />
+          </Tooltip>,
         ];
         if (record.status === AccountStatus.ACTIVE) {
           actions.push(
-            <a
-              key="deactivate"
-              style={{ color: '#cf1322' }}
-              onClick={() => confirmDeactivate(record)}
-            >
-              Deactive
-            </a>,
+            <Tooltip key="deactivate" title="Deactive">
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<StopOutlined />}
+                onClick={() => confirmDeactivate(record)}
+              />
+            </Tooltip>,
           );
         }
         return actions;
