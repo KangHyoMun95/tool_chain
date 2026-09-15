@@ -1,12 +1,12 @@
 'use client';
 
 import { PageContainer } from '@ant-design/pro-components';
-import { Card } from 'antd';
+import { UserTable } from '@/components/admin/user-table';
 
 export default function AdminUsersPage() {
   return (
     <PageContainer title="Quản lý User">
-      <Card>Danh sách User (ProTable) sẽ được thêm ở bước sau.</Card>
+      <UserTable />
     </PageContainer>
   );
 }
