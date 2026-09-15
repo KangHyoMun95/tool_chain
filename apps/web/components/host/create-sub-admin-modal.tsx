@@ -3,15 +3,15 @@
 import { ModalForm, ProFormText } from '@ant-design/pro-components';
 import { App, Button } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { useCreateAdminCon, type CreateAdminConInput } from '@/lib/api/admin-con';
+import { useCreateSubAdmin, type CreateSubAdminInput } from '@/lib/api/sub-admin';
 
 /** "Tạo Admin Con" — ProForm inside a Modal. */
-export function CreateAdminConModal({ onSuccess }: { onSuccess?: () => void }) {
+export function CreateSubAdminModal({ onSuccess }: { onSuccess?: () => void }) {
   const { message } = App.useApp();
-  const create = useCreateAdminCon();
+  const create = useCreateSubAdmin();
 
   return (
-    <ModalForm<CreateAdminConInput>
+    <ModalForm<CreateSubAdminInput>
       title="Tạo Admin Con"
       trigger={
         <Button type="primary" icon={<PlusOutlined />}>

@@ -10,23 +10,23 @@ import {
 import { JwtPayload, Role } from '@toolhackchain/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { AdminConService } from './admin-con.service';
-import { CreateAdminConDto } from './dto/create-admin-con.dto';
+import { SubAdminService } from './sub-admin.service';
+import { CreateSubAdminDto } from './dto/create-sub-admin.dto';
 import { GrantPointsDto } from './dto/grant-points.dto';
-import { UpdateAdminConDto } from './dto/update-admin-con.dto';
+import { UpdateSubAdminDto } from './dto/update-sub-admin.dto';
 
 /**
  * Admin(Con) management — HOST only (see CLAUDE.md). Every action is scoped to
- * the calling Host inside AdminConService, so a Host only ever touches its own
+ * the calling Host inside SubAdminService, so a Host only ever touches its own
  * Admin(Con)s.
  */
-@Controller('admin-cons')
+@Controller('sub-admins')
 @Roles(Role.HOST)
-export class AdminConController {
-  constructor(private readonly service: AdminConService) {}
+export class SubAdminController {
+  constructor(private readonly service: SubAdminService) {}
 
   @Post()
-  create(@CurrentUser() host: JwtPayload, @Body() dto: CreateAdminConDto) {
+  create(@CurrentUser() host: JwtPayload, @Body() dto: CreateSubAdminDto) {
     return this.service.create(host.sub, dto);
   }
 
@@ -47,7 +47,7 @@ export class AdminConController {
   update(
     @CurrentUser() host: JwtPayload,
     @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateAdminConDto,
+    @Body() dto: UpdateSubAdminDto,
   ) {
     return this.service.update(host.sub, id, dto);
   }

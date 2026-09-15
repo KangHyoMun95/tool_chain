@@ -9,7 +9,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { AccountStatus, Role } from '@toolhackchain/shared';
-import { AdminCon } from './admin-con.entity';
+import { SubAdmin } from './sub-admin.entity';
 
 /** End user. Belongs to exactly one Admin(Con). No admin privileges. */
 @Entity({ name: 'users' })
@@ -36,14 +36,14 @@ export class User {
   /** FK -> sub_admins.id */
   @Index()
   @Column({ type: 'uuid', name: 'managed_by_admin_con_id' })
-  managedByAdminConId: string;
+  managedBySubAdminId: string;
 
-  @ManyToOne(() => AdminCon, (adminCon) => adminCon.users, {
+  @ManyToOne(() => SubAdmin, (subAdmin) => subAdmin.users, {
     onDelete: 'CASCADE',
     nullable: false,
   })
   @JoinColumn({ name: 'managed_by_admin_con_id' })
-  managedByAdminCon: AdminCon;
+  managedBySubAdmin: SubAdmin;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

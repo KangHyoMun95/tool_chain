@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { AccountStatus, Role } from '@toolhackchain/shared';
 import { hashPassword } from '../../common/utils/password';
 import { Admin } from '../entities/admin.entity';
-import { AdminCon } from '../entities/admin-con.entity';
+import { SubAdmin } from '../entities/sub-admin.entity';
 import AppDataSource from '../data-source';
 
 /**
@@ -24,7 +24,7 @@ async function seed(): Promise<void> {
   await AppDataSource.initialize();
   try {
     const admins = AppDataSource.getRepository(Admin);
-    const adminCons = AppDataSource.getRepository(AdminCon);
+    const subAdmins = AppDataSource.getRepository(SubAdmin);
 
     // --- Admin(Host) ---
     let host = await admins.findOne({ where: { username: hostUsername } });
@@ -47,14 +47,14 @@ async function seed(): Promise<void> {
     }
 
     // --- Demo Admin(Con) under that Host ---
-    const existingCon = await adminCons.findOne({
+    const existingCon = await subAdmins.findOne({
       where: { username: conUsername },
     });
     if (existingCon) {
       console.log(`[seed] Admin(Con) "${conUsername}" already exists — skipping.`);
     } else {
-      const con = await adminCons.save(
-        adminCons.create({
+      const con = await subAdmins.save(
+        subAdmins.create({
           username: conUsername,
           passwordHash: await hashPassword(conPassword),
           role: Role.ADMIN_CON,

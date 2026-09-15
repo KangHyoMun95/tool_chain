@@ -30,7 +30,7 @@ export interface BaseAccount {
 }
 
 /** An Admin(Con): created & funded by the Host; manages its own Users. */
-export interface AdminCon extends BaseAccount {
+export interface SubAdmin extends BaseAccount {
   role: Role.ADMIN_CON;
   /** FK -> Admin(Host).id */
   hostId: string;
@@ -39,8 +39,8 @@ export interface AdminCon extends BaseAccount {
 /** A User: belongs to exactly one Admin(Con). */
 export interface User extends BaseAccount {
   role: Role.USER;
-  /** FK -> AdminCon.id */
-  managedByAdminConId: string;
+  /** FK -> SubAdmin.id */
+  managedBySubAdminId: string;
 }
 
 /** Direction of a points movement, always recorded for audit. */
@@ -74,7 +74,7 @@ export interface PointTransaction {
  */
 export interface HomepageConfig {
   id: string;
-  adminConId: string;
+  subAdminId: string;
   /** Free-form JSON config; structure TBD. */
   content: Record<string, unknown>;
   updatedAt: string;
@@ -101,7 +101,7 @@ export interface JwtPayload {
 
 // ----- Example admin DTO contracts (extend as endpoints are built) -----
 
-export interface CreateAdminConDto {
+export interface CreateSubAdminDto {
   username: string;
   password: string;
   initialPoints?: number;

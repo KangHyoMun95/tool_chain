@@ -8,7 +8,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { AccountStatus, Role } from '@toolhackchain/shared';
-import { AdminCon } from './admin-con.entity';
+import { SubAdmin } from './sub-admin.entity';
 
 /** Top-level account. Always role HOST (see CLAUDE.md permission model). */
 @Entity({ name: 'admins' })
@@ -33,8 +33,8 @@ export class Admin {
   points: number;
 
   /** Admin(Con) accounts created and funded by this Host. */
-  @OneToMany(() => AdminCon, (adminCon) => adminCon.host)
-  adminCons: AdminCon[];
+  @OneToMany(() => SubAdmin, (subAdmin) => subAdmin.host)
+  subAdmins: SubAdmin[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
