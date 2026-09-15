@@ -1,8 +1,9 @@
 'use client';
 
+import { useState } from 'react';
 import { LoginForm, ProFormText } from '@ant-design/pro-components';
 import { LockOutlined, UserOutlined } from '@ant-design/icons';
-import { App } from 'antd';
+import { App, Spin } from 'antd';
 import { useRouter } from 'next/navigation';
 import { LoginRequest } from '@toolhackchain/shared';
 import { useLogin } from '@/lib/api/auth';
@@ -12,11 +13,14 @@ export default function LoginPage() {
   const router = useRouter();
   const { message } = App.useApp();
   const login = useLogin();
+  // Keeps the overlay up from a successful response until the target page loads.
+  const [redirecting, setRedirecting] = useState(false);
 
   const onFinish = async (values: LoginRequest) => {
     try {
       const res = await login.mutateAsync(values);
       message.success('Đăng nhập thành công');
+      setRedirecting(true);
       router.replace(homeForRole(res.role));
       return true;
     } catch (err) {
@@ -35,6 +39,12 @@ export default function LoginPage() {
         background: '#f5f6f8',
       }}
     >
+      {/* Spinner during the API call and while navigating to the target page. */}
+      <Spin
+        spinning={login.isPending || redirecting}
+        fullscreen
+        tip={redirecting ? 'Đang tải...' : 'Đang đăng nhập...'}
+      />
       <LoginForm<LoginRequest>
         title="ToolHackChain"
         subTitle="Đăng nhập khu vực quản trị"
