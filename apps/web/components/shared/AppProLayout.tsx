@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { ProLayout, type MenuDataItem } from '@ant-design/pro-components';
 import { Dropdown, Spin, Tag } from 'antd';
 import {
+  DashboardOutlined,
   DollarOutlined,
   LogoutOutlined,
   SafetyCertificateOutlined,
@@ -20,11 +21,13 @@ import { useMyProfile } from '@/lib/api/profile';
 function menuForRole(role: Role): MenuDataItem[] {
   if (role === Role.HOST) {
     return [
+      { path: '/host/dashboard', name: 'Dashboard', icon: <DashboardOutlined /> },
       { path: '/host/admins', name: 'Quản lý người dùng', icon: <TeamOutlined /> },
     ];
   }
   if (role === Role.ADMIN_CON) {
     return [
+      { path: '/admin/dashboard', name: 'Dashboard', icon: <DashboardOutlined /> },
       { path: '/admin/users', name: 'Quản lý User', icon: <UserOutlined /> },
     ];
   }
