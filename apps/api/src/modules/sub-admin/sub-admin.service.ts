@@ -9,6 +9,7 @@ import { AccountStatus, PointTargetType, Role } from '@toolhackchain/shared';
 import { hashPassword } from '../../common/utils/password';
 import { SubAdmin } from '../../database/entities/sub-admin.entity';
 import { User } from '../../database/entities/user.entity';
+import { AuditAction, AuditService } from '../audit/audit.service';
 import { PointsService } from '../points/points.service';
 import { CreateSubAdminDto } from './dto/create-sub-admin.dto';
 import { GrantPointsDto } from './dto/grant-points.dto';
@@ -33,7 +34,11 @@ export class SubAdminService {
     @InjectRepository(User)
     private readonly users: Repository<User>,
     private readonly pointsService: PointsService,
+    private readonly audit: AuditService,
   ) {}
+
+  private readonly ENTITY = 'SubAdmin';
+  private readonly ACTOR_ROLE = 'HOST';
 
   /**
    * Host reads the Users managed by one of its own Admin(Con)s. Ownership of
@@ -71,6 +76,17 @@ export class SubAdminService {
       phoneNumber: dto.phoneNumber ?? null,
     });
     const saved = await this.subAdmins.save(entity);
+    await this.audit.record({
+      action: AuditAction.CREATE,
+      entityType: this.ENTITY,
+      entityId: saved.id,
+      actorBy: hostId,
+      actorRole: this.ACTOR_ROLE,
+      changes: [
+        { columnName: 'username', newValue: saved.username },
+        { columnName: 'phoneNumber', newValue: saved.phoneNumber },
+      ],
+    });
     return this.toView(saved);
   }
 
@@ -93,22 +109,37 @@ export class SubAdminService {
     dto: UpdateSubAdminDto,
   ): Promise<SubAdminView> {
     const entity = await this.getOwned(hostId, id);
+    const changes: { columnName: string; oldValue?: unknown; newValue?: unknown }[] = [];
 
     if (dto.username && dto.username !== entity.username) {
       const clash = await this.subAdmins.findOne({
         where: { username: dto.username },
       });
       if (clash) throw new ConflictException('Username already taken');
+      changes.push({ columnName: 'username', oldValue: entity.username, newValue: dto.username });
       entity.username = dto.username;
     }
     if (dto.password) {
+      changes.push({ columnName: 'password', oldValue: '***', newValue: '***' });
       entity.passwordHash = await hashPassword(dto.password);
     }
-    if (dto.phoneNumber !== undefined) {
+    if (dto.phoneNumber !== undefined && dto.phoneNumber !== entity.phoneNumber) {
+      changes.push({ columnName: 'phoneNumber', oldValue: entity.phoneNumber, newValue: dto.phoneNumber });
       entity.phoneNumber = dto.phoneNumber;
     }
 
-    return this.toView(await this.subAdmins.save(entity));
+    const saved = await this.subAdmins.save(entity);
+    if (changes.length) {
+      await this.audit.record({
+        action: AuditAction.UPDATE,
+        entityType: this.ENTITY,
+        entityId: id,
+        actorBy: hostId,
+        actorRole: this.ACTOR_ROLE,
+        changes,
+      });
+    }
+    return this.toView(saved);
   }
 
   /** Soft-delete: deactivate (Host does not hard-delete Admin(Con)s). */
@@ -130,7 +161,7 @@ export class SubAdminService {
     id: string,
     dto: GrantPointsDto,
   ): Promise<SubAdminView> {
-    await this.getOwned(hostId, id); // 404 if not this Host's Admin(Con)
+    const before = await this.getOwned(hostId, id); // 404 if not this Host's Admin(Con)
     await this.pointsService.adjust({
       fromAdminId: hostId,
       targetType: PointTargetType.ADMIN_CON,
@@ -139,7 +170,17 @@ export class SubAdminService {
       direction: dto.direction,
       reason: dto.reason,
     });
-    return this.findOne(hostId, id);
+    const view = await this.findOne(hostId, id);
+    await this.audit.record({
+      action: AuditAction.GRANT_POINTS,
+      entityType: this.ENTITY,
+      entityId: id,
+      actorBy: hostId,
+      actorRole: this.ACTOR_ROLE,
+      reason: `${dto.direction} ${dto.amount}${dto.reason ? ` — ${dto.reason}` : ''}`,
+      changes: [{ columnName: 'points', oldValue: before.points, newValue: view.points }],
+    });
+    return view;
   }
 
   private async setStatus(
@@ -148,8 +189,21 @@ export class SubAdminService {
     status: AccountStatus,
   ): Promise<SubAdminView> {
     const entity = await this.getOwned(hostId, id);
+    const oldStatus = entity.status;
     entity.status = status;
-    return this.toView(await this.subAdmins.save(entity));
+    const saved = await this.subAdmins.save(entity);
+    await this.audit.record({
+      action:
+        status === AccountStatus.ACTIVE
+          ? AuditAction.ACTIVATE
+          : AuditAction.DEACTIVATE,
+      entityType: this.ENTITY,
+      entityId: id,
+      actorBy: hostId,
+      actorRole: this.ACTOR_ROLE,
+      changes: [{ columnName: 'status', oldValue: oldStatus, newValue: status }],
+    });
+    return this.toView(saved);
   }
 
   /**
