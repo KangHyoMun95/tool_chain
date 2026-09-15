@@ -99,6 +99,15 @@ export interface JwtPayload {
   role: Role;
 }
 
+/** Current account profile returned by GET /auth/me. */
+export interface ProfileResponse {
+  sub: string;
+  role: Role;
+  username: string;
+  /** Current points balance (Host is always 0 — Host has no points). */
+  points: number;
+}
+
 // ----- Example admin DTO contracts (extend as endpoints are built) -----
 
 export interface CreateSubAdminDto {

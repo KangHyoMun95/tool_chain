@@ -35,6 +35,14 @@ export class SubAdminController {
     return this.service.findAll(host.sub);
   }
 
+  @Get(':id/users')
+  listUsers(
+    @CurrentUser() host: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.service.listUsers(host.sub, id);
+  }
+
   @Get(':id')
   findOne(
     @CurrentUser() host: JwtPayload,
