@@ -25,6 +25,9 @@ export class SubAdmin {
   @Column({ type: 'varchar', length: 64 })
   username: string;
 
+  @Column({ name: 'phone_number', type: 'varchar', length: 20, nullable: true })
+  phoneNumber: string | null;
+
   @Column({ type: 'varchar', name: 'password_hash' })
   passwordHash: string;
 

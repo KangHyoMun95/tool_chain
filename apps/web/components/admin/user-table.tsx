@@ -39,7 +39,7 @@ export function UserTable() {
 
   const confirmDeactivate = (record: UserRow) => {
     modal.confirm({
-      title: 'Deactive User',
+      title: 'Deactive người dùng',
       content: `Vô hiệu hoá "${record.username}"? User sẽ không đăng nhập được.`,
       okText: 'Deactive',
       okButtonProps: { danger: true },
@@ -59,7 +59,7 @@ export function UserTable() {
 
   const confirmDelete = (record: UserRow) => {
     modal.confirm({
-      title: 'Xoá User',
+      title: 'Xoá người dùng',
       content: `Xoá vĩnh viễn "${record.username}"? Hành động không thể hoàn tác.`,
       okText: 'Xoá',
       okButtonProps: { danger: true },
@@ -67,7 +67,7 @@ export function UserTable() {
       onOk: async () => {
         try {
           await remove.mutateAsync(record.id);
-          message.success('Đã xoá User');
+          message.success('Đã xoá người dùng');
           reload();
         } catch (err) {
           message.error(err instanceof Error ? err.message : 'Xoá thất bại');
@@ -79,7 +79,7 @@ export function UserTable() {
 
   const columns: ProColumns<UserRow>[] = [
     { title: 'Tên', dataIndex: 'username', ellipsis: true },
-    { title: 'Email', dataIndex: 'email', ellipsis: true, renderText: (v) => v || '—' },
+    { title: 'Số điện thoại', dataIndex: 'phoneNumber', ellipsis: true, renderText: (v) => v || '—' },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
@@ -166,10 +166,10 @@ export function UserTable() {
         request={async (params) => {
           const all = await loadUsers(queryClient);
           const byName = (params.username ?? '').toString().toLowerCase();
-          const byEmail = (params.email ?? '').toString().toLowerCase();
+          const byPhone = (params.phoneNumber ?? '').toString().toLowerCase();
           let rows = all;
           if (byName) rows = rows.filter((r) => r.username.toLowerCase().includes(byName));
-          if (byEmail) rows = rows.filter((r) => (r.email ?? '').toLowerCase().includes(byEmail));
+          if (byPhone) rows = rows.filter((r) => (r.phoneNumber ?? '').toLowerCase().includes(byPhone));
           const current = params.current ?? 1;
           const pageSize = params.pageSize ?? 10;
           const start = (current - 1) * pageSize;
@@ -177,7 +177,7 @@ export function UserTable() {
         }}
         search={{ labelWidth: 'auto' }}
         pagination={{ pageSize: 10, showSizeChanger: true }}
-        headerTitle="Danh sách User"
+        headerTitle="Danh sách người dùng"
         toolBarRender={() => [<CreateUserModal key="create" onSuccess={reload} />]}
       />
 

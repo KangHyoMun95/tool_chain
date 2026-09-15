@@ -32,6 +32,7 @@ export interface BaseAccount {
 /** An Admin(Con): created & funded by the Host; manages its own Users. */
 export interface SubAdmin extends BaseAccount {
   role: Role.ADMIN_CON;
+  phoneNumber?: string | null;
   /** FK -> Admin(Host).id */
   hostId: string;
 }
@@ -39,6 +40,7 @@ export interface SubAdmin extends BaseAccount {
 /** A User: belongs to exactly one Admin(Con). */
 export interface User extends BaseAccount {
   role: Role.USER;
+  phoneNumber?: string | null;
   /** FK -> SubAdmin.id */
   managedBySubAdminId: string;
 }
@@ -113,12 +115,14 @@ export interface ProfileResponse {
 export interface CreateSubAdminDto {
   username: string;
   password: string;
+  phoneNumber?: string;
   initialPoints?: number;
 }
 
 export interface CreateUserDto {
   username: string;
   password: string;
+  phoneNumber?: string;
 }
 
 export interface AdjustPointsDto {

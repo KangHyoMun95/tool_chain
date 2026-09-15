@@ -43,6 +43,7 @@ export class UserService {
       status: AccountStatus.ACTIVE,
       points: 0,
       managedBySubAdminId: adminConId,
+      phoneNumber: dto.phoneNumber ?? null,
     });
     return this.toView(await this.users.save(entity));
   }
@@ -74,6 +75,7 @@ export class UserService {
       entity.username = dto.username;
     }
     if (dto.password) entity.passwordHash = await hashPassword(dto.password);
+    if (dto.phoneNumber !== undefined) entity.phoneNumber = dto.phoneNumber;
 
     return this.toView(await this.users.save(entity));
   }

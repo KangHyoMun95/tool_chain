@@ -12,14 +12,11 @@ import { apiFetch } from './client';
 export const SUB_ADMINS_KEY = ['sub-admins'] as const;
 
 /**
- * A row as returned by GET /sub-admins. `email` is optional: the backend
- * SubAdmin entity does not store an email yet, so it may be undefined until
- * that column is added server-side.
- */
+/** A row as returned by GET /sub-admins. */
 export interface SubAdminRow {
   id: string;
   username: string;
-  email?: string;
+  phoneNumber?: string | null;
   role: Role;
   status: AccountStatus;
   points: number;
@@ -31,11 +28,13 @@ export interface SubAdminRow {
 export interface CreateSubAdminInput {
   username: string;
   password: string;
+  phoneNumber?: string;
 }
 
 export interface UpdateSubAdminInput {
   username?: string;
   password?: string;
+  phoneNumber?: string;
 }
 
 export interface GrantPointsInput {

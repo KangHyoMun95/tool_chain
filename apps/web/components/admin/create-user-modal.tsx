@@ -5,24 +5,24 @@ import { App, Button } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useCreateUser, type CreateUserInput } from '@/lib/api/user';
 
-/** "Tạo User" — ProForm inside a Modal. */
+/** "Tạo người dùng" — ProForm inside a Modal. */
 export function CreateUserModal({ onSuccess }: { onSuccess?: () => void }) {
   const { message } = App.useApp();
   const create = useCreateUser();
 
   return (
     <ModalForm<CreateUserInput>
-      title="Tạo User"
+      title="Tạo người dùng"
       trigger={
         <Button type="primary" icon={<PlusOutlined />}>
-          Tạo User
+          Tạo người dùng
         </Button>
       }
       modalProps={{ destroyOnClose: true }}
       onFinish={async (values) => {
         try {
           await create.mutateAsync(values);
-          message.success('Đã tạo User');
+          message.success('Đã tạo người dùng');
           onSuccess?.();
           return true;
         } catch (err) {
@@ -40,6 +40,11 @@ export function CreateUserModal({ onSuccess }: { onSuccess?: () => void }) {
         name="password"
         label="Mật khẩu"
         rules={[{ required: true, message: 'Nhập mật khẩu' }, { min: 6 }]}
+      />
+      <ProFormText
+        name="phoneNumber"
+        label="Số điện thoại"
+        rules={[{ max: 20, message: 'Tối đa 20 ký tự' }]}
       />
     </ModalForm>
   );
