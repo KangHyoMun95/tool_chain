@@ -21,11 +21,11 @@ export function EditUserModal({
 
   return (
     <ModalForm<UpdateUserInput>
-      title={record ? `Sửa User: ${record.username}` : 'Sửa User'}
+      title={record ? `Sửa người dùng: ${record.username}` : 'Sửa người dùng'}
       open={open}
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
-      initialValues={{ username: record?.username }}
+      initialValues={{ username: record?.username, phoneNumber: record?.phoneNumber ?? undefined }}
       onFinish={async (values) => {
         if (!record) return false;
         const payload: UpdateUserInput = {};
@@ -33,6 +33,9 @@ export function EditUserModal({
           payload.username = values.username;
         }
         if (values.password) payload.password = values.password;
+        if ((values.phoneNumber ?? '') !== (record.phoneNumber ?? '')) {
+          payload.phoneNumber = values.phoneNumber ?? '';
+        }
         try {
           await update.mutateAsync({ id: record.id, ...payload });
           message.success('Đã cập nhật User');
@@ -50,6 +53,11 @@ export function EditUserModal({
         label="Mật khẩu mới"
         placeholder="Để trống nếu không đổi"
         rules={[{ min: 6 }]}
+      />
+      <ProFormText
+        name="phoneNumber"
+        label="Số điện thoại"
+        rules={[{ max: 20, message: 'Tối đa 20 ký tự' }]}
       />
     </ModalForm>
   );

@@ -75,7 +75,7 @@ export function SubAdminDetail({ id }: { id: string }) {
             columns={[
               { title: 'ID', dataIndex: 'id', copyable: true },
               { title: 'Tên đăng nhập', dataIndex: 'username' },
-              { title: 'Email', dataIndex: 'email', render: (_d, r) => r.email || '—' },
+              { title: 'Số điện thoại', dataIndex: 'phoneNumber', render: (_d, r) => r.phoneNumber || '—' },
               { title: 'Trạng thái', dataIndex: 'status', valueEnum: STATUS_VALUE_ENUM },
               { title: 'Điểm hiện có', dataIndex: 'points', valueType: 'digit' },
               { title: 'Ngày tạo', dataIndex: 'createdAt', valueType: 'dateTime' },

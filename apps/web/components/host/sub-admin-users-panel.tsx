@@ -28,6 +28,12 @@ export function SubAdminUsersPanel({ subAdminId }: { subAdminId: string }) {
   const columns: ColumnsType<UserRow> = [
     { title: 'Tên', dataIndex: 'username', ellipsis: true },
     {
+      title: 'Số điện thoại',
+      dataIndex: 'phoneNumber',
+      width: 150,
+      render: (v: string | null) => v || '—',
+    },
+    {
       title: 'Trạng thái',
       dataIndex: 'status',
       width: 130,

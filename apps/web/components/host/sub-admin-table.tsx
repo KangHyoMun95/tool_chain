@@ -60,8 +60,8 @@ export function SubAdminTable() {
   const columns: ProColumns<SubAdminRow>[] = [
     { title: 'Tên', dataIndex: 'username', ellipsis: true },
     {
-      title: 'Email',
-      dataIndex: 'email',
+      title: 'Số điện thoại',
+      dataIndex: 'phoneNumber',
       ellipsis: true,
       renderText: (value) => value || '—',
     },
@@ -147,21 +147,21 @@ export function SubAdminTable() {
             <SubAdminUsersPanel subAdminId={record.id} />
           ),
         }}
-        // Search (tên/email) + pagination are applied client-side over the
+        // Search (tên/sđt) + pagination are applied client-side over the
         // cached ['sub-admins'] list, so no page state is managed by hand.
         request={async (params) => {
           const all = await loadSubAdmins(queryClient);
           const byName = (params.username ?? '').toString().toLowerCase();
-          const byEmail = (params.email ?? '').toString().toLowerCase();
+          const byPhone = (params.phoneNumber ?? '').toString().toLowerCase();
           let rows = all;
           if (byName) {
             rows = rows.filter((r) =>
               r.username.toLowerCase().includes(byName),
             );
           }
-          if (byEmail) {
+          if (byPhone) {
             rows = rows.filter((r) =>
-              (r.email ?? '').toLowerCase().includes(byEmail),
+              (r.phoneNumber ?? '').toLowerCase().includes(byPhone),
             );
           }
           const current = params.current ?? 1;

@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Length, MinLength } from 'class-validator';
+import { IsOptional, IsString, Length, MaxLength, MinLength } from 'class-validator';
 
 /** Partial update of a User. Points are NOT changed here (use PointsService). */
 export class UpdateUserDto {
@@ -11,4 +11,9 @@ export class UpdateUserDto {
   @IsString()
   @MinLength(6)
   password?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  phoneNumber?: string;
 }

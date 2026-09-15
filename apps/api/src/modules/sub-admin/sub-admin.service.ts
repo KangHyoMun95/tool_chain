@@ -68,6 +68,7 @@ export class SubAdminService {
       status: AccountStatus.ACTIVE,
       points: 0, // Point grants go through PointsService (audit trail).
       hostId,
+      phoneNumber: dto.phoneNumber ?? null,
     });
     const saved = await this.subAdmins.save(entity);
     return this.toView(saved);
@@ -102,6 +103,9 @@ export class SubAdminService {
     }
     if (dto.password) {
       entity.passwordHash = await hashPassword(dto.password);
+    }
+    if (dto.phoneNumber !== undefined) {
+      entity.phoneNumber = dto.phoneNumber;
     }
 
     return this.toView(await this.subAdmins.save(entity));

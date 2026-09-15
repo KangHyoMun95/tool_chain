@@ -29,7 +29,7 @@ export function EditSubAdminModal({
       open={open}
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
-      initialValues={{ username: record?.username }}
+      initialValues={{ username: record?.username, phoneNumber: record?.phoneNumber ?? undefined }}
       onFinish={async (values) => {
         if (!record) return false;
         // Only send fields that were actually filled in.
@@ -38,6 +38,9 @@ export function EditSubAdminModal({
           payload.username = values.username;
         }
         if (values.password) payload.password = values.password;
+        if ((values.phoneNumber ?? '') !== (record.phoneNumber ?? '')) {
+          payload.phoneNumber = values.phoneNumber ?? '';
+        }
         try {
           await update.mutateAsync({ id: record.id, ...payload });
           message.success('Đã cập nhật Admin Con');
@@ -59,6 +62,11 @@ export function EditSubAdminModal({
         label="Mật khẩu mới"
         placeholder="Để trống nếu không đổi"
         rules={[{ min: 6 }]}
+      />
+      <ProFormText
+        name="phoneNumber"
+        label="Số điện thoại"
+        rules={[{ max: 20, message: 'Tối đa 20 ký tự' }]}
       />
     </ModalForm>
   );

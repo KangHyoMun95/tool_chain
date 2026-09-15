@@ -28,7 +28,7 @@ function menuForRole(role: Role): MenuDataItem[] {
   if (role === Role.ADMIN_CON) {
     return [
       { path: '/admin/dashboard', name: 'Dashboard', icon: <DashboardOutlined /> },
-      { path: '/admin/users', name: 'Quản lý User', icon: <UserOutlined /> },
+      { path: '/admin/users', name: 'Quản lý người dùng', icon: <UserOutlined /> },
     ];
   }
   return [];

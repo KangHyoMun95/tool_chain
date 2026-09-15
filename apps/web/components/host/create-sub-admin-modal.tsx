@@ -41,6 +41,11 @@ export function CreateSubAdminModal({ onSuccess }: { onSuccess?: () => void }) {
         label="Mật khẩu"
         rules={[{ required: true, message: 'Nhập mật khẩu' }, { min: 6 }]}
       />
+      <ProFormText
+        name="phoneNumber"
+        label="Số điện thoại"
+        rules={[{ max: 20, message: 'Tối đa 20 ký tự' }]}
+      />
     </ModalForm>
   );
 }

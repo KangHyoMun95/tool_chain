@@ -18,6 +18,7 @@ import { SUB_ADMINS_KEY, type SubAdminRow } from './sub-admin';
 export interface UserRow {
   id: string;
   username: string;
+  phoneNumber?: string | null;
   role: Role;
   status: AccountStatus;
   points: number;

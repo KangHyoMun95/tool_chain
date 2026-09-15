@@ -19,7 +19,7 @@ export const USERS_KEY = ['users'] as const;
 export interface UserRow {
   id: string;
   username: string;
-  email?: string;
+  phoneNumber?: string | null;
   role: Role;
   status: AccountStatus;
   points: number;
@@ -31,11 +31,13 @@ export interface UserRow {
 export interface CreateUserInput {
   username: string;
   password: string;
+  phoneNumber?: string;
 }
 
 export interface UpdateUserInput {
   username?: string;
   password?: string;
+  phoneNumber?: string;
 }
 
 export interface GrantUserPointsInput {
