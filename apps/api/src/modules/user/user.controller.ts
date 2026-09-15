@@ -7,6 +7,7 @@ import {
   ParseUUIDPipe,
   Patch,
   Post,
+  Put,
 } from '@nestjs/common';
 import { JwtPayload, Role } from '@toolhackchain/shared';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -14,6 +15,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { UserService } from './user.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { GrantPointsDto } from './dto/grant-points.dto';
+import { SetHostnamesDto } from './dto/set-hostnames.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
 /**
@@ -84,5 +86,14 @@ export class UserController {
     @Body() dto: GrantPointsDto,
   ) {
     return this.service.grantPoints(actor.sub, id, dto);
+  }
+
+  @Put(':id/hostnames')
+  setHostnames(
+    @CurrentUser() actor: JwtPayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SetHostnamesDto,
+  ) {
+    return this.service.setHostnames(actor.sub, id, dto.hostnameIds);
   }
 }

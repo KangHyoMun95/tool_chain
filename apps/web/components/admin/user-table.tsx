@@ -6,7 +6,7 @@ import {
   type ActionType,
   type ProColumns,
 } from '@ant-design/pro-components';
-import { App, Button, Tooltip } from 'antd';
+import { App, Button, Space, Tag, Tooltip } from 'antd';
 import {
   DeleteOutlined,
   DollarOutlined,
@@ -102,6 +102,23 @@ export function UserTable() {
       valueType: 'dateTime',
       search: false,
       sorter: (a, b) => a.createdAt.localeCompare(b.createdAt),
+    },
+    {
+      title: 'Trang chủ',
+      dataIndex: 'hostnames',
+      search: false,
+      render: (_dom, r) =>
+        r.hostnames?.length ? (
+          <Space size={[0, 4]} wrap>
+            {r.hostnames.map((h) => (
+              <Tag key={h.id} color="geekblue">
+                {h.name}
+              </Tag>
+            ))}
+          </Space>
+        ) : (
+          '—'
+        ),
     },
     {
       title: 'Thao tác',

@@ -69,18 +69,6 @@ export interface PointTransaction {
   createdAt: string;
 }
 
-/**
- * Homepage configuration owned by the Host, per Admin(Con), read by that
- * Admin(Con)'s Users. Content shape is intentionally open (JSON) until the
- * page-builder mechanism is decided — see CLAUDE.md.
- */
-export interface HomepageConfig {
-  id: string;
-  subAdminId: string;
-  /** Free-form JSON config; structure TBD. */
-  content: Record<string, unknown>;
-  updatedAt: string;
-}
 
 // ----- Auth DTO contracts -----
 

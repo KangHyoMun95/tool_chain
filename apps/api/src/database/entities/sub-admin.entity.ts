@@ -6,14 +6,12 @@ import {
   JoinColumn,
   ManyToOne,
   OneToMany,
-  OneToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { AccountStatus, Role } from '@toolhackchain/shared';
 import { Admin } from './admin.entity';
 import { User } from './user.entity';
-import { HomepageConfig } from './homepage-config.entity';
 
 /** Sub-admin. Belongs to exactly one Host; manages its own Users. */
 @Entity({ name: 'sub_admins' })
@@ -55,10 +53,6 @@ export class SubAdmin {
   /** Users managed by this Admin(Con). */
   @OneToMany(() => User, (user) => user.managedBySubAdmin)
   users: User[];
-
-  /** Homepage configured by the Host for this Admin(Con) (one per SubAdmin). */
-  @OneToOne(() => HomepageConfig, (config) => config.subAdmin)
-  homepageConfig: HomepageConfig;
 
   @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
   lastLoginAt: Date | null;

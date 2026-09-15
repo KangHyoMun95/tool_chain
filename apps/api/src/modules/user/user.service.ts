@@ -4,18 +4,28 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { AccountStatus, Role } from '@toolhackchain/shared';
 import { hashPassword } from '../../common/utils/password';
 import { User } from '../../database/entities/user.entity';
+import { Hostname } from '../../database/entities/hostname.entity';
 import { AuditAction, AuditService } from '../audit/audit.service';
 import { PointsService } from '../points/points.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { GrantPointsDto } from './dto/grant-points.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 
-/** Public shape of a User — never exposes passwordHash. */
-export type UserView = Omit<User, 'passwordHash' | 'managedBySubAdmin'>;
+export interface HostnameRef {
+  id: string;
+  name: string;
+  url: string;
+}
+
+/** Public shape of a User — never exposes passwordHash; hostnames trimmed. */
+export type UserView = Omit<
+  User,
+  'passwordHash' | 'managedBySubAdmin' | 'hostnames'
+> & { hostnames: HostnameRef[] };
 
 /**
  * CRUD for Users, performed by an Admin(Con).
@@ -28,6 +38,8 @@ export type UserView = Omit<User, 'passwordHash' | 'managedBySubAdmin'>;
 export class UserService {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
+    @InjectRepository(Hostname)
+    private readonly hostnames: Repository<Hostname>,
     private readonly pointsService: PointsService,
     private readonly audit: AuditService,
   ) {}
@@ -69,8 +81,46 @@ export class UserService {
     const rows = await this.users.find({
       where: { managedBySubAdminId: adminConId },
       order: { createdAt: 'DESC' },
+      relations: { hostnames: true },
     });
     return rows.map((r) => this.toView(r));
+  }
+
+  /** Replace the set of hostnames assigned to a User (both owned by caller). */
+  async setHostnames(
+    adminConId: string,
+    id: string,
+    hostnameIds: string[],
+  ): Promise<UserView> {
+    const user = await this.getOwned(adminConId, id);
+    const before = (user.hostnames ?? []).map((h) => h.id).sort();
+
+    let selected: Hostname[] = [];
+    if (hostnameIds.length) {
+      selected = await this.hostnames.find({
+        where: { id: In(hostnameIds), ownerSubAdminId: adminConId },
+      });
+      if (selected.length !== new Set(hostnameIds).size) {
+        throw new NotFoundException('One or more hostnames not found');
+      }
+    }
+    user.hostnames = selected;
+    const saved = await this.users.save(user);
+    await this.audit.record({
+      action: AuditAction.UPDATE,
+      entityType: this.ENTITY,
+      entityId: id,
+      actorBy: adminConId,
+      actorRole: this.ACTOR_ROLE,
+      changes: [
+        {
+          columnName: 'hostnames',
+          oldValue: before,
+          newValue: selected.map((h) => h.id).sort(),
+        },
+      ],
+    });
+    return this.toView(saved);
   }
 
   async findOne(adminConId: string, id: string): Promise<UserView> {
@@ -196,6 +246,7 @@ export class UserService {
   private async getOwned(adminConId: string, id: string): Promise<User> {
     const entity = await this.users.findOne({
       where: { id, managedBySubAdminId: adminConId },
+      relations: { hostnames: true },
     });
     if (!entity) throw new NotFoundException('User not found');
     return entity;
@@ -203,7 +254,14 @@ export class UserService {
 
   private toView(entity: User): UserView {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash, managedBySubAdmin, ...view } = entity;
-    return view;
+    const { passwordHash, managedBySubAdmin, hostnames, ...rest } = entity;
+    return {
+      ...rest,
+      hostnames: (hostnames ?? []).map((h) => ({
+        id: h.id,
+        name: h.name,
+        url: h.url,
+      })),
+    };
   }
 }

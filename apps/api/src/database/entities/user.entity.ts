@@ -4,12 +4,15 @@ import {
   Entity,
   Index,
   JoinColumn,
+  JoinTable,
+  ManyToMany,
   ManyToOne,
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { AccountStatus, Role } from '@toolhackchain/shared';
 import { SubAdmin } from './sub-admin.entity';
+import { Hostname } from './hostname.entity';
 
 /** End user. Belongs to exactly one Admin(Con). No admin privileges. */
 @Entity({ name: 'users' })
@@ -50,6 +53,14 @@ export class User {
 
   @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
   lastLoginAt: Date | null;
+
+  @ManyToMany(() => Hostname, (hostname) => hostname.users)
+  @JoinTable({
+    name: 'user_hostnames',
+    joinColumn: { name: 'user_id' },
+    inverseJoinColumn: { name: 'hostname_id' },
+  })
+  hostnames: Hostname[];
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;

@@ -1,23 +1,18 @@
 'use client';
 
-import { useState } from 'react';
 import {
   ProCard,
   ProDescriptions,
-  ProForm,
-  ProFormTextArea,
   ProTable,
   type ProColumns,
 } from '@ant-design/pro-components';
-import { App, Skeleton, Tag } from 'antd';
+import { Skeleton, Space, Tag } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { AccountStatus } from '@toolhackchain/shared';
 import type { SubAdminRow } from '@/lib/api/sub-admin';
 import {
   loadPointTransactions,
   loadSubAdminUsers,
-  useHomepageConfig,
-  useSaveHomepageConfig,
   useSubAdmin,
   type PointTransactionRow,
   type UserRow,
@@ -30,20 +25,28 @@ const STATUS_VALUE_ENUM = {
 
 export function SubAdminDetail({ id }: { id: string }) {
   const queryClient = useQueryClient();
-  const { message } = App.useApp();
   const { data: subAdmin, isLoading } = useSubAdmin(id);
-  const homepage = useHomepageConfig(id);
-  const saveHomepage = useSaveHomepageConfig(id);
-  const [savingJson, setSavingJson] = useState(false);
 
   const userColumns: ProColumns<UserRow>[] = [
     { title: 'Tên', dataIndex: 'username', ellipsis: true },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      valueEnum: STATUS_VALUE_ENUM,
-    },
+    { title: 'Trạng thái', dataIndex: 'status', valueEnum: STATUS_VALUE_ENUM },
     { title: 'Điểm', dataIndex: 'points', valueType: 'digit' },
+    {
+      title: 'Trang chủ',
+      dataIndex: 'hostnames',
+      render: (_dom, r) =>
+        r.hostnames?.length ? (
+          <Space size={[0, 4]} wrap>
+            {r.hostnames.map((h) => (
+              <Tag key={h.id} color="geekblue">
+                {h.name}
+              </Tag>
+            ))}
+          </Space>
+        ) : (
+          '—'
+        ),
+    },
     { title: 'Ngày tạo', dataIndex: 'createdAt', valueType: 'dateTime' },
   ];
 
@@ -98,7 +101,7 @@ export function SubAdminDetail({ id }: { id: string }) {
         />
       </ProCard>
 
-      <ProCard title="Lịch sử cấp điểm" bordered headerBordered style={{ marginBottom: 16 }}>
+      <ProCard title="Lịch sử cấp điểm" bordered headerBordered>
         <ProTable<PointTransactionRow>
           rowKey="id"
           search={false}
@@ -110,48 +113,6 @@ export function SubAdminDetail({ id }: { id: string }) {
             return { data: rows, total: rows.length, success: true };
           }}
         />
-      </ProCard>
-
-      <ProCard title="Cấu hình Homepage (chỉ Host)" bordered headerBordered>
-        {homepage.isLoading ? (
-          <Skeleton active />
-        ) : (
-          <ProForm
-            key={homepage.dataUpdatedAt}
-            submitter={{ searchConfig: { submitText: 'Lưu cấu hình' }, resetButtonProps: false }}
-            loading={savingJson}
-            initialValues={{
-              contentJson: JSON.stringify(homepage.data?.content ?? {}, null, 2),
-            }}
-            onFinish={async (values: { contentJson: string }) => {
-              let parsed: Record<string, unknown>;
-              try {
-                parsed = JSON.parse(values.contentJson || '{}');
-              } catch {
-                message.error('Nội dung JSON không hợp lệ');
-                return false;
-              }
-              setSavingJson(true);
-              try {
-                await saveHomepage.mutateAsync(parsed);
-                message.success('Đã lưu cấu hình Homepage');
-                return true;
-              } catch (err) {
-                message.error(err instanceof Error ? err.message : 'Lưu thất bại');
-                return false;
-              } finally {
-                setSavingJson(false);
-              }
-            }}
-          >
-            <ProFormTextArea
-              name="contentJson"
-              label="Nội dung (JSON config — cấu trúc để mở, sẽ thiết kế page builder sau)"
-              fieldProps={{ autoSize: { minRows: 8, maxRows: 24 }, style: { fontFamily: 'monospace' } }}
-              rules={[{ required: true, message: 'Nhập JSON cấu hình' }]}
-            />
-          </ProForm>
-        )}
       </ProCard>
     </>
   );
