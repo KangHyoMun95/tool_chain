@@ -5,9 +5,9 @@ File này hướng dẫn Claude Code khi làm việc với source code trong rep
 ## Tổng quan dự án
 
 **ToolHackChain** là một webapp phân cấp quản trị 3 tầng (Admin Host → Admin Con → User), cho phép:
-- Admin Host quản lý toàn bộ hệ thống, tạo/sửa/deactive các Admin Con, cấp điểm cho Admin Con, và quản lý cấu hình trang chủ riêng cho từng Admin Con.
+- Admin Host quản lý toàn bộ hệ thống, tạo/sửa/deactive các Admin Con, cấp điểm cho Admin Con; CHỈ xem được tên trang chủ (không trực tiếp quản lý trang chủ).
 - Admin Con quản lý User thuộc quyền của mình: tạo, sửa, xóa, deactive User, và cấp điểm cho User.
-- User truy cập trang chủ được setup sẵn bởi Admin Host, tùy theo Admin Con đang quản lý mình.
+- User được Admin Con (đang quản lý mình) gắn cho một hoặc nhiều trang chủ.
 
 ## Mô hình phân quyền & dữ liệu (quan trọng)
 
@@ -22,12 +22,12 @@ Admin (Host)
 - **Admin Host**: role cao nhất, duy nhất hoặc số lượng giới hạn. Có quyền:
   - CRUD Admin (Con): tạo, sửa, deactive, xem danh sách
   - Cấp/trừ điểm cho Admin (Con)
-  - Cấu hình trang chủ (homepage config) cho từng Admin (Con) — nội dung trang chủ này sau đó hiển thị cho User thuộc Admin (Con) đó
+  - CHỈ **xem tên** trang chủ của các Admin (Con) — KHÔNG trực tiếp quản lý trang chủ
 - **Admin (Con)**: quản lý User trong phạm vi của mình. Có quyền:
   - CRUD User: tạo, xóa, deactive User (không tạo được Admin khác)
   - Cấp/trừ điểm cho User
-  - KHÔNG được tự cấu hình trang chủ — trang chủ do Admin Host set up
-- **User**: chỉ xem/tương tác với trang chủ đã được Admin Host cấu hình cho Admin (Con) đang quản lý mình. Không có quyền quản trị.
+  - Quản lý **trang chủ** (`Hostname`: tên + url): tạo/sửa/xoá; và gắn nhiều trang chủ cho một User (multi-select)
+- **User**: chỉ xem/tương tác với các trang chủ được Admin (Con) quản lý mình gắn cho. Không có quyền quản trị.
 
 > Khi sinh entity/schema, luôn đảm bảo quan hệ: `AdminCon.hostId -> Admin(Host).id` và `User.managedByAdminConId -> AdminCon.id`. Mọi query cho Admin (Con) hoặc User phải scope theo đúng cấp trên (tránh leak dữ liệu chéo giữa các Admin Con).
 
@@ -55,7 +55,7 @@ toolhackchain/
 │   │   │   │   ├── admin-con/
 │   │   │   │   ├── user/
 │   │   │   │   ├── points/         # logic cấp/trừ điểm
-│   │   │   │   └── homepage-config/
+│   │   │   │   └── hostname/
 │   │   │   ├── common/   # guards, decorators, interceptors dùng chung
 │   │   │   └── main.ts
 │   │   └── src/migrations/         # TypeORM migrations
@@ -70,8 +70,8 @@ toolhackchain/
 
 ## Quy ước code
 
-- **NestJS**: mỗi domain (admin-host, admin-con, user, points, homepage-config) là một module riêng với controller/service/entity tách biệt. Dùng Guard + custom decorator (`@Roles()`) để enforce phân quyền theo 3 role: `HOST`, `ADMIN_CON`, `USER`.
-- **TypeORM**: không sửa tay migration đã chạy; luôn tạo migration mới qua `typeorm migration:generate`. Entity đặt tên số ít (`Admin`, `User`, `PointTransaction`, `HomepageConfig`).
+- **NestJS**: mỗi domain (admin-host, admin-con, user, points, hostname) là một module riêng với controller/service/entity tách biệt. Dùng Guard + custom decorator (`@Roles()`) để enforce phân quyền theo 3 role: `HOST`, `ADMIN_CON`, `USER`.
+- **TypeORM**: không sửa tay migration đã chạy; luôn tạo migration mới qua `typeorm migration:generate`. Entity đặt tên số ít (`Admin`, `User`, `PointTransaction`, `Hostname`).
 - **Điểm số (points)**: mọi thay đổi điểm nên đi qua một service trung tâm (vd `PointsService`) và ghi log giao dịch (`PointTransaction`) thay vì cộng/trừ trực tiếp field `points` — để có audit trail.
 - **Audit (BẮT BUỘC)**: MỌI thay đổi dữ liệu (create / update / delete / deactivate / activate / cấp điểm ...) đều phải ghi lại qua `AuditService.record()` (module `modules/audit`, đã `@Global()`). Inject `AuditService` vào service và gọi `record()` sau khi thao tác thành công, truyền `action`, `entityType`, `entityId`, `actorBy` (id người thực hiện), và `changes` (mỗi field: `columnName` + `oldValue`/`newValue`). KHÔNG log mật khẩu — dùng `'***'`. Bảng `audit_logs` không có khóa ngoại (lưu theo giá trị) để audit sống sót khi bản ghi gốc bị xoá.
 - **Next.js**: tách route theo role (`/host/...`, `/admin/...`, `/`) với middleware kiểm tra role trước khi render.
@@ -111,6 +111,6 @@ pnpm --filter api test
 - Khi thêm tính năng mới liên quan đến quyền, luôn hỏi lại: tính năng này thuộc quyền của Host, Admin Con, hay User? Không giả định.
 - Khi sinh API, luôn có middleware/guard kiểm tra scope dữ liệu (Admin Con A không được thấy/sửa User của Admin Con B).
 - Khi viết/sửa bất kỳ service nào có thao tác thay đổi dữ liệu, PHẢI gọi `AuditService.record()` cho thao tác đó (xem mục Audit ở "Quy ước code"). Nếu review/audit code, báo rõ nếu có mutation không ghi audit.
-- Trang chủ (`homepage-config`) là dữ liệu do Host quản lý nhưng được User của Admin Con tương ứng đọc — thiết kế API cho 2 chiều: ghi (Host only) và đọc (User, theo đúng Admin Con của mình).
-- Chưa quyết định cơ chế thiết kế nội dung trang chủ (page builder, template, v.v.) — phần này "sẽ được thiết kế sau", nên khi implement, để interface/schema đủ mở (vd JSON config) thay vì hard-code cấu trúc cứng.
+- Trang chủ (`hostname`: tên + url) do **Admin Con** quản lý (CRUD) và gắn cho User của mình; **Host chỉ xem được tên**, không sửa. Mọi query hostname phải scope theo `owner_sub_admin_id` = Admin Con; gán cho User phải đảm bảo cả User lẫn hostname đều thuộc Admin Con đó.
+- Trang chủ lưu dạng quan hệ (bảng `hostname` với cột `name`, `url`), KHÔNG dùng JSON. Quan hệ User↔Hostname là nhiều-nhiều qua bảng `user_hostnames`.
 - Không sử dụng tiếng việt để đặt tên cho biến, tên api, tên file, tên module, và các code liên quan.
