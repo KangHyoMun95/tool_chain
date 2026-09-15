@@ -128,3 +128,30 @@ export interface AdjustPointsDto {
 }
 
 export const API_PREFIX = 'api';
+
+// ----- Dashboard -----
+
+/** One day bucket in a dashboard time series. */
+export interface DashboardDailyPoint {
+  /** ISO date (YYYY-MM-DD). */
+  date: string;
+  value: number;
+}
+
+/**
+ * Dashboard metrics, role-aware:
+ *  - HOST: "user" = the Admin(Con)s it manages.
+ *  - ADMIN_CON: "user" = the Users it manages.
+ */
+export interface DashboardResponse {
+  totalUsers: number;
+  activeUsers: number;
+  /** Accounts that have not logged in within the last 7 days (incl. never). */
+  inactive7Days: number;
+  /** Sum of current (unused) points across the managed accounts. */
+  totalUnusedPoints: number;
+  /** New accounts created per day, last 7 days. */
+  createdPerDay: DashboardDailyPoint[];
+  /** Points spent (debited) per day, last 7 days. */
+  pointsUsedPerDay: DashboardDailyPoint[];
+}

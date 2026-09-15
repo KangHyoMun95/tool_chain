@@ -45,6 +45,9 @@ export class User {
   @JoinColumn({ name: 'managed_by_admin_con_id' })
   managedBySubAdmin: SubAdmin;
 
+  @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
+  lastLoginAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

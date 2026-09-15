@@ -57,6 +57,9 @@ export class SubAdmin {
   @OneToOne(() => HomepageConfig, (config) => config.subAdmin)
   homepageConfig: HomepageConfig;
 
+  @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
+  lastLoginAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

@@ -36,6 +36,9 @@ export class Admin {
   @OneToMany(() => SubAdmin, (subAdmin) => subAdmin.host)
   subAdmins: SubAdmin[];
 
+  @Column({ name: 'last_login_at', type: 'timestamptz', nullable: true })
+  lastLoginAt: Date | null;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 

@@ -43,9 +43,20 @@ export class AuthService {
       throw new UnauthorizedException('Account is deactivated');
     }
 
+    await this.touchLastLogin(account.role, account.id);
+
     const payload: JwtPayload = { sub: account.id, role: account.role };
     const accessToken = await this.jwtService.signAsync(payload);
     return { accessToken, role: account.role };
+  }
+
+  /** Record the login time on the matched account (for the 7-day metric). */
+  private async touchLastLogin(role: Role, id: string): Promise<void> {
+    const now = new Date();
+    if (role === Role.HOST) await this.admins.update(id, { lastLoginAt: now });
+    else if (role === Role.ADMIN_CON)
+      await this.subAdmins.update(id, { lastLoginAt: now });
+    else await this.users.update(id, { lastLoginAt: now });
   }
 
   /** Current account profile (id, role, username, points) for GET /auth/me. */
