@@ -9,14 +9,14 @@ import { AccountStatus, PointDirection, Role } from '@toolhackchain/shared';
 import { apiFetch } from './client';
 
 /** Query key for every Admin(Con) list/detail query. */
-export const ADMIN_CONS_KEY = ['admin-cons'] as const;
+export const SUB_ADMINS_KEY = ['sub-admins'] as const;
 
 /**
- * A row as returned by GET /admin-cons. `email` is optional: the backend
- * AdminCon entity does not store an email yet, so it may be undefined until
+ * A row as returned by GET /sub-admins. `email` is optional: the backend
+ * SubAdmin entity does not store an email yet, so it may be undefined until
  * that column is added server-side.
  */
-export interface AdminConRow {
+export interface SubAdminRow {
   id: string;
   username: string;
   email?: string;
@@ -28,12 +28,12 @@ export interface AdminConRow {
   updatedAt: string;
 }
 
-export interface CreateAdminConInput {
+export interface CreateSubAdminInput {
   username: string;
   password: string;
 }
 
-export interface UpdateAdminConInput {
+export interface UpdateSubAdminInput {
   username?: string;
   password?: string;
 }
@@ -45,52 +45,52 @@ export interface GrantPointsInput {
 }
 
 /** Raw fetch of all Admin(Con)s owned by the current Host (used by ProTable). */
-export function fetchAdminCons(): Promise<AdminConRow[]> {
-  return apiFetch<AdminConRow[]>('/admin-cons');
+export function fetchSubAdmins(): Promise<SubAdminRow[]> {
+  return apiFetch<SubAdminRow[]>('/sub-admins');
 }
 
 /** Fetch through the react-query cache so ProTable + hooks share one source. */
-export function loadAdminCons(qc: QueryClient): Promise<AdminConRow[]> {
-  return qc.fetchQuery({ queryKey: ADMIN_CONS_KEY, queryFn: fetchAdminCons });
+export function loadSubAdmins(qc: QueryClient): Promise<SubAdminRow[]> {
+  return qc.fetchQuery({ queryKey: SUB_ADMINS_KEY, queryFn: fetchSubAdmins });
 }
 
-export function useCreateAdminCon() {
+export function useCreateSubAdmin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateAdminConInput) =>
-      apiFetch<AdminConRow>('/admin-cons', {
+    mutationFn: (input: CreateSubAdminInput) =>
+      apiFetch<SubAdminRow>('/sub-admins', {
         method: 'POST',
         body: JSON.stringify(input),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ADMIN_CONS_KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: SUB_ADMINS_KEY }),
   });
 }
 
-export function useUpdateAdminCon() {
+export function useUpdateSubAdmin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...input }: UpdateAdminConInput & { id: string }) =>
-      apiFetch<AdminConRow>(`/admin-cons/${id}`, {
+    mutationFn: ({ id, ...input }: UpdateSubAdminInput & { id: string }) =>
+      apiFetch<SubAdminRow>(`/sub-admins/${id}`, {
         method: 'PATCH',
         body: JSON.stringify(input),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ADMIN_CONS_KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: SUB_ADMINS_KEY }),
   });
 }
 
-export function useDeactivateAdminCon() {
+export function useDeactivateSubAdmin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiFetch<AdminConRow>(`/admin-cons/${id}/deactivate`, {
+      apiFetch<SubAdminRow>(`/sub-admins/${id}/deactivate`, {
         method: 'PATCH',
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ADMIN_CONS_KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: SUB_ADMINS_KEY }),
   });
 }
 
 /**
- * Grant/deduct points for an Admin(Con) via POST /admin-cons/:id/points.
+ * Grant/deduct points for an Admin(Con) via POST /sub-admins/:id/points.
  * The backend routes this through PointsService, which updates the balance and
  * writes a PointTransaction audit record in one transaction (per CLAUDE.md).
  */
@@ -98,10 +98,10 @@ export function useGrantPoints() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...input }: GrantPointsInput & { id: string }) =>
-      apiFetch<AdminConRow>(`/admin-cons/${id}/points`, {
+      apiFetch<SubAdminRow>(`/sub-admins/${id}/points`, {
         method: 'POST',
         body: JSON.stringify(input),
       }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ADMIN_CONS_KEY }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: SUB_ADMINS_KEY }),
   });
 }

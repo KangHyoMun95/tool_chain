@@ -17,7 +17,7 @@ import { HomepageConfig } from './homepage-config.entity';
 
 /** Sub-admin. Belongs to exactly one Host; manages its own Users. */
 @Entity({ name: 'sub_admins' })
-export class AdminCon {
+export class SubAdmin {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
@@ -42,7 +42,7 @@ export class AdminCon {
   @Column({ type: 'uuid', name: 'host_id' })
   hostId: string;
 
-  @ManyToOne(() => Admin, (admin) => admin.adminCons, {
+  @ManyToOne(() => Admin, (admin) => admin.subAdmins, {
     onDelete: 'CASCADE',
     nullable: false,
   })
@@ -50,11 +50,11 @@ export class AdminCon {
   host: Admin;
 
   /** Users managed by this Admin(Con). */
-  @OneToMany(() => User, (user) => user.managedByAdminCon)
+  @OneToMany(() => User, (user) => user.managedBySubAdmin)
   users: User[];
 
-  /** Homepage configured by the Host for this Admin(Con) (one per AdminCon). */
-  @OneToOne(() => HomepageConfig, (config) => config.adminCon)
+  /** Homepage configured by the Host for this Admin(Con) (one per SubAdmin). */
+  @OneToOne(() => HomepageConfig, (config) => config.subAdmin)
   homepageConfig: HomepageConfig;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })

@@ -3,7 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { buildDataSourceOptions } from './config/typeorm.config';
 import { AuthModule } from './modules/auth/auth.module';
-import { AdminConModule } from './modules/admin-con/admin-con.module';
+import { SubAdminModule } from './modules/sub-admin/sub-admin.module';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
@@ -15,7 +15,7 @@ import { AppService } from './app.service';
       useFactory: () => buildDataSourceOptions(),
     }),
     AuthModule,
-    AdminConModule,
+    SubAdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

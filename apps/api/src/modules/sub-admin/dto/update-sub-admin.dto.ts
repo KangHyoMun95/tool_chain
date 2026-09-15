@@ -1,7 +1,7 @@
 import { IsOptional, IsString, Length, MinLength } from 'class-validator';
 
 /** Partial update of an Admin(Con). Points are NOT changed here (use PointsService). */
-export class UpdateAdminConDto {
+export class UpdateSubAdminDto {
   @IsOptional()
   @IsString()
   @Length(3, 64)

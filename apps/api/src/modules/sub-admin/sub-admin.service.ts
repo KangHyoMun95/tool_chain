@@ -7,14 +7,14 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { AccountStatus, PointTargetType, Role } from '@toolhackchain/shared';
 import { hashPassword } from '../../common/utils/password';
-import { AdminCon } from '../../database/entities/admin-con.entity';
+import { SubAdmin } from '../../database/entities/sub-admin.entity';
 import { PointsService } from '../points/points.service';
-import { CreateAdminConDto } from './dto/create-admin-con.dto';
+import { CreateSubAdminDto } from './dto/create-sub-admin.dto';
 import { GrantPointsDto } from './dto/grant-points.dto';
-import { UpdateAdminConDto } from './dto/update-admin-con.dto';
+import { UpdateSubAdminDto } from './dto/update-sub-admin.dto';
 
 /** Public shape of an Admin(Con) — never exposes passwordHash. */
-export type AdminConView = Omit<AdminCon, 'passwordHash' | 'host' | 'users' | 'homepageConfig'>;
+export type SubAdminView = Omit<SubAdmin, 'passwordHash' | 'host' | 'users' | 'homepageConfig'>;
 
 /**
  * CRUD for Admin(Con), performed by a Host.
@@ -25,25 +25,25 @@ export type AdminConView = Omit<AdminCon, 'passwordHash' | 'host' | 'users' | 'h
  * with a PointTransaction audit record.
  */
 @Injectable()
-export class AdminConService {
+export class SubAdminService {
   constructor(
-    @InjectRepository(AdminCon)
-    private readonly adminCons: Repository<AdminCon>,
+    @InjectRepository(SubAdmin)
+    private readonly subAdmins: Repository<SubAdmin>,
     private readonly pointsService: PointsService,
   ) {}
 
   async create(
     hostId: string,
-    dto: CreateAdminConDto,
-  ): Promise<AdminConView> {
-    const existing = await this.adminCons.findOne({
+    dto: CreateSubAdminDto,
+  ): Promise<SubAdminView> {
+    const existing = await this.subAdmins.findOne({
       where: { username: dto.username },
     });
     if (existing) {
       throw new ConflictException('Username already taken');
     }
 
-    const entity = this.adminCons.create({
+    const entity = this.subAdmins.create({
       username: dto.username,
       passwordHash: await hashPassword(dto.password),
       role: Role.ADMIN_CON,
@@ -51,32 +51,32 @@ export class AdminConService {
       points: 0, // Point grants go through PointsService (audit trail).
       hostId,
     });
-    const saved = await this.adminCons.save(entity);
+    const saved = await this.subAdmins.save(entity);
     return this.toView(saved);
   }
 
   /** List only the Admin(Con)s owned by this Host. */
-  async findAll(hostId: string): Promise<AdminConView[]> {
-    const rows = await this.adminCons.find({
+  async findAll(hostId: string): Promise<SubAdminView[]> {
+    const rows = await this.subAdmins.find({
       where: { hostId },
       order: { createdAt: 'DESC' },
     });
     return rows.map((r) => this.toView(r));
   }
 
-  async findOne(hostId: string, id: string): Promise<AdminConView> {
+  async findOne(hostId: string, id: string): Promise<SubAdminView> {
     return this.toView(await this.getOwned(hostId, id));
   }
 
   async update(
     hostId: string,
     id: string,
-    dto: UpdateAdminConDto,
-  ): Promise<AdminConView> {
+    dto: UpdateSubAdminDto,
+  ): Promise<SubAdminView> {
     const entity = await this.getOwned(hostId, id);
 
     if (dto.username && dto.username !== entity.username) {
-      const clash = await this.adminCons.findOne({
+      const clash = await this.subAdmins.findOne({
         where: { username: dto.username },
       });
       if (clash) throw new ConflictException('Username already taken');
@@ -86,15 +86,15 @@ export class AdminConService {
       entity.passwordHash = await hashPassword(dto.password);
     }
 
-    return this.toView(await this.adminCons.save(entity));
+    return this.toView(await this.subAdmins.save(entity));
   }
 
   /** Soft-delete: deactivate (Host does not hard-delete Admin(Con)s). */
-  async deactivate(hostId: string, id: string): Promise<AdminConView> {
+  async deactivate(hostId: string, id: string): Promise<SubAdminView> {
     return this.setStatus(hostId, id, AccountStatus.INACTIVE);
   }
 
-  async activate(hostId: string, id: string): Promise<AdminConView> {
+  async activate(hostId: string, id: string): Promise<SubAdminView> {
     return this.setStatus(hostId, id, AccountStatus.ACTIVE);
   }
 
@@ -107,7 +107,7 @@ export class AdminConService {
     hostId: string,
     id: string,
     dto: GrantPointsDto,
-  ): Promise<AdminConView> {
+  ): Promise<SubAdminView> {
     await this.getOwned(hostId, id); // 404 if not this Host's Admin(Con)
     await this.pointsService.adjust({
       fromAdminId: hostId,
@@ -124,23 +124,23 @@ export class AdminConService {
     hostId: string,
     id: string,
     status: AccountStatus,
-  ): Promise<AdminConView> {
+  ): Promise<SubAdminView> {
     const entity = await this.getOwned(hostId, id);
     entity.status = status;
-    return this.toView(await this.adminCons.save(entity));
+    return this.toView(await this.subAdmins.save(entity));
   }
 
   /**
    * Load an Admin(Con) ONLY if it belongs to this Host. Never look up by id
    * alone — that would let one Host reach another Host's Admin(Con).
    */
-  private async getOwned(hostId: string, id: string): Promise<AdminCon> {
-    const entity = await this.adminCons.findOne({ where: { id, hostId } });
+  private async getOwned(hostId: string, id: string): Promise<SubAdmin> {
+    const entity = await this.subAdmins.findOne({ where: { id, hostId } });
     if (!entity) throw new NotFoundException('Admin(Con) not found');
     return entity;
   }
 
-  private toView(entity: AdminCon): AdminConView {
+  private toView(entity: SubAdmin): SubAdminView {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { passwordHash, host, users, homepageConfig, ...view } = entity;
     return view;

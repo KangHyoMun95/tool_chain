@@ -10,26 +10,26 @@ import { App, Button } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
 import { AccountStatus } from '@toolhackchain/shared';
 import {
-  loadAdminCons,
-  useDeactivateAdminCon,
-  type AdminConRow,
-} from '@/lib/api/admin-con';
-import { CreateAdminConModal } from './create-admin-con-modal';
-import { EditAdminConModal } from './edit-admin-con-modal';
+  loadSubAdmins,
+  useDeactivateSubAdmin,
+  type SubAdminRow,
+} from '@/lib/api/sub-admin';
+import { CreateSubAdminModal } from './create-sub-admin-modal';
+import { EditSubAdminModal } from './edit-sub-admin-modal';
 import { GrantPointsModal } from './grant-points-modal';
 
-export function AdminConTable() {
+export function SubAdminTable() {
   const actionRef = useRef<ActionType>();
   const queryClient = useQueryClient();
   const { message, modal } = App.useApp();
-  const deactivate = useDeactivateAdminCon();
+  const deactivate = useDeactivateSubAdmin();
 
-  const [editing, setEditing] = useState<AdminConRow | null>(null);
-  const [granting, setGranting] = useState<AdminConRow | null>(null);
+  const [editing, setEditing] = useState<SubAdminRow | null>(null);
+  const [granting, setGranting] = useState<SubAdminRow | null>(null);
 
   const reload = () => actionRef.current?.reload();
 
-  const confirmDeactivate = (record: AdminConRow) => {
+  const confirmDeactivate = (record: SubAdminRow) => {
     modal.confirm({
       title: 'Deactive Admin Con',
       content: `Vô hiệu hoá "${record.username}"? Admin Con sẽ không đăng nhập được.`,
@@ -49,7 +49,7 @@ export function AdminConTable() {
     });
   };
 
-  const columns: ProColumns<AdminConRow>[] = [
+  const columns: ProColumns<SubAdminRow>[] = [
     { title: 'Tên', dataIndex: 'username', ellipsis: true },
     {
       title: 'Email',
@@ -111,14 +111,14 @@ export function AdminConTable() {
 
   return (
     <>
-      <ProTable<AdminConRow>
+      <ProTable<SubAdminRow>
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
         // Search (tên/email) + pagination are applied client-side over the
-        // cached ['admin-cons'] list, so no page state is managed by hand.
+        // cached ['sub-admins'] list, so no page state is managed by hand.
         request={async (params) => {
-          const all = await loadAdminCons(queryClient);
+          const all = await loadSubAdmins(queryClient);
           const byName = (params.username ?? '').toString().toLowerCase();
           const byEmail = (params.email ?? '').toString().toLowerCase();
           let rows = all;
@@ -145,11 +145,11 @@ export function AdminConTable() {
         pagination={{ pageSize: 10, showSizeChanger: true }}
         headerTitle="Danh sách Admin Con"
         toolBarRender={() => [
-          <CreateAdminConModal key="create" onSuccess={reload} />,
+          <CreateSubAdminModal key="create" onSuccess={reload} />,
         ]}
       />
 
-      <EditAdminConModal
+      <EditSubAdminModal
         record={editing}
         open={editing !== null}
         onOpenChange={(o) => !o && setEditing(null)}

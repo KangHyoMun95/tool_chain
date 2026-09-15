@@ -1,7 +1,7 @@
 import { SetMetadata } from '@nestjs/common';
 import { SCOPE_RESOURCE_KEY } from '../constants';
 
-export type ScopedResourceType = 'user' | 'adminCon';
+export type ScopedResourceType = 'user' | 'subAdmin';
 
 export interface ScopeResourceOptions {
   /** Which kind of resource the route param points at. */

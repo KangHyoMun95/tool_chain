@@ -6,7 +6,7 @@ import {
 import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { PointDirection, PointTargetType } from '@toolhackchain/shared';
-import { AdminCon } from '../../database/entities/admin-con.entity';
+import { SubAdmin } from '../../database/entities/sub-admin.entity';
 import { User } from '../../database/entities/user.entity';
 import { PointTransaction } from '../../database/entities/point-transaction.entity';
 
@@ -42,7 +42,7 @@ export class PointsService {
 
     return this.dataSource.transaction(async (manager) => {
       const entityType =
-        input.targetType === PointTargetType.ADMIN_CON ? AdminCon : User;
+        input.targetType === PointTargetType.ADMIN_CON ? SubAdmin : User;
 
       // Lock the target row so concurrent adjustments stay consistent.
       const target = await manager.findOne(entityType, {

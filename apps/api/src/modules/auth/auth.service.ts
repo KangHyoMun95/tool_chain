@@ -10,7 +10,7 @@ import {
 } from '@toolhackchain/shared';
 import { verifyPassword } from '../../common/utils/password';
 import { Admin } from '../../database/entities/admin.entity';
-import { AdminCon } from '../../database/entities/admin-con.entity';
+import { SubAdmin } from '../../database/entities/sub-admin.entity';
 import { User } from '../../database/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 
@@ -26,8 +26,8 @@ export class AuthService {
   constructor(
     private readonly jwtService: JwtService,
     @InjectRepository(Admin) private readonly admins: Repository<Admin>,
-    @InjectRepository(AdminCon)
-    private readonly adminCons: Repository<AdminCon>,
+    @InjectRepository(SubAdmin)
+    private readonly subAdmins: Repository<SubAdmin>,
     @InjectRepository(User) private readonly users: Repository<User>,
   ) {}
 
@@ -57,8 +57,8 @@ export class AuthService {
     const admin = await this.admins.findOne({ where: { username } });
     if (admin) return this.toAccount(admin);
 
-    const adminCon = await this.adminCons.findOne({ where: { username } });
-    if (adminCon) return this.toAccount(adminCon);
+    const subAdmin = await this.subAdmins.findOne({ where: { username } });
+    if (subAdmin) return this.toAccount(subAdmin);
 
     const user = await this.users.findOne({ where: { username } });
     if (user) return this.toAccount(user);
@@ -66,7 +66,7 @@ export class AuthService {
     return null;
   }
 
-  private toAccount(entity: Admin | AdminCon | User): AuthenticatedAccount {
+  private toAccount(entity: Admin | SubAdmin | User): AuthenticatedAccount {
     return {
       id: entity.id,
       role: entity.role,

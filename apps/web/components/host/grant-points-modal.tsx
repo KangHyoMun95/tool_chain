@@ -10,9 +10,9 @@ import { App } from 'antd';
 import { PointDirection } from '@toolhackchain/shared';
 import {
   useGrantPoints,
-  type AdminConRow,
+  type SubAdminRow,
   type GrantPointsInput,
-} from '@/lib/api/admin-con';
+} from '@/lib/api/sub-admin';
 
 /** Controlled "Cấp điểm" modal: amount + direction + reason. */
 export function GrantPointsModal({
@@ -21,7 +21,7 @@ export function GrantPointsModal({
   onOpenChange,
   onSuccess,
 }: {
-  record: AdminConRow | null;
+  record: SubAdminRow | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSuccess?: () => void;

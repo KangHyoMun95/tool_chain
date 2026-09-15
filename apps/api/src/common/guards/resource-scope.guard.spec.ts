@@ -21,8 +21,8 @@ function guardWith(
     getAllAndOverride: () => scopeOptions,
   } as unknown as Reflector;
   const users = { findOne: async () => targetUser } as any;
-  const adminCons = { findOne: async () => null } as any;
-  return new ResourceScopeGuard(reflector, users, adminCons);
+  const subAdmins = { findOne: async () => null } as any;
+  return new ResourceScopeGuard(reflector, users, subAdmins);
 }
 
 describe('ResourceScopeGuard', () => {
@@ -46,7 +46,7 @@ describe('ResourceScopeGuard', () => {
   });
 
   it('allows ADMIN_CON to act on its OWN user', async () => {
-    const target = { id: 'u1', managedByAdminConId: conA };
+    const target = { id: 'u1', managedBySubAdminId: conA };
     const guard = guardWith({ type: 'user', idParam: 'id' }, target);
     const req: Req = { user: { sub: conA, role: Role.ADMIN_CON }, params: { id: 'u1' } };
     await expect(guard.canActivate(ctxFor(req))).resolves.toBe(true);
@@ -54,7 +54,7 @@ describe('ResourceScopeGuard', () => {
   });
 
   it('BLOCKS ADMIN_CON A from touching a user owned by ADMIN_CON B', async () => {
-    const target = { id: 'u2', managedByAdminConId: conB };
+    const target = { id: 'u2', managedBySubAdminId: conB };
     const guard = guardWith({ type: 'user', idParam: 'id' }, target);
     await expect(
       guard.canActivate(
@@ -66,7 +66,7 @@ describe('ResourceScopeGuard', () => {
   it('allows USER on its own record but blocks others', async () => {
     const guardSelf = guardWith(
       { type: 'user', idParam: 'id' },
-      { id: 'u1', managedByAdminConId: conA },
+      { id: 'u1', managedBySubAdminId: conA },
     );
     await expect(
       guardSelf.canActivate(
@@ -76,7 +76,7 @@ describe('ResourceScopeGuard', () => {
 
     const guardOther = guardWith(
       { type: 'user', idParam: 'id' },
-      { id: 'u9', managedByAdminConId: conA },
+      { id: 'u9', managedBySubAdminId: conA },
     );
     await expect(
       guardOther.canActivate(
@@ -86,7 +86,7 @@ describe('ResourceScopeGuard', () => {
   });
 
   it('blocks ADMIN_CON from another ADMIN_CON resource', async () => {
-    const guard = guardWith({ type: 'adminCon', idParam: 'id' }, null);
+    const guard = guardWith({ type: 'subAdmin', idParam: 'id' }, null);
     await expect(
       guard.canActivate(
         ctxFor({ user: { sub: conA, role: Role.ADMIN_CON }, params: { id: conB } }),

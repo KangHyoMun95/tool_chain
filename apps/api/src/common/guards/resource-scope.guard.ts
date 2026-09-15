@@ -11,7 +11,7 @@ import { Repository } from 'typeorm';
 import { JwtPayload, Role } from '@toolhackchain/shared';
 import { SCOPE_RESOURCE_KEY } from '../constants';
 import { ScopeResourceOptions } from '../decorators/scope-resource.decorator';
-import { AdminCon } from '../../database/entities/admin-con.entity';
+import { SubAdmin } from '../../database/entities/sub-admin.entity';
 import { User } from '../../database/entities/user.entity';
 
 /**
@@ -20,8 +20,8 @@ import { User } from '../../database/entities/user.entity';
  * Rules (see CLAUDE.md permission model):
  *  - HOST: full access, no scoping.
  *  - ADMIN_CON on a `user` resource: only Users where
- *    user.managedByAdminConId === caller.sub.
- *  - ADMIN_CON on an `adminCon` resource: only itself (caller.sub).
+ *    user.managedBySubAdminId === caller.sub.
+ *  - ADMIN_CON on an `subAdmin` resource: only itself (caller.sub).
  *  - USER: only its own record.
  *
  * The resolved entity is attached to request.scopedResource for handler reuse.
@@ -31,8 +31,8 @@ export class ResourceScopeGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
     @InjectRepository(User) private readonly users: Repository<User>,
-    @InjectRepository(AdminCon)
-    private readonly adminCons: Repository<AdminCon>,
+    @InjectRepository(SubAdmin)
+    private readonly subAdmins: Repository<SubAdmin>,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -55,18 +55,18 @@ export class ResourceScopeGuard implements CanActivate {
       throw new ForbiddenException(`Missing route param "${idParam}"`);
     }
 
-    if (options.type === 'adminCon') {
-      return this.checkAdminConScope(user, resourceId, request);
+    if (options.type === 'subAdmin') {
+      return this.checkSubAdminScope(user, resourceId, request);
     }
     return this.checkUserScope(user, resourceId, request);
   }
 
-  private checkAdminConScope(
+  private checkSubAdminScope(
     user: JwtPayload,
     resourceId: string,
     request: Record<string, unknown>,
   ): boolean {
-    // Only the Admin(Con) itself may act on its own adminCon resource.
+    // Only the Admin(Con) itself may act on its own subAdmin resource.
     if (user.role === Role.ADMIN_CON && resourceId === user.sub) {
       request.scopedResource = { id: resourceId };
       return true;
@@ -84,7 +84,7 @@ export class ResourceScopeGuard implements CanActivate {
 
     const allowed =
       (user.role === Role.ADMIN_CON &&
-        target.managedByAdminConId === user.sub) ||
+        target.managedBySubAdminId === user.sub) ||
       (user.role === Role.USER && target.id === user.sub);
 
     if (!allowed) throw new ForbiddenException('Out of scope');

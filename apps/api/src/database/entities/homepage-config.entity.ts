@@ -8,7 +8,7 @@ import {
   PrimaryGeneratedColumn,
   UpdateDateColumn,
 } from 'typeorm';
-import { AdminCon } from './admin-con.entity';
+import { SubAdmin } from './sub-admin.entity';
 
 /**
  * Homepage config owned/written by the Host, one per Admin(Con), read by that
@@ -23,14 +23,14 @@ export class HomepageConfig {
   /** FK -> sub_admins.id (one config per Admin(Con)). */
   @Index({ unique: true })
   @Column({ type: 'uuid', name: 'admin_con_id' })
-  adminConId: string;
+  subAdminId: string;
 
-  @OneToOne(() => AdminCon, (adminCon) => adminCon.homepageConfig, {
+  @OneToOne(() => SubAdmin, (subAdmin) => subAdmin.homepageConfig, {
     onDelete: 'CASCADE',
     nullable: false,
   })
   @JoinColumn({ name: 'admin_con_id' })
-  adminCon: AdminCon;
+  subAdmin: SubAdmin;
 
   /** Free-form JSON config; structure TBD. */
   @Column({ type: 'jsonb', default: () => "'{}'::jsonb" })

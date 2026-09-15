@@ -9,14 +9,14 @@ import {
   RolesGuard,
 } from '../../common/guards';
 import { Admin } from '../../database/entities/admin.entity';
-import { AdminCon } from '../../database/entities/admin-con.entity';
+import { SubAdmin } from '../../database/entities/sub-admin.entity';
 import { User } from '../../database/entities/user.entity';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Admin, AdminCon, User]),
+    TypeOrmModule.forFeature([Admin, SubAdmin, User]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
