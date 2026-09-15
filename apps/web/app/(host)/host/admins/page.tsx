@@ -5,7 +5,7 @@ import { SubAdminTable } from '@/components/host/sub-admin-table';
 
 export default function HostAdminsPage() {
   return (
-    <PageContainer title="Quản lý Admin Con">
+    <PageContainer title="Quản lý người dùng">
       <SubAdminTable />
     </PageContainer>
   );

@@ -167,7 +167,7 @@ export function SubAdminTable() {
         }}
         search={{ labelWidth: 'auto' }}
         pagination={{ pageSize: 10, showSizeChanger: true }}
-        headerTitle="Danh sách Admin Con"
+        headerTitle="Danh sách người dùng"
         toolBarRender={() => [
           <CreateSubAdminModal key="create" onSuccess={reload} />,
         ]}

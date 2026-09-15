@@ -12,10 +12,10 @@ export function CreateSubAdminModal({ onSuccess }: { onSuccess?: () => void }) {
 
   return (
     <ModalForm<CreateSubAdminInput>
-      title="Tạo Admin Con"
+      title="Tạo người dùng"
       trigger={
         <Button type="primary" icon={<PlusOutlined />}>
-          Tạo Admin Con
+          Tạo người dùng
         </Button>
       }
       modalProps={{ destroyOnClose: true }}

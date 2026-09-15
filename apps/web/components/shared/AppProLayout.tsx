@@ -18,7 +18,7 @@ import { ROLE_LABEL, useCurrentUser, useLogout } from '@/lib/auth/current-user';
 function menuForRole(role: Role): MenuDataItem[] {
   if (role === Role.HOST) {
     return [
-      { path: '/host/admins', name: 'Quản lý Admin Con', icon: <TeamOutlined /> },
+      { path: '/host/admins', name: 'Quản lý người dùng', icon: <TeamOutlined /> },
     ];
   }
   if (role === Role.ADMIN_CON) {
