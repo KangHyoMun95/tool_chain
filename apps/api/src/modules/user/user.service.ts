@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { AccountStatus, Role } from '@toolhackchain/shared';
 import { hashPassword } from '../../common/utils/password';
 import { User } from '../../database/entities/user.entity';
+import { AuditAction, AuditService } from '../audit/audit.service';
 import { PointsService } from '../points/points.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { GrantPointsDto } from './dto/grant-points.dto';
@@ -28,7 +29,11 @@ export class UserService {
   constructor(
     @InjectRepository(User) private readonly users: Repository<User>,
     private readonly pointsService: PointsService,
+    private readonly audit: AuditService,
   ) {}
+
+  private readonly ENTITY = 'User';
+  private readonly ACTOR_ROLE = 'ADMIN_CON';
 
   async create(adminConId: string, dto: CreateUserDto): Promise<UserView> {
     const existing = await this.users.findOne({
@@ -45,7 +50,19 @@ export class UserService {
       managedBySubAdminId: adminConId,
       phoneNumber: dto.phoneNumber ?? null,
     });
-    return this.toView(await this.users.save(entity));
+    const saved = await this.users.save(entity);
+    await this.audit.record({
+      action: AuditAction.CREATE,
+      entityType: this.ENTITY,
+      entityId: saved.id,
+      actorBy: adminConId,
+      actorRole: this.ACTOR_ROLE,
+      changes: [
+        { columnName: 'username', newValue: saved.username },
+        { columnName: 'phoneNumber', newValue: saved.phoneNumber },
+      ],
+    });
+    return this.toView(saved);
   }
 
   async findAll(adminConId: string): Promise<UserView[]> {
@@ -66,24 +83,51 @@ export class UserService {
     dto: UpdateUserDto,
   ): Promise<UserView> {
     const entity = await this.getOwned(adminConId, id);
+    const changes: { columnName: string; oldValue?: unknown; newValue?: unknown }[] = [];
 
     if (dto.username && dto.username !== entity.username) {
       const clash = await this.users.findOne({
         where: { username: dto.username },
       });
       if (clash) throw new ConflictException('Username already taken');
+      changes.push({ columnName: 'username', oldValue: entity.username, newValue: dto.username });
       entity.username = dto.username;
     }
-    if (dto.password) entity.passwordHash = await hashPassword(dto.password);
-    if (dto.phoneNumber !== undefined) entity.phoneNumber = dto.phoneNumber;
+    if (dto.password) {
+      changes.push({ columnName: 'password', oldValue: '***', newValue: '***' });
+      entity.passwordHash = await hashPassword(dto.password);
+    }
+    if (dto.phoneNumber !== undefined && dto.phoneNumber !== entity.phoneNumber) {
+      changes.push({ columnName: 'phoneNumber', oldValue: entity.phoneNumber, newValue: dto.phoneNumber });
+      entity.phoneNumber = dto.phoneNumber;
+    }
 
-    return this.toView(await this.users.save(entity));
+    const saved = await this.users.save(entity);
+    if (changes.length) {
+      await this.audit.record({
+        action: AuditAction.UPDATE,
+        entityType: this.ENTITY,
+        entityId: id,
+        actorBy: adminConId,
+        actorRole: this.ACTOR_ROLE,
+        changes,
+      });
+    }
+    return this.toView(saved);
   }
 
   /** Hard delete — an Admin(Con) may delete its own Users (see CLAUDE.md). */
   async remove(adminConId: string, id: string): Promise<{ id: string }> {
     const entity = await this.getOwned(adminConId, id);
     await this.users.remove(entity);
+    await this.audit.record({
+      action: AuditAction.DELETE,
+      entityType: this.ENTITY,
+      entityId: id,
+      actorBy: adminConId,
+      actorRole: this.ACTOR_ROLE,
+      changes: [{ columnName: 'username', oldValue: entity.username }],
+    });
     return { id };
   }
 
@@ -100,7 +144,7 @@ export class UserService {
     id: string,
     dto: GrantPointsDto,
   ): Promise<UserView> {
-    await this.getOwned(adminConId, id); // 404 if not this Admin(Con)'s User
+    const before = await this.getOwned(adminConId, id); // 404 if not this Admin(Con)'s User
     // Granting to a User is funded from the Admin(Con)'s own balance (transfer),
     // not minted — the amount is deducted from the Admin(Con).
     await this.pointsService.transferSubAdminToUser({
@@ -110,7 +154,16 @@ export class UserService {
       direction: dto.direction,
       reason: dto.reason,
     });
-    return this.findOne(adminConId, id);
+    const view = await this.findOne(adminConId, id);
+    await this.audit.record({
+      action: AuditAction.GRANT_POINTS,
+      entityType: this.ENTITY,
+      entityId: id,
+      actorBy: adminConId,
+      actorRole: this.ACTOR_ROLE,
+      changes: [{ columnName: 'points', oldValue: before.points, newValue: view.points }],
+    });
+    return view;
   }
 
   private async setStatus(
@@ -119,8 +172,21 @@ export class UserService {
     status: AccountStatus,
   ): Promise<UserView> {
     const entity = await this.getOwned(adminConId, id);
+    const oldStatus = entity.status;
     entity.status = status;
-    return this.toView(await this.users.save(entity));
+    const saved = await this.users.save(entity);
+    await this.audit.record({
+      action:
+        status === AccountStatus.ACTIVE
+          ? AuditAction.ACTIVATE
+          : AuditAction.DEACTIVATE,
+      entityType: this.ENTITY,
+      entityId: id,
+      actorBy: adminConId,
+      actorRole: this.ACTOR_ROLE,
+      changes: [{ columnName: 'status', oldValue: oldStatus, newValue: status }],
+    });
+    return this.toView(saved);
   }
 
   /**

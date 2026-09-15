@@ -73,6 +73,7 @@ toolhackchain/
 - **NestJS**: mỗi domain (admin-host, admin-con, user, points, homepage-config) là một module riêng với controller/service/entity tách biệt. Dùng Guard + custom decorator (`@Roles()`) để enforce phân quyền theo 3 role: `HOST`, `ADMIN_CON`, `USER`.
 - **TypeORM**: không sửa tay migration đã chạy; luôn tạo migration mới qua `typeorm migration:generate`. Entity đặt tên số ít (`Admin`, `User`, `PointTransaction`, `HomepageConfig`).
 - **Điểm số (points)**: mọi thay đổi điểm nên đi qua một service trung tâm (vd `PointsService`) và ghi log giao dịch (`PointTransaction`) thay vì cộng/trừ trực tiếp field `points` — để có audit trail.
+- **Audit (BẮT BUỘC)**: MỌI thay đổi dữ liệu (create / update / delete / deactivate / activate / cấp điểm ...) đều phải ghi lại qua `AuditService.record()` (module `modules/audit`, đã `@Global()`). Inject `AuditService` vào service và gọi `record()` sau khi thao tác thành công, truyền `action`, `entityType`, `entityId`, `actorBy` (id người thực hiện), và `changes` (mỗi field: `columnName` + `oldValue`/`newValue`). KHÔNG log mật khẩu — dùng `'***'`. Bảng `audit_logs` không có khóa ngoại (lưu theo giá trị) để audit sống sót khi bản ghi gốc bị xoá.
 - **Next.js**: tách route theo role (`/host/...`, `/admin/...`, `/`) với middleware kiểm tra role trước khi render.
 - **DTO/Validation**: dùng `class-validator` + `class-transformer` ở NestJS cho mọi input.
 
@@ -109,6 +110,7 @@ pnpm --filter api test
 
 - Khi thêm tính năng mới liên quan đến quyền, luôn hỏi lại: tính năng này thuộc quyền của Host, Admin Con, hay User? Không giả định.
 - Khi sinh API, luôn có middleware/guard kiểm tra scope dữ liệu (Admin Con A không được thấy/sửa User của Admin Con B).
+- Khi viết/sửa bất kỳ service nào có thao tác thay đổi dữ liệu, PHẢI gọi `AuditService.record()` cho thao tác đó (xem mục Audit ở "Quy ước code"). Nếu review/audit code, báo rõ nếu có mutation không ghi audit.
 - Trang chủ (`homepage-config`) là dữ liệu do Host quản lý nhưng được User của Admin Con tương ứng đọc — thiết kế API cho 2 chiều: ghi (Host only) và đọc (User, theo đúng Admin Con của mình).
 - Chưa quyết định cơ chế thiết kế nội dung trang chủ (page builder, template, v.v.) — phần này "sẽ được thiết kế sau", nên khi implement, để interface/schema đủ mở (vd JSON config) thay vì hard-code cấu trúc cứng.
 - Không sử dụng tiếng việt để đặt tên cho biến, tên api, tên file, tên module, và các code liên quan.
