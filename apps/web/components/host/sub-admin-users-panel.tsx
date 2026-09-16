@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Empty, Table, Tag } from 'antd';
+import { Empty, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useQueryClient } from '@tanstack/react-query';
 import { AccountStatus } from '@toolhackchain/shared';
@@ -45,6 +45,22 @@ export function SubAdminUsersPanel({ subAdminId }: { subAdminId: string }) {
         ),
     },
     { title: 'Điểm', dataIndex: 'points', width: 100 },
+    {
+      title: 'Trang chủ',
+      dataIndex: 'hostnames',
+      render: (_: unknown, r: UserRow) =>
+        r.hostnames?.length ? (
+          <Space size={[0, 4]} wrap>
+            {r.hostnames.map((h) => (
+              <Tag key={h.id} color="geekblue">
+                {h.name}
+              </Tag>
+            ))}
+          </Space>
+        ) : (
+          '—'
+        ),
+    },
     {
       title: 'Ngày tạo',
       dataIndex: 'createdAt',

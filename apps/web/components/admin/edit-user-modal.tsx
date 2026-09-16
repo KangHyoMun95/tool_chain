@@ -1,10 +1,20 @@
 'use client';
 
-import { ModalForm, ProFormText } from '@ant-design/pro-components';
+import { ModalForm, ProFormSelect, ProFormText } from '@ant-design/pro-components';
 import { App } from 'antd';
-import { useUpdateUser, type UpdateUserInput, type UserRow } from '@/lib/api/user';
+import { useHostnames } from '@/lib/api/hostname';
+import {
+  useSetUserHostnames,
+  useUpdateUser,
+  type UpdateUserInput,
+  type UserRow,
+} from '@/lib/api/user';
 
-/** Controlled edit modal for a single User. */
+interface FormValues extends UpdateUserInput {
+  hostnameIds?: string[];
+}
+
+/** Controlled edit modal for a User, incl. hostname multi-select. */
 export function EditUserModal({
   record,
   open,
@@ -18,15 +28,21 @@ export function EditUserModal({
 }) {
   const { message } = App.useApp();
   const update = useUpdateUser();
+  const setHostnames = useSetUserHostnames();
+  const { data: hostnames } = useHostnames();
 
   return (
-    <ModalForm<UpdateUserInput>
+    <ModalForm<FormValues>
       title={record ? `Sửa người dùng: ${record.username}` : 'Sửa người dùng'}
       open={open}
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
-      initialValues={{ username: record?.username, phoneNumber: record?.phoneNumber ?? undefined }}
-      onFinish={async (values) => {
+      initialValues={{
+        username: record?.username,
+        phoneNumber: record?.phoneNumber ?? undefined,
+        hostnameIds: record?.hostnames?.map((h) => h.id) ?? [],
+      }}
+      onFinish={async ({ hostnameIds, ...values }) => {
         if (!record) return false;
         const payload: UpdateUserInput = {};
         if (values.username && values.username !== record.username) {
@@ -37,8 +53,15 @@ export function EditUserModal({
           payload.phoneNumber = values.phoneNumber ?? '';
         }
         try {
-          await update.mutateAsync({ id: record.id, ...payload });
-          message.success('Đã cập nhật User');
+          if (Object.keys(payload).length) {
+            await update.mutateAsync({ id: record.id, ...payload });
+          }
+          const currentIds = (record.hostnames ?? []).map((h) => h.id).sort();
+          const nextIds = (hostnameIds ?? []).slice().sort();
+          if (JSON.stringify(currentIds) !== JSON.stringify(nextIds)) {
+            await setHostnames.mutateAsync({ id: record.id, hostnameIds: hostnameIds ?? [] });
+          }
+          message.success('Đã cập nhật người dùng');
           onSuccess?.();
           return true;
         } catch (err) {
@@ -58,6 +81,13 @@ export function EditUserModal({
         name="phoneNumber"
         label="Số điện thoại"
         rules={[{ max: 20, message: 'Tối đa 20 ký tự' }]}
+      />
+      <ProFormSelect
+        name="hostnameIds"
+        label="Trang chủ"
+        mode="multiple"
+        placeholder="Chọn trang chủ gắn cho user"
+        options={(hostnames ?? []).map((h) => ({ label: h.name, value: h.id }))}
       />
     </ModalForm>
   );

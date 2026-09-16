@@ -16,7 +16,7 @@ import { GrantPointsDto } from './dto/grant-points.dto';
 import { UpdateSubAdminDto } from './dto/update-sub-admin.dto';
 
 /** Public shape of an Admin(Con) — never exposes passwordHash. */
-export type SubAdminView = Omit<SubAdmin, 'passwordHash' | 'host' | 'users' | 'homepageConfig'>;
+export type SubAdminView = Omit<SubAdmin, 'passwordHash' | 'host' | 'users'>;
 
 /**
  * CRUD for Admin(Con), performed by a Host.
@@ -50,9 +50,19 @@ export class SubAdminService {
     const rows = await this.users.find({
       where: { managedBySubAdminId: subAdminId },
       order: { createdAt: 'DESC' },
+      relations: { hostnames: true },
     });
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    return rows.map(({ passwordHash, managedBySubAdmin, ...view }) => view);
+    return rows.map(
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      ({ passwordHash, managedBySubAdmin, hostnames, ...view }) => ({
+        ...view,
+        hostnames: (hostnames ?? []).map((h) => ({
+          id: h.id,
+          name: h.name,
+          url: h.url,
+        })),
+      }),
+    );
   }
 
   async create(
@@ -217,7 +227,7 @@ export class SubAdminService {
 
   private toView(entity: SubAdmin): SubAdminView {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { passwordHash, host, users, homepageConfig, ...view } = entity;
+    const { passwordHash, host, users, ...view } = entity;
     return view;
   }
 }
