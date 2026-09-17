@@ -61,6 +61,16 @@ export function AppProLayout({ children }: { children: React.ReactNode }) {
       title="ToolHackChain"
       logo={<SafetyCertificateOutlined style={{ fontSize: 22 }} />}
       layout="side"
+      navTheme="realDark"
+      token={{
+        bgLayout: '#0A0E14',
+        sider: {
+          colorMenuBackground: '#0B0F16',
+          colorTextMenuSelected: '#22D3EE',
+          colorBgMenuItemSelected: 'rgba(34,211,238,0.08)',
+        },
+        header: { colorBgHeader: '#0B0F16' },
+      }}
       fixSiderbar
       location={{ pathname }}
       route={{ path: '/', routes: menuForRole(role) }}
