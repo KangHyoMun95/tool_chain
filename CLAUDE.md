@@ -59,9 +59,11 @@ toolhackchain/
 │   │   │   ├── common/   # guards, decorators, interceptors dùng chung
 │   │   │   └── main.ts
 │   │   └── src/migrations/         # TypeORM migrations
-│   └── web/              # Next.js frontend
-│       ├── app/
-│       └── components/
+│   ├── web-admin/        # Next.js — khu quản trị (Host + Admin Con)
+│   │   ├── app/
+│   │   └── components/
+│   └── web-portal/       # Next.js — cổng cho User (port 3001)
+│       └── app/
 ├── packages/
 │   └── shared/           # types/DTO dùng chung giữa api & web
 ├── pnpm-workspace.yaml
@@ -74,7 +76,7 @@ toolhackchain/
 - **TypeORM**: không sửa tay migration đã chạy; luôn tạo migration mới qua `typeorm migration:generate`. Entity đặt tên số ít (`Admin`, `User`, `PointTransaction`, `Hostname`).
 - **Điểm số (points)**: mọi thay đổi điểm nên đi qua một service trung tâm (vd `PointsService`) và ghi log giao dịch (`PointTransaction`) thay vì cộng/trừ trực tiếp field `points` — để có audit trail.
 - **Audit (BẮT BUỘC)**: MỌI thay đổi dữ liệu (create / update / delete / deactivate / activate / cấp điểm ...) đều phải ghi lại qua `AuditService.record()` (module `modules/audit`, đã `@Global()`). Inject `AuditService` vào service và gọi `record()` sau khi thao tác thành công, truyền `action`, `entityType`, `entityId`, `actorBy` (id người thực hiện), và `changes` (mỗi field: `columnName` + `oldValue`/`newValue`). KHÔNG log mật khẩu — dùng `'***'`. Bảng `audit_logs` không có khóa ngoại (lưu theo giá trị) để audit sống sót khi bản ghi gốc bị xoá.
-- **Next.js**: tách route theo role (`/host/...`, `/admin/...`, `/`) với middleware kiểm tra role trước khi render.
+- **Next.js (web-admin)**: tách route theo role (`/host/...`, `/admin/...`, `/`) với middleware kiểm tra role trước khi render.
 - **DTO/Validation**: dùng `class-validator` + `class-transformer` ở NestJS cho mọi input.
 
 ## Lệnh thường dùng
@@ -92,7 +94,8 @@ pnpm dev
 pnpm --filter api start:dev
 
 # Chỉ chạy frontend
-pnpm --filter web dev
+pnpm --filter @toolhackchain/web-admin dev   # admin (port 3000)
+pnpm --filter @toolhackchain/web-portal dev  # portal (port 3001)
 
 # Tạo migration mới
 pnpm --filter api typeorm migration:generate -- -n TenMigration

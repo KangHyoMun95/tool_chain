@@ -8,9 +8,10 @@
   },
   "scripts": {
     "dev": "pnpm -r --parallel dev",
-    "build": "pnpm --filter @toolhackchain/shared build && pnpm --filter @toolhackchain/api build && pnpm --filter @toolhackchain/web build",
+    "build": "pnpm --filter @toolhackchain/shared build && pnpm --filter @toolhackchain/api build && pnpm --filter @toolhackchain/web-admin build && pnpm --filter @toolhackchain/web-portal build",
     "dev:api": "pnpm --filter @toolhackchain/api dev",
-    "dev:web": "pnpm --filter @toolhackchain/web dev",
-    "test": "pnpm --filter @toolhackchain/api test"
+    "dev:web": "pnpm --filter @toolhackchain/web-admin dev",
+    "test": "pnpm --filter @toolhackchain/api test",
+    "dev:portal": "pnpm --filter @toolhackchain/web-portal dev"
   }
 }
