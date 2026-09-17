@@ -79,6 +79,25 @@ toolhackchain/
 - **Next.js (web-admin)**: tách route theo role (`/host/...`, `/admin/...`, `/`) với middleware kiểm tra role trước khi render.
 - **DTO/Validation**: dùng `class-validator` + `class-transformer` ở NestJS cho mọi input.
 
+## Theme / Design (BÁM SÁT cho mỗi web app)
+
+Mỗi frontend có **design contract riêng**, đặt trong `.claude/designs/`. Khi tạo/sửa UI trong app nào, PHẢI đọc và bám đúng file design của app đó; hai app KHÔNG dùng chung theme. Đặt token màu/typography tập trung (vd `ConfigProvider theme` trong `app/providers.tsx`), không hardcode hex rải rác.
+
+### `apps/web-admin` — Dark SOC / Cyber‑Threat (`.claude/designs/WEB-ADMIN.DESIGN.md`)
+- Tinh thần: Security Operations Center do AI vận hành (kiểu CrowdStrike/Darktrace), **KHÔNG** matrix‑rain/hacker‑terminal.
+- Nền tối: background `#0A0E14`, surface `#111827`, elevated `#161D2B`, border `#1F2937`.
+- Màu: **Primary Cyan `#22D3EE`**, Secondary Pink `#EC4899` (chỉ cho ngữ cảnh "AI assistant"). Text `#F3F4F6` / `#9CA3AF` / `#6B7280`.
+- **Bảng severity/status (quan trọng nhất, dùng nhất quán)**: Critical `#EF4444`, High/Warning `#F59E0B`, Medium `#22D3EE`, Low `#9CA3AF`, Success `#10B981`.
+- Typography: **heading dùng monospace** (Space Mono / JetBrains Mono); body sans (Inter/Geist); tag/badge monospace UPPERCASE, letter‑spacing rộng.
+
+### `apps/web-portal` — Deep‑Violet AI Console (`.claude/designs/WEB-PORTAL.DESIGN.md`)
+- Tinh thần: neural‑network / AI research console, khoa học‑tinh gọn.
+- Nền tím thẫm: background `#0A0714`, panel `#120B22` / `#150E28`, border `rgba(168,85,247,0.16)`.
+- **Hệ màu "hai cực" (Dual‑Pole)**: cực tím/magenta `#A855F7`→`#D946EF` (input/training) vs cực xanh dương `#38BDF8`→`#60A5FA` (output/validation) — mọi cặp chỉ số input↔output / training↔validation map vào 2 cực này. Text `#F3EEFF` / `#B7A9D6` / `#7C6A99`. Success `#22C55E` / Warning `#FBBF24` chỉ dùng rất hẹp cho System Alerts.
+- Typography: **toàn bộ sans‑serif** (Inter/Geist), label UPPERCASE letter‑spacing ~0.08–0.12em; **không** dùng monospace làm điểm nhấn.
+
+> `.claude/skills/nextjs-frontend` (antd + pro-components) áp dụng cho **web-admin**; theme của web-admin cấu hình qua `ConfigProvider` token theo bảng màu trên.
+
 ## Lệnh thường dùng
 
 > Node: dùng Node >= 18.18 (repo pin Node 20 trong `.nvmrc` — chạy `nvm use` trước). Next.js 14 không chạy được trên Node < 18.18.
