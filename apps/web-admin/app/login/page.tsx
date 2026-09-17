@@ -36,7 +36,8 @@ export default function LoginPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#f5f6f8',
+        background:
+          'radial-gradient(1200px 500px at 50% -10%, rgba(34,211,238,0.06), transparent), #0A0E14',
       }}
     >
       {/* Spinner during the API call and while navigating to the target page. */}
