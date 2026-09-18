@@ -86,7 +86,7 @@ export function UserTable() {
       search: false,
       valueEnum: {
         [AccountStatus.ACTIVE]: { text: 'Active', status: 'Success' },
-        [AccountStatus.INACTIVE]: { text: 'Deactive', status: 'Default' },
+        [AccountStatus.INACTIVE]: { text: 'Deactive', status: 'Warning' },
       },
     },
     {
