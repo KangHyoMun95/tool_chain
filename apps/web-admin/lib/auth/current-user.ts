@@ -31,12 +31,20 @@ export function homeForRole(role: Role): string {
   }
 }
 
+/**
+ * Decodes the JWT payload client-side. Returns null when the token is invalid,
+ * missing required claims, or already expired (`exp` is in the past) — callers
+ * then treat it as unauthenticated and send the user back to /login.
+ */
 function decodeJwt(token: string): Pick<JwtPayload, 'sub' | 'role'> | null {
   try {
     const [, payload] = token.split('.');
     const json = JSON.parse(
       atob(payload.replace(/-/g, '+').replace(/_/g, '/')),
     );
+    if (typeof json?.exp === 'number' && json.exp * 1000 <= Date.now()) {
+      return null;
+    }
     if (json?.sub && json?.role) return { sub: json.sub, role: json.role };
     return null;
   } catch {
@@ -58,6 +66,9 @@ export function useCurrentUser(): { user: CurrentUser | null; isLoading: boolean
     const token = getToken();
     const claims = token ? decodeJwt(token) : null;
     if (!claims) {
+      // A stored-but-unusable token (invalid / expired) is cleared so it does
+      // not linger; RoleGuard will send the user to /login.
+      if (token) clearSession();
       setState({ user: null, isLoading: false });
       return;
     }

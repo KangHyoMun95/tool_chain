@@ -39,6 +39,20 @@ export function clearSession(): void {
   }
 }
 
+/**
+ * Clears the session and hard-redirects to the login page. Used when the JWT
+ * is rejected by the API (expired / invalid / user no longer exists). Guarded
+ * so it is a no-op on the server and when already on /login (avoids a loop
+ * when a bad-credentials login also returns 401).
+ */
+export function redirectToLogin(): void {
+  if (typeof window === 'undefined') return;
+  clearSession();
+  if (window.location.pathname !== '/login') {
+    window.location.replace('/login');
+  }
+}
+
 /** fetch wrapper that attaches the JWT and parses JSON, throwing on non-2xx. */
 export async function apiFetch<T>(
   path: string,
@@ -54,6 +68,10 @@ export async function apiFetch<T>(
     },
   });
   if (!res.ok) {
+    // Expired / invalid / unknown token -> back to login.
+    if (res.status === 401) {
+      redirectToLogin();
+    }
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { message?: string }).message ?? `HTTP ${res.status}`);
   }
