@@ -1,6 +1,6 @@
-import { DataSourceOptions } from 'typeorm';
-import { join } from 'path';
-import * as entities from '../database/entities';
+import { DataSourceOptions } from "typeorm";
+import { join } from "path";
+import * as entities from "../database/entities";
 
 /**
  * Single source of truth for the DB connection, read from environment
@@ -11,16 +11,16 @@ import * as entities from '../database/entities';
  */
 export function buildDataSourceOptions(): DataSourceOptions {
   return {
-    type: 'postgres',
-    host: process.env.DB_HOST ?? 'localhost',
+    type: "postgres",
+    host: process.env.DB_HOST ?? "localhost",
     port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 5432,
-    username: process.env.DB_USER ?? 'postgres',
-    password: process.env.DB_PASSWORD ?? 'postgres',
-    database: process.env.DB_NAME ?? 'toolhackchain',
+    username: process.env.DB_USER ?? "postgres",
+    password: process.env.DB_PASSWORD ?? "123456",
+    database: process.env.DB_NAME ?? "toolhackchain",
     entities: Object.values(entities),
     // Compiled JS at runtime, .ts when run through ts-node (CLI).
-    migrations: [join(__dirname, '..', 'migrations', '*.{ts,js}')],
+    migrations: [join(__dirname, "..", "migrations", "*.{ts,js}")],
     synchronize: false,
-    logging: process.env.DB_LOGGING === 'true',
+    logging: process.env.DB_LOGGING === "true",
   };
 }
