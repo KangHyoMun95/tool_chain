@@ -1,20 +1,14 @@
-import 'reflect-metadata';
+import "dotenv/config";
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
-import { API_PREFIX } from '@toolhackchain/shared';
-import { AppModule } from './app.module';
+import { AppModule } from './app.module.js';
+import cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix(API_PREFIX);
-  app.useGlobalPipes(
-    new ValidationPipe({ whitelist: true, transform: true }),
-  );
-  app.enableCors();
-  const port = process.env.PORT ? Number(process.env.PORT) : 4000;
-  await app.listen(port);
-  // eslint-disable-next-line no-console
-  console.log(`[api] listening on http://localhost:${port}/${API_PREFIX}`);
+  app.setGlobalPrefix("api");
+  app.use(cookieParser());
+  app.enableCors({ origin: process.env.WEB_ORIGINS!.split(","), credentials: true });
+  app.enableShutdownHooks();                       // để onModuleDestroy chạy khi tắt
+  await app.listen(Number(process.env.API_PORT ?? 4000));
 }
-
-bootstrap();
+await bootstrap();
