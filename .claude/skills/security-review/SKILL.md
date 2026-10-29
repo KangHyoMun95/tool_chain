@@ -23,9 +23,9 @@ description: Dùng skill này khi review một Pull Request của ToolHackChain.
 
 ## Bước 1 — Nạp context trước khi review
 
-1. Đọc `CLAUDE.md` ở gốc repo để nắm lại: mô hình phân quyền 3 tầng, quy ước NestJS/TypeORM/Next.js.
+1. Đọc `CLAUDE.md` ở gốc repo để nắm lại: mô hình phân quyền 3 tầng, quy ước NestJS/TypeORM (truy vấn)/Flyway (schema)/Next.js.
 2. Nếu PR đụng tới backend (`apps/api`), đọc thêm `.claude/skills/rbac-guard/SKILL.md` và
-   `.claude/skills/typeorm-migration/SKILL.md` để áp dụng đúng luật.
+   `.claude/skills/flyway-migration/SKILL.md` để áp dụng đúng luật.
 3. Nếu PR đụng tới frontend (`apps/web`), đọc thêm `.claude/skills/nextjs-frontend/SKILL.md`.
 4. Đọc thêm các file liên quan tới phần code mới (không chỉ dòng thay đổi) để hiểu code xung
    quanh có bị ảnh hưởng không. Ví dụ: PR sửa 1 service, phải đọc luôn controller + guard gọi
