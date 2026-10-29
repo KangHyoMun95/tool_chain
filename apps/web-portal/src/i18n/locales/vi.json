@@ -1,0 +1,76 @@
+{
+  "brand": {
+    "name": "NEXUS AI ROYALE",
+    "tagline": "Hệ thống phân tích thuật toán chuyên nghiệp"
+  },
+  "nav": {
+    "backToLobbies": "Quay Lại Sảnh",
+    "backToStreams": "Quay Lại Bàn LIVE",
+    "language": "Ngôn ngữ"
+  },
+  "banner": {
+    "realtime": "HỆ THỐNG MÁY HỌC - CẬP NHẬT CHU KỲ DỰ ĐOÁN REAL-TIME DƯỚI 3 GIÂY"
+  },
+  "lobbies": {
+    "title": "1. Chọn Sảnh Phân Tích",
+    "count": "{count} Sảnh VIP",
+    "tables": "{count} Bàn"
+  },
+  "categories": {
+    "title": "2. Loại Trò Chơi (Sảnh {lobby})",
+    "hint": "Bấm \"Bàn Live\" để xem danh sách",
+    "liveTables": "{count} Bàn LIVE Active",
+    "aiWinRate": "Tỷ Lệ Win AI",
+    "openStreams": "Bàn Live →"
+  },
+  "streams": {
+    "subtitle": "Danh sách các bàn đang chạy phân tích trực tiếp",
+    "liveBadge": "{count} BÀN LIVE",
+    "session": "Phiên #{id}",
+    "live": "LIVE",
+    "winStreak": "Chuỗi Thắng",
+    "recentResults": "{count} Lượt Gần Nhất",
+    "viewDetail": "Chi Tiết AI Dự Đoán →"
+  },
+  "detail": {
+    "badge": "REAL-TIME AI ANALYSIS",
+    "title": "{stream} - Phân Tích Chuyên Sâu",
+    "subtitle": "Mô Hình Neural Network & Chu Kỳ Ma Trận Dữ Liệu",
+    "scanningSession": "MÃ PHIÊN ĐANG QUÉT",
+    "analyzing": "THUẬT TOÁN ĐANG PHÂN TÍCH...",
+    "analyzingHint": "Đang trích xuất 50 chu kỳ gần nhất",
+    "newPrediction": "DỰ ĐOÁN LƯỢT MỚI",
+    "confidence": "Tỷ lệ tin cậy",
+    "awaitingResult": "Chờ kết quả phiên",
+    "currentWinRate": "Tỷ Lệ Win Hiện Tại",
+    "liveWinStreak": "Chuỗi Thắng LIVE",
+    "chartTitle": "Biểu Đồ Phần Trăm Độ Tin Cậy Mỗi Phiên",
+    "chartRange": "{count} Phiên Gần Nhất",
+    "chartSeries": "Độ Tin Cậy AI (%)",
+    "historyTitle": "Lịch Sử {count} Lượt Dự Đoán Gần Nhất",
+    "session": "Phiên #{id}",
+    "correct": "CHÍNH XÁC",
+    "wrong": "SAI",
+    "winTitle": "DỰ ĐOÁN CHÍNH XÁC",
+    "winSubtitle": "AI dự đoán đúng kết quả phiên #{id}",
+    "lossTitle": "KẾT QUẢ SAI LỆCH",
+    "lossSubtitle": "Độ lệch chuẩn vượt ngưỡng dự đoán"
+  },
+  "prediction": {
+    "up": "XU HƯỚNG TĂNG",
+    "down": "XU HƯỚNG GIẢM",
+    "forward": "CHU KỲ THUẬN",
+    "reverse": "CHU KỲ NGHỊCH"
+  },
+  "predictionShort": {
+    "up": "TĂNG",
+    "down": "GIẢM",
+    "forward": "THUẬN",
+    "reverse": "NGHỊCH"
+  },
+  "notFound": {
+    "title": "Không tìm thấy trang",
+    "description": "Nội dung bạn tìm không tồn tại hoặc đã bị gỡ.",
+    "action": "Về trang chủ"
+  }
+}

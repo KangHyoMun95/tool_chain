@@ -1,0 +1,76 @@
+{
+  "brand": {
+    "name": "NEXUS AI ROYALE",
+    "tagline": "Professional algorithm analytics platform"
+  },
+  "nav": {
+    "backToLobbies": "Back to Lobbies",
+    "backToStreams": "Back to LIVE Tables",
+    "language": "Language"
+  },
+  "banner": {
+    "realtime": "MACHINE LEARNING SYSTEM - REAL-TIME PREDICTION CYCLE UPDATES IN UNDER 3 SECONDS"
+  },
+  "lobbies": {
+    "title": "1. Choose an Analysis Lobby",
+    "count": "{count} VIP Lobbies",
+    "tables": "{count} Tables"
+  },
+  "categories": {
+    "title": "2. Game Types ({lobby} Lobby)",
+    "hint": "Press \"Live Tables\" to see the list",
+    "liveTables": "{count} LIVE Tables Active",
+    "aiWinRate": "AI Win Rate",
+    "openStreams": "Live Tables →"
+  },
+  "streams": {
+    "subtitle": "Tables currently running live analysis",
+    "liveBadge": "{count} LIVE TABLES",
+    "session": "Session #{id}",
+    "live": "LIVE",
+    "winStreak": "Win Streak",
+    "recentResults": "Last {count} Rounds",
+    "viewDetail": "AI Prediction Details →"
+  },
+  "detail": {
+    "badge": "REAL-TIME AI ANALYSIS",
+    "title": "{stream} - Deep Analysis",
+    "subtitle": "Neural Network Model & Data Matrix Cycles",
+    "scanningSession": "SESSION BEING SCANNED",
+    "analyzing": "ALGORITHM IS ANALYZING...",
+    "analyzingHint": "Extracting the last 50 cycles",
+    "newPrediction": "NEW ROUND PREDICTION",
+    "confidence": "Confidence",
+    "awaitingResult": "Waiting for session result",
+    "currentWinRate": "Current Win Rate",
+    "liveWinStreak": "LIVE Win Streak",
+    "chartTitle": "Confidence Percentage per Session",
+    "chartRange": "Last {count} Sessions",
+    "chartSeries": "AI Confidence (%)",
+    "historyTitle": "Last {count} Predictions",
+    "session": "Session #{id}",
+    "correct": "CORRECT",
+    "wrong": "WRONG",
+    "winTitle": "PREDICTION CORRECT",
+    "winSubtitle": "The AI predicted session #{id} correctly",
+    "lossTitle": "RESULT DEVIATED",
+    "lossSubtitle": "Standard deviation exceeded the prediction threshold"
+  },
+  "prediction": {
+    "up": "UPWARD TREND",
+    "down": "DOWNWARD TREND",
+    "forward": "FORWARD CYCLE",
+    "reverse": "REVERSE CYCLE"
+  },
+  "predictionShort": {
+    "up": "UP",
+    "down": "DOWN",
+    "forward": "FORWARD",
+    "reverse": "REVERSE"
+  },
+  "notFound": {
+    "title": "Page not found",
+    "description": "The content you are looking for does not exist or was removed.",
+    "action": "Back to home"
+  }
+}
