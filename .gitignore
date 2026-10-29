@@ -10,3 +10,6 @@ out/
 !.env.example
 coverage/
 .DS_Store
+
+# MCP config (may hold secrets)
+.mcp.json

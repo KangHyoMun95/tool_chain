@@ -1,14 +1,18 @@
+import { LobbyBrowser } from '@/src/components/LobbyBrowser';
+import { PortalShell } from '@/src/components/PortalShell';
+import { SystemBanner } from '@/src/components/SystemBanner';
+import { listCategories, listLobbies } from '@/src/lib/portal-data';
+
 export default function PortalHomePage() {
+  const lobbies = listLobbies();
+  const categoriesByLobby = Object.fromEntries(
+    lobbies.map((lobby) => [lobby.id, listCategories(lobby.id)]),
+  );
+
   return (
-    <main style={{ maxWidth: 640, margin: '4rem auto', padding: '0 1rem' }}>
-      <h1>ToolHackChain Portal</h1>
-      <p>
-        Đây là cổng dành cho <strong>người dùng</strong> (User) — nơi hiển thị
-        các trang chủ (hostname) do Admin Con gắn cho họ.
-      </p>
-      <p style={{ color: '#666' }}>
-        Giao diện sẽ được xây dựng ở các bước sau.
-      </p>
-    </main>
+    <PortalShell>
+      <SystemBanner />
+      <LobbyBrowser lobbies={lobbies} categoriesByLobby={categoriesByLobby} />
+    </PortalShell>
   );
 }

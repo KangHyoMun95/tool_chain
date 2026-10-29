@@ -3,9 +3,8 @@
     "allow": [
       "Bash(pnpm install)",
       "Bash(pnpm dev)",
-      "Bash(pnpm --filter api *)",
-      "Bash(pnpm --filter web *)",
-      "Bash(pnpm --filter api typeorm migration:generate*)",
+      "Bash(pnpm --filter @toolhackchain/* *)",
+      "Bash(pnpm --filter @toolhackchain/api typeorm migration:generate*)",
       "Bash(git status)",
       "Bash(git diff*)",
       "Bash(git add*)",
@@ -15,8 +14,8 @@
       "Bash(gh pr create*)"
     ],
     "ask": [
-      "Bash(pnpm --filter api typeorm migration:run*)",
-      "Bash(pnpm --filter api typeorm migration:revert*)",
+      "Bash(pnpm --filter @toolhackchain/api typeorm migration:run*)",
+      "Bash(pnpm --filter @toolhackchain/api typeorm migration:revert*)",
       "Bash(gh pr merge*)"
     ],
     "deny": [
