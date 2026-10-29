@@ -121,9 +121,9 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 |---|---|---|
 | `roles` | role_id, role_name | HOST / ADMIN / USER |
 | `users` | user_id, phone_number, password, role_id, refer_user_id, balance, status, created_at | password luôn hash |
-| `lobbies` | lobby_id, lobby_name | |
-| `categories` | category_id, category_name, lobby_id | |
-| `streams` | stream_id, stream_name, category_id, key_id (unique), status | |
+| `lobbies` | lobby_id, lobby_name, created_at (default now), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
+| `categories` | category_id, category_name, lobby_id, created_at (default now), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
+| `streams` | stream_id, stream_name, category_id, key_id (unique), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `stream_information` | stream_information_id, stream_id, streamer_id | `streamer_id` là **tên** người live (text), không phải FK |
 | `game_sessions` | game_session_id, stream_id, road_count, result, status | status: `RUNNING` → `FINISHED` \| `CANCELLED` |
 | `predictions` | prediction_id, stream_id, game_session_id (**unique**), predict_result, confidence_score | mỗi ván của mỗi stream chỉ có 1 prediction |
