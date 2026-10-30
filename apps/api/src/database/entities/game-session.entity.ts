@@ -6,6 +6,8 @@ import { GameSessionStatus } from "@toolhackchain/shared";
 export class GameSessionEntity {
   @PrimaryColumn({ name: "game_session_id", type: "uuid" }) gameSessionId!: string;
   @Column({ name: "stream_id", type: "bigint" }) streamId!: string;
+  @Column({ name: "road_shoe", type: "integer" }) roadShoe!: number;
+  // stream_shoe / stream_round của crawler (số nguyên) → road_shoe / road_count; unique (stream_id, road_shoe, road_count)
   @Column({ name: "road_count", type: "integer", nullable: true }) roadCount!: number | null;
   @Column({ type: "varchar", length: 50, nullable: true }) result!: string | null;
   @Column({ length: 20, default: GameSessionStatus.RUNNING }) status!: GameSessionStatus;
