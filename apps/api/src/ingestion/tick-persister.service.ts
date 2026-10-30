@@ -6,6 +6,7 @@ import { PERSIST_GROUP, TICK_STREAM, Tick } from "@toolhackchain/shared";
 import { fieldsToObject, sleep, StreamEntry } from "../common/stream.util.js";
 import { IngestionService } from "./ingestion.service.js";
 import { MAX_BATCH, MAX_WAIT_MS, RETRY_DELAY_MS } from "./ingestion.constants.js";
+import { deadLetterTick, isDataError, pgErrorCode } from "./dead-letter.js";
 
 // tick = null: tin hỏng (không parse được), chỉ cần XACK để khỏi kẹt trong PEL
 type Item = { id: string; tick: Tick | null };
@@ -88,11 +89,33 @@ export class TickPersister implements OnApplicationBootstrap, OnModuleDestroy {
         || (this.buffer.length > 0 && Date.now() - this.bufferSince >= MAX_WAIT_MS);
   }
 
+  /**
+   * Ghi cả nhóm trong một transaction. Gặp lỗi dữ liệu thì chia đôi và ghi từng nửa để cô lập tick độc;
+   * tick độc đơn lẻ được chuyển vào ticks:dead (rồi được XACK cùng batch), các tick còn lại đi tiếp.
+   */
+  private async persistIsolating(items: (Item & { tick: Tick })[]): Promise<void> {
+    if (items.length === 0) return;
+    try {
+      await this.ingestion.persist(items.map((i) => i.tick));
+    } catch (e) {
+      if (!isDataError(e)) throw e;
+      if (items.length === 1) {
+        const [{ id, tick }] = items;
+        this.log.error(`Tick ${tick.id} (${tick.item_id}) lỗi dữ liệu ${pgErrorCode(e)}, chuyển vào ticks:dead`);
+        await deadLetterTick(this.conn, id, tick, e);
+        return;
+      }
+      const mid = Math.ceil(items.length / 2);
+      await this.persistIsolating(items.slice(0, mid));
+      await this.persistIsolating(items.slice(mid));
+    }
+  }
+
   private async flush() {
     const batch = this.buffer;
-    const ticks = batch.flatMap((b) => (b.tick ? [b.tick] : []));
 
-    if (ticks.length > 0) await this.ingestion.persist(ticks);   // lỗi → ném ra, buffer giữ nguyên, không XACK
+    // Lỗi tạm thời (DB sập...) → ném ra, buffer giữ nguyên, không XACK, vòng lặp thử lại.
+    await this.persistIsolating(batch.filter((b): b is Item & { tick: Tick } => b.tick !== null));
     this.log.log(`flush ${batch.length} tick`);
 
     await this.conn.xack(TICK_STREAM, PERSIST_GROUP, ...batch.map((b) => b.id));

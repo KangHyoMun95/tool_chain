@@ -1,6 +1,7 @@
 // packages/shared/src/realtime.ts
 export const TICK_STREAM = "ticks";
 export const PERSIST_GROUP = "persist";
+export const TICK_DEAD_STREAM = "ticks:dead";   // tick gây lỗi dữ liệu khi ghi DB (đọc lại: ingestion/dead-letter.ts)
 
 // Payload crawler gửi liên tục (nhiều lần cho cùng một ván). Phải khớp CrawlPayload trong apps/crawl-agent/contract.py.
 // Ghi DB: lobby_name, category_name, stream_name, stream_shoe, stream_round, streamer_id, actual_result.

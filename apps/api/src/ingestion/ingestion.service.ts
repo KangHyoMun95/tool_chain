@@ -13,10 +13,12 @@ import { gameSessionId } from "../game-sessions/game-session-id.js";
 import { BoundedMap } from "./bounded-map.js";
 import { IdCache } from "./id-cache.service.js";
 import { ShoeObserver } from "./shoe-observer.js";
+import { pgErrorCode } from "./dead-letter.js";
 import { INVALID_LOG_INTERVAL_MS, MAX_NAME_LENGTH, MAX_RESULT_LENGTH, MEMORY_CACHE_MAX } from "./ingestion.constants.js";
 
 const PG_FOREIGN_KEY_VIOLATION = "23503";
 const MAX_INT4 = 2_147_483_647;
+const NUL = "\u0000";   // Postgres từ chối ký tự NUL trong text
 
 /** Số nguyên không âm, vừa int4; nhận number hoặc chuỗi số (đã trim). */
 function toInt(v: unknown): number | null {
@@ -68,7 +70,7 @@ export class IngestionService {
     try {
       await this.run(parsed);
     } catch (e) {
-      if ((e as { code?: string }).code !== PG_FOREIGN_KEY_VIOLATION) throw e;
+      if (pgErrorCode(e) !== PG_FOREIGN_KEY_VIOLATION) throw e;
       this.log.warn("Cache id lệch với DB (FK violation), xoá cache và thử lại");
       await this.ids.invalidate();
       this.sessions.clear();
@@ -97,6 +99,7 @@ export class IngestionService {
       const v = d[f];
       if (typeof v !== "string" || normalizeName(v) === "") return fail(`${f} không hợp lệ`);
       if (displayName(v).length > MAX_NAME_LENGTH) return fail(`${f} quá dài`);
+      if (v.includes(NUL)) return fail(`${f} chứa ký tự NUL`);
       if (v.includes("|")) return fail(`${f} chứa ký tự '|' (trùng dấu phân tách key_id)`);
       names.push(v);
     }
@@ -112,12 +115,14 @@ export class IngestionService {
     const ar = d.actual_result;
     if (ar !== null && ar !== undefined) {
       if (typeof ar !== "string") return fail("actual_result phải là chuỗi hoặc null");
+      if (ar.includes(NUL)) return fail("actual_result chứa ký tự NUL");
       result = ar.trim() === "" ? null : ar.trim();
       if (result !== null && result.length > MAX_RESULT_LENGTH) return fail("actual_result quá dài");
     }
 
     let streamer: string | null = null;
     if (typeof d.streamer_id === "string" && d.streamer_id.trim() !== "") {
+      if (d.streamer_id.includes(NUL)) return fail("streamer_id chứa ký tự NUL");
       streamer = displayName(d.streamer_id);
       if (streamer.length > MAX_NAME_LENGTH) return fail("streamer_id quá dài");
     }
