@@ -20,6 +20,11 @@ export class PermissionService {
     @InjectDataSource() private dataSource: DataSource,
   ) {}
 
+  // Role mà actor được phép tạo / quản lý trực tiếp (HOST → ADMIN, ADMIN → USER); USER thì null.
+  managedRole(actorRole: Role): Role | null {
+    return MANAGES[actorRole];
+  }
+
   async allowedItems(userId: string): Promise<Set<string>> {
     return new Set(await this.redis.smembers(RedisKeys.perm(userId)));
   }

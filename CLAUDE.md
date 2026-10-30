@@ -195,6 +195,7 @@ Mọi route đều yêu cầu đăng nhập, trừ route gắn `@Public()`. Rout
 - `@Roles(...)` + `RolesGuard`; decorator `@Public()`, `@CurrentUser()` ở `auth/decorators.ts`.
 - Phạm vi theo `users.refer_user_id` (cấp trên trực tiếp), kiểm tra trong `PermissionService.assertCanManage()`: **ADMIN chỉ thao tác USER có `refer_user_id = admin.user_id`; HOST chỉ thao tác ADMIN có `refer_user_id = host.user_id`**. Không ai thao tác / cấp điểm cho chính mình (`assertCanGrantPoints`). Target không tồn tại hoặc ngoài phạm vi đều trả 403. Mọi API mới thao tác trên user khác PHẢI gọi hàm này.
 - Xóa (soft delete) User chỉ ADMIN được làm; HOST chỉ kích hoạt / hủy kích hoạt ADMIN.
+- `POST /api/users` `{ phone_number, password (>= 12 ký tự) }`: HOST tạo ADMIN, ADMIN tạo USER. Role do server suy ra từ người gọi (`PermissionService.managedRole`), `refer_user_id` luôn là người gọi; body không nhận `role` / `refer_user_id`. Phone trùng ⇒ 409.
 
 ### SSE (đang giữ lại)
 `GET /api/stream` hiện đang `@Public()` (EventSource không gửi được `Authorization`). Kế hoạch: `POST /api/realtime/ticket` → ticket một lần, TTL 30s trong Redis, SSE nhận `?ticket=` (tuyệt đối không đưa access token lên query string), và đóng SSE khi session bị thu hồi. Chưa làm.
@@ -203,6 +204,8 @@ Mọi route đều yêu cầu đăng nhập, trừ route gắn `@Public()`. Rout
 Helmet, CORS chỉ cho `CORS_ORIGINS` (`credentials: true`), throttler lưu Redis, `ValidationPipe` global (`whitelist`, `forbidNonWhitelisted`, `transform`), body tối đa 100kb, exception filter global (không lộ stack / lỗi DB), cột `users.password` là `select: false`, không log mật khẩu / token. Thiếu `JWT_SECRET`, `JWT_REFRESH_SECRET`, `REDIS_URL`, `DATABASE_URL`, `CORS_ORIGINS` thì app dừng ngay (`config/env.validation.ts`). `SameSite=Strict` ⇒ ở production web và api phải cùng site.
 
 ### Tạo user đầu tiên
+Migration `db/migrations/V4__seed_default_host.sql` seed sẵn một HOST (phone `0000000000`) với mật khẩu ban đầu đã biết và nằm trong repo ⇒ **phải đổi / vô hiệu hóa trước khi deploy ngoài local** (hiện chưa có API đổi mật khẩu; cập nhật hash trực tiếp trong DB hoặc tạo migration mới, không sửa file V4). Có thể tạo thêm HOST bằng CLI bên dưới.
+
 ```bash
 NEW_USER_PHONE=... NEW_USER_PASSWORD=... pnpm --filter @toolhackchain/api create-host      # thiếu env thì hỏi (mật khẩu được ẩn), tối thiểu 12 ký tự
 pnpm --filter @toolhackchain/api create-user --role ADMIN --refer-phone <phone của HOST>   # USER thì refer tới ADMIN
