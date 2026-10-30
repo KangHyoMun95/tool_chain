@@ -21,7 +21,7 @@ Mọi thành phần dùng **bản stable mới nhất**.
 | Migration (schema) | Flyway — công cụ **duy nhất** quản lý schema PostgreSQL |
 | ORM | TypeORM — **chỉ dùng để truy vấn**, không quản lý schema |
 | Database | PostgreSQL |
-| Message bus / cache | Redis (Redis Stream cho event, cache key_id → stream_id) |
+| Message bus / cache | Redis (Redis Stream cho event, cache id lobby/category/stream) |
 | Auth | JWT, session lưu trên Redis |
 | Crawler | Python, quản lý dependency bằng pip (`pyproject.toml`) |
 | AI predict | Python (`apps/ai/`) |
@@ -45,7 +45,9 @@ tool_chain/
 │   │       ├── users/                     # đổi status user (có kiểm tra phạm vi)
 │   │       ├── config/                    # validate env lúc khởi động
 │   │       ├── cli/                       # create-user / create-host
-│   │       ├── ticks/                     # luồng ghi DB theo batch
+│   │       ├── ingestion/                 # luồng ghi DB theo batch: tick-persister + IngestionService điều phối
+│   │       ├── lobbies/ categories/ streams/ stream-information/ game-sessions/   # mỗi bảng một service upsert
+│   │       ├── ticks/                     # bản cũ, giữ để so sánh, KHÔNG đăng ký trong AppModule
 │   │       └── realtime/                  # luồng SSE đẩy xuống client
 │   ├── crawl-agent/         # Python — crawler, publish event vào Redis
 │   ├── ai/                  # Python — service AI predict, đọc dữ liệu từ DB
@@ -77,7 +79,7 @@ tool_chain/
 ```
 crawl-agent ──publish──► Redis Stream ──► api consumer
                                              ├─► realtime.hub  → SSE xuống web-portal (lọc theo key_id)
-                                             └─► tick-persister → ghi DB theo batch (500 dòng hoặc 3s)
+                                             └─► tick-persister → ghi DB theo batch (MAX_BATCH dòng hoặc MAX_WAIT_MS, xem ingestion/ingestion.constants.ts)
 ```
 
 ### Luồng 2 — Dự đoán (phase 1, đi theo cùng mô hình)
@@ -92,11 +94,18 @@ crawler có result → cập nhật game_session (FINISHED) → settlement: hoà
 stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn điểm toàn bộ
 ```
 
-### key_id
-- Format: `<lobby_name>|<category_name>|<stream_name>`, do crawler sinh ra.
-- **Chuẩn hóa** (trim, lowercase) trước khi ghép. Lưu thành cột **unique** trên `streams`.
-- API tra `key_id → stream_id` một lần (có cache Redis). Từ đó trở đi, mọi thứ bên trong (phòng SSE, participants, predictions) dùng **`stream_id`**, không truyền `key_id` đi khắp nơi.
-- Stream chưa tồn tại thì tạo mới (lobby/category tạo theo nếu cần).
+### key_id, payload crawler & ingestion
+- `key_id` = `<lobby_name>|<category_name>|<stream_name>` đã chuẩn hóa. **Chỉ là khóa cache / phòng realtime (`item_id` của tick), KHÔNG lưu DB** (không có cột `streams.key_id`). Tên chứa `|` bị coi là tick lỗi.
+- **Chuẩn hóa tên** (`normalizeName()` ở `common/normalize.ts`, `normalize_name()` ở `contract.py`): trim, gộp khoảng trắng liên tiếp thành 1, lowercase. **Chỉ để chống trùng, không lưu**; DB lưu tên đã trim của lần gặp đầu. Chống trùng bằng unique index trên biểu thức (không có cột `*_norm`), biểu thức SQL phải khớp `normalizeName()`: lobbies `(norm(lobby_name))`, categories `(lobby_id, norm(category_name))`, streams `(category_id, norm(stream_name))`. Upsert: `INSERT ... ON CONFLICT (<biểu thức>) DO NOTHING`, rồi SELECT lại id.
+- Cache id (RAM + Redis, ghi sau khi DB commit): `lobby:{norm}`, `category:{lobby_id}:{norm}`, `stream:{key_id}`. Chỉ chạm DB khi cache miss. Mọi thứ bên trong sau đó dùng **`stream_id`**.
+- **Payload crawler** (`CrawlPayload`, `contract.py` ↔ `realtime.ts`), gửi liên tục, nhiều lần cho cùng một ván: `lobby_name, category_name, stream_id, stream_name, stream_round, streamer_id, player_count, player_value, status, actual_result, total_B/P/T`.
+  - **Ghi DB**: tên lobby/category/stream, `stream_round` (số nguyên → `game_sessions.road_count`), `streamer_id` (→ `stream_information`), `actual_result` (→ `game_sessions.result`).
+  - **Chỉ hiển thị** (chỉ qua realtime/SSE, không ghi DB): `player_count, player_value, status, total_B/P/T`. `stream_id` là id text phía nguồn, bỏ qua. Ingestion không đọc `status` của payload để suy ra trạng thái.
+- **`game_session_id`** = UUIDv5 xác định từ `key_id + "|" + stream_round` với namespace cố định (`game-sessions/game-session-id.ts`, không được đổi). Cùng ván luôn ra cùng ID; unique `(stream_id, road_count)`. Insert `ON CONFLICT DO NOTHING`, không set `status` (status của stream / game_session do job khác quản lý).
+- **Không bao giờ ghi đè `result`**: chỉ `UPDATE ... SET result = ? WHERE result IS NULL`. Tick báo result khác result đã lưu → log cảnh báo, giữ nguyên.
+- `stream_information`: một dòng cho mỗi stream (unique `stream_id`), chỉ ghi khi `streamer_id` đổi.
+- Batch: gộp tick theo `(stream, stream_round)` giữ bản mới nhất (giữ result nếu có), ghi theo thứ tự lobbies → categories → streams → stream_information → game_sessions trong **một DB transaction**, chỉ `XACK` sau khi commit. Tick lỗi validate: log, bỏ qua (vẫn XACK). Lỗi DB: giữ buffer, thử lại.
+- Tự kiểm tra: `apps/api/scripts/publish-sample-tick.mjs` (bắn tick mẫu) và `apps/api/scripts/ingestion-check.sql` (đếm dòng).
 
 ### Redis Stream consumer
 - Tên consumer **cố định**, khai báo qua biến môi trường trong `docker-compose.yml` (ví dụ `CONSUMER_NAME=api-worker-0`).
@@ -128,9 +137,9 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 | `users` | user_id, phone_number, password, role_id, refer_user_id, balance, status, created_at | password luôn hash; status: `ACTIVE` (default) \| `DEACTIVE` \| `DELETED` |
 | `lobbies` | lobby_id, lobby_name, created_at (default now), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `categories` | category_id, category_name, lobby_id, created_at (default now), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
-| `streams` | stream_id, stream_name, category_id, key_id (unique), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
+| `streams` | stream_id, stream_name, category_id, status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `stream_information` | stream_information_id, stream_id, streamer_id | `streamer_id` là **tên** người live (text), không phải FK |
-| `game_sessions` | game_session_id, stream_id, road_count, result, status, created_at | status: `RUNNING` → `FINISHED` \| `CANCELLED` |
+| `game_sessions` | game_session_id, stream_id, road_count (= stream_round), result, status, created_at | status: `RUNNING` → `FINISHED` \| `CANCELLED` |
 | `predictions` | prediction_id, stream_id, game_session_id (**unique**), predict_result, confidence_score, created_at | mỗi ván của mỗi stream chỉ có 1 prediction |
 | `stream_participants` | stream_participant_id, user_id, stream_id, last_seen_at, created_at | unique (user_id, stream_id) |
 | `prediction_subscriptions` | prediction_subscription_id, user_id, prediction_id, fee_amount, refunded_at, created_at | unique (user_id, prediction_id) |

@@ -14,7 +14,7 @@ import { RolesGuard } from "./auth/roles.guard.js";
 import { SessionGuard } from "./auth/session.guard.js";
 import { UsersModule } from "./users/users.module.js";
 import { AuthModule } from "./auth/auth.module.js";
-import { TicksModule } from "./ticks/ticks.module.js";
+import { IngestionModule } from "./ingestion/ingestion.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
 import { entities } from "./database/entities/index.js";
 
@@ -44,7 +44,8 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     }),
     AuthModule,
     UsersModule,
-    TicksModule,
+    // ticks/ giữ lại để so sánh, KHÔNG đăng ký: cùng group "persist" + cùng consumer sẽ tranh tin với IngestionModule.
+    IngestionModule,
     RealtimeModule,
   ],
   controllers: [AppController],
