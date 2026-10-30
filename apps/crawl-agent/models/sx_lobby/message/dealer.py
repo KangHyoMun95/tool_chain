@@ -1,6 +1,6 @@
 from abc import ABC
 
-from models.base_detection import BaseDetection
+from models.sx_lobby.message.base_detection import BaseDetection
 
 
 class Dealer(BaseDetection):

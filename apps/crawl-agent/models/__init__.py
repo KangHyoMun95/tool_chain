@@ -1,1 +1,1 @@
-from . import bet, dealer, table_info, road_info, base_detection
+from .sx_lobby.message import bet
