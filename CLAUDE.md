@@ -18,7 +18,8 @@ Mọi thành phần dùng **bản stable mới nhất**.
 |---|---|
 | Monorepo | pnpm workspaces |
 | API | NestJS (TypeScript) |
-| ORM / migration | TypeORM |
+| Migration (schema) | Flyway — công cụ **duy nhất** quản lý schema PostgreSQL |
+| ORM | TypeORM — **chỉ dùng để truy vấn**, không quản lý schema |
 | Database | PostgreSQL |
 | Message bus / cache | Redis (Redis Stream cho event, cache key_id → stream_id) |
 | Auth | JWT, session lưu trên Redis |
@@ -47,6 +48,7 @@ tool_chain/
 │   ├── ai/                  # Python — service AI predict, đọc dữ liệu từ DB
 │   ├── web-admin/           # Next.js — CHỈ UI (Host/Admin)
 │   └── web-portal/          # Next.js — CHỈ UI (User)
+├── db/migrations/           # Flyway SQL migration (nguồn sự thật của schema)
 ├── packages/shared/src/     # type/contract dùng chung TS
 │   └── realtime.ts          # schema event realtime
 ├── docker-compose.yml
@@ -111,7 +113,7 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 | User | — | Bị trừ điểm khi nhận prediction |
 
 - `users.refer_user_id` trỏ tới cấp trên trực tiếp. Dùng nó để Admin lọc user của mình, Host lọc admin của mình.
-- Xóa user là **xóa mềm** (`status = 'deleted'`). Không `DELETE` vì sẽ làm mất tham chiếu của lịch sử giao dịch. Điểm còn lại giữ nguyên trong tài khoản.
+- Xóa user là **xóa mềm** (`status = 'DELETED'`). Không `DELETE` vì sẽ làm mất tham chiếu của lịch sử giao dịch. Điểm còn lại giữ nguyên trong tài khoản.
 
 ---
 
@@ -120,13 +122,13 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 | Bảng | Cột chính | Ghi chú |
 |---|---|---|
 | `roles` | role_id, role_name | HOST / ADMIN / USER |
-| `users` | user_id, phone_number, password, role_id, refer_user_id, balance, status, created_at | password luôn hash |
+| `users` | user_id, phone_number, password, role_id, refer_user_id, balance, status, created_at | password luôn hash; status: `ACTIVE` (default) \| `DEACTIVE` \| `DELETED` |
 | `lobbies` | lobby_id, lobby_name, created_at (default now), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `categories` | category_id, category_name, lobby_id, created_at (default now), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `streams` | stream_id, stream_name, category_id, key_id (unique), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `stream_information` | stream_information_id, stream_id, streamer_id | `streamer_id` là **tên** người live (text), không phải FK |
-| `game_sessions` | game_session_id, stream_id, road_count, result, status | status: `RUNNING` → `FINISHED` \| `CANCELLED` |
-| `predictions` | prediction_id, stream_id, game_session_id (**unique**), predict_result, confidence_score | mỗi ván của mỗi stream chỉ có 1 prediction |
+| `game_sessions` | game_session_id, stream_id, road_count, result, status, created_at | status: `RUNNING` → `FINISHED` \| `CANCELLED` |
+| `predictions` | prediction_id, stream_id, game_session_id (**unique**), predict_result, confidence_score, created_at | mỗi ván của mỗi stream chỉ có 1 prediction |
 | `stream_participants` | stream_participant_id, user_id, stream_id, last_seen_at, created_at | unique (user_id, stream_id) |
 | `prediction_subscriptions` | prediction_subscription_id, user_id, prediction_id, fee_amount, refunded_at, created_at | unique (user_id, prediction_id) |
 | `transactions` | transaction_id, user_id, predictions_subscriptions_id (nullable), transaction_type, amount, balance_before, balance_after, created_by, created_at | |
@@ -147,7 +149,7 @@ Các quy tắc dưới đây **không được phá vỡ**. Nếu một yêu c�
    ```sql
    UPDATE users
    SET balance = balance - :fee
-   WHERE user_id = ANY(:participant_ids) AND balance >= :fee AND status = 'active'
+   WHERE user_id = ANY(:participant_ids) AND balance >= :fee AND status = 'ACTIVE'
    RETURNING user_id, balance + :fee AS balance_before, balance AS balance_after;
    ```
    Sau đó bulk insert `prediction_subscriptions` và `transactions (CHARGE)` **trong cùng một DB transaction**.
@@ -159,6 +161,7 @@ Các quy tắc dưới đây **không được phá vỡ**. Nếu một yêu c�
 6. **Chuyển điểm Admin → User:** kiểm tra `admin.balance >= amount`. Ghi 2 dòng `TRANSFER_OUT` và `TRANSFER_IN` trong cùng một DB transaction. **Lock các dòng users theo thứ tự `user_id` tăng dần** để tránh deadlock.
 7. Mọi thay đổi `balance` đều phải có dòng `transactions` tương ứng với `balance_before`/`balance_after` khớp nhau.
 8. `fee_amount` lưu lại giá tại thời điểm trừ. Không tính lại từ hằng số hiện tại.
+9. **Không tính toán trên `balance`/`amount`/`fee_amount`/`balance_before`/`balance_after` bằng `+`, `-`, `Number()` trong TS.** Các cột này là `bigint` nên TypeORM/`pg` trả về **chuỗi**: `"10" + 5` ra `"105"`, còn `Number()` mất độ chính xác khi vượt 2^53. Mọi phép cộng/trừ/so sánh tính **trong SQL** (như câu `UPDATE` ở mục 3); nếu bắt buộc tính ở TS thì dùng `BigInt`, không bao giờ `Number`.
 
 ---
 
@@ -187,32 +190,39 @@ Các quy tắc dưới đây **không được phá vỡ**. Nếu một yêu c�
 
 ## Lệnh thường dùng
 
-> Node >= 18.18 (repo pin Node 20 trong `.nvmrc`, chạy `nvm use` trước). Tên package: `@toolhackchain/api`, `@toolhackchain/web-admin`, `@toolhackchain/web-portal`, `@toolhackchain/shared`.
+> Node >= 18.18 (repo pin Node 20 trong `.nvmrc`, chạy `nvm use` trước). Tên package: `api`, `@toolhackchain/web-admin`, `@toolhackchain/web-portal`, `@toolhackchain/shared`.
 
 ```bash
-# Hạ tầng (Postgres, Redis)
+# Hạ tầng (Postgres, Redis) + Flyway tự migrate. Lần đầu: cp .env.example .env và cp apps/api/.env.example apps/api/.env
 docker compose up -d
+
+# Flyway (schema)
+pnpm db:migrate    # áp dụng migration mới
+pnpm db:info       # trạng thái từng migration
+pnpm db:validate   # kiểm tra checksum
 
 # Node (chạy ở thư mục gốc)
 pnpm install
 pnpm dev                                          # chạy song song mọi package
 pnpm --filter @toolhackchain/shared dev           # build watch cho shared (api/web import từ đây)
-pnpm --filter @toolhackchain/api start:dev        # API
+pnpm --filter api start:dev                       # API
 pnpm --filter @toolhackchain/web-admin dev        # admin, port 3000
 pnpm --filter @toolhackchain/web-portal dev       # portal, port 3001
 pnpm build                                        # build theo thứ tự shared -> api -> web-admin -> web-portal
-pnpm --filter @toolhackchain/api lint             # oxlint
+pnpm --filter api lint                            # oxlint
 
 # Crawler (Python, cần Brave + CDP port 9222, xem apps/crawl-agent/README.md)
 pip install -r apps/crawl-agent/requirements.txt
 bash apps/crawl-agent/run_server.sh
 ```
-<!-- TODO: bổ sung lệnh tạo/chạy migration TypeORM khi TypeOrmModule được bật trong app.module.ts (hiện đang comment) -->
 
 ## Quy ước khi làm việc
 
 - Sửa schema event thì cập nhật cả `contract.py` và `packages/shared/src/realtime.ts`.
-- Thay đổi schema DB **luôn đi qua migration TypeORM**. Không bật `synchronize: true`.
+- **Schema DB do Flyway quản lý** (`db/migrations/`). Đặt tên `V<số>__<mo_ta_snake_case>.sql` (versioned) hoặc `R__<mo_ta>.sql` (repeatable); mỗi file một mục đích, có comment đầu file.
+- Mọi thay đổi schema = **một file Flyway mới + sửa entity tương ứng trong cùng commit**. SQL là nguồn sự thật, entity theo SQL.
+- **Không bao giờ sửa file migration đã được apply** (kể cả thêm comment, vì Flyway so checksum); muốn đổi thì tạo file mới.
+- Không bật `synchronize`, không dùng `flyway clean` (đã `FLYWAY_CLEAN_DISABLED=true`). TypeORM không chạy migration (`migrationsRun: false`).
 - Dùng `pnpm`, không dùng npm/yarn. Thêm dependency vào đúng package bằng `pnpm --filter`.
 - Không đọc hoặc commit giá trị trong `.env`.
 - Không dùng tiếng Việt để đặt tên biến, API, file, module và code liên quan.
@@ -224,4 +234,4 @@ Khi tạo/sửa UI, PHẢI đọc và bám file design của đúng app; hai app
 - `apps/web-admin` — Dark SOC / Cyber-Threat: `.claude/designs/WEB-ADMIN.DESIGN.md` (nền `#0A0E14`, primary cyan `#22D3EE`, heading monospace, bảng severity nhất quán). Dùng skill `nextjs-frontend` (antd + pro-components).
 - `apps/web-portal` — Nexus AI Royale / Royal Purple Analytics (nguồn: Stitch `projects/10681042779717465733`): `.claude/designs/WEB-PORTAL.DESIGN.md` (nền sáng lavender `#F3E8FF`→`#F5D0FE`, header tím `#581C87`→`#7E22CE`, nhấn vàng amber `#F59E0B`, xanh lá/hồng đỏ chỉ cho đúng–sai, font Outfit + Plus Jakarta Sans, không monospace).
 
-Skills khác trong `.claude/skills/`: `rbac-guard` (scope dữ liệu theo cấp trên), `typeorm-migration`, `security-review`.
+Skills khác trong `.claude/skills/`: `rbac-guard` (scope dữ liệu theo cấp trên), `flyway-migration`, `security-review`.

@@ -4,7 +4,8 @@
       "Bash(pnpm install)",
       "Bash(pnpm dev)",
       "Bash(pnpm --filter @toolhackchain/* *)",
-      "Bash(pnpm --filter @toolhackchain/api typeorm migration:generate*)",
+      "Bash(pnpm db:info)",
+      "Bash(pnpm db:validate)",
       "Bash(git status)",
       "Bash(git diff*)",
       "Bash(git add*)",
@@ -14,8 +15,7 @@
       "Bash(gh pr create*)"
     ],
     "ask": [
-      "Bash(pnpm --filter @toolhackchain/api typeorm migration:run*)",
-      "Bash(pnpm --filter @toolhackchain/api typeorm migration:revert*)",
+      "Bash(pnpm db:migrate)",
       "Bash(gh pr merge*)"
     ],
     "deny": [

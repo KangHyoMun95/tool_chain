@@ -1,12 +1,9 @@
 // src/ticks/tick-persister.service.ts
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
-// import { InjectRepository } from "@nestjs/typeorm";
-// import { Repository } from "typeorm";
 import { Redis } from "ioredis";
 import { hostname } from "os";
 import { PERSIST_GROUP, TICK_STREAM, Tick } from "@toolhackchain/shared";
 import { fieldsToObject, sleep, StreamEntry } from "../common/stream.util.js";
-// import { TickEntity } from "./tick.entity.js";
 
 @Injectable()
 export class TickPersister implements OnApplicationBootstrap, OnModuleDestroy {
@@ -14,8 +11,6 @@ export class TickPersister implements OnApplicationBootstrap, OnModuleDestroy {
   private conn = new Redis(process.env.REDIS_URL!);      // kết nối riêng vì sẽ BLOCK
   private running = true;
   private consumer = process.env.CONSUMER_NAME ?? hostname(); // cố định qua các lần restart
-
-  // constructor(@InjectRepository(TickEntity) private repo: Repository<TickEntity>) {}
 
   async onApplicationBootstrap() {
     try {
@@ -45,7 +40,6 @@ export class TickPersister implements OnApplicationBootstrap, OnModuleDestroy {
           return { dedupKey: t.id, itemId: t.item_id, sourceTs: new Date(t.ts * 1000), data: t.data };
         });
 
-        // await this.repo.createQueryBuilder().insert().into(TickEntity).values(rows).orIgnore().execute();
         for (const r of rows) {
           this.log.log(`${r.itemId} ${r.sourceTs.toISOString()} ${JSON.stringify(r.data)}`);
         }
