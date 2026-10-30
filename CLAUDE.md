@@ -41,7 +41,10 @@ tool_chain/
 │   │   └── src/
 │   │       ├── common/stream.util.ts      # helper Redis Stream
 │   │       ├── redis/                     # Redis module
-│   │       ├── auth/                      # session guard, phân quyền
+│   │       ├── auth/                      # login/refresh, session guard, roles, permission
+│   │       ├── users/                     # đổi status user (có kiểm tra phạm vi)
+│   │       ├── config/                    # validate env lúc khởi động
+│   │       ├── cli/                       # create-user / create-host
 │   │       ├── ticks/                     # luồng ghi DB theo batch
 │   │       └── realtime/                  # luồng SSE đẩy xuống client
 │   ├── crawl-agent/         # Python — crawler, publish event vào Redis
@@ -61,7 +64,7 @@ tool_chain/
 - **`crawl-agent`**: chỉ thu thập và publish. Không ghi DB trực tiếp.
 - **`ai`**: đọc dữ liệu (game_sessions, lịch sử kết quả) từ DB và sinh dự đoán. **Không** được đổi `balance`, không ghi `prediction_subscriptions` hay `transactions`. Kết quả dự đoán phải đi qua `api` để chạy billing và đẩy SSE. <!-- TODO: chốt kênh AI trả kết quả về api (đề xuất: publish vào Redis Stream) -->
 - **Lưu ý độ trễ:** game_session được ghi DB theo batch (tối đa 3s), nên AI có thể thấy ván mới chậm tới vài giây sau khi crawler phát hiện. Prediction có thể về muộn hơn mức cần thiết. <!-- TODO: chốt cách AI biết có ván mới (polling DB / nhận event) -->
-- Auth: JWT, session lưu trên Redis. Guard ở `auth/session.guard.ts`, quyền theo vai trò ở `auth/permission.service.ts`.
+- Auth: xem mục **Auth & bảo mật** bên dưới.
 
 ### Contract dùng chung
 `apps/crawl-agent/contract.py` và `packages/shared/src/realtime.ts` mô tả **cùng một schema event**. Sửa một bên thì **bắt buộc** sửa bên kia trong cùng một commit.
@@ -175,6 +178,41 @@ Các quy tắc dưới đây **không được phá vỡ**. Nếu một yêu c�
 
 ---
 
+## Auth & bảo mật (`apps/api`)
+
+Mọi route đều yêu cầu đăng nhập, trừ route gắn `@Public()`. Route thực tế có tiền tố `/api`.
+
+### Luồng token
+- `POST /api/auth/login` `{ phone_number, password }` → access token JWT (HS256, ~15 phút; claims `sub`=user_id dạng string, `role`, `sid`, `jti`) trong body + refresh token trong cookie `refresh_token` (`httpOnly`, `Secure`, `SameSite=Strict`, `path=/api/auth/refresh`).
+- `POST /api/auth/refresh` (đọc cookie) xoay refresh token mỗi lần gọi. Dùng lại token cũ ⇒ thu hồi cả session (phát hiện bị đánh cắp). Không có khoảng ân hạn: hai tab refresh đồng thời có thể làm đăng xuất.
+- `POST /api/auth/logout` xóa session + cookie; `GET /api/auth/me` không bao giờ trả `password`.
+- Redis: `session:{sid}` `{user_id, role, created_at}` (TTL `SESSION_TTL_SECONDS`, sliding), `user_sessions:{user_id}` (set sid), `refresh:{sid}` (hash `current`/`previous`, chỉ lưu HMAC-SHA256 bằng `JWT_REFRESH_SECRET`), `login_fail:{phone}` / `login_lock:{phone}`.
+- `SessionGuard` (APP_GUARD, `auth/session.guard.ts`): verify chữ ký + `exp` với thuật toán cố định HS256, rồi kiểm tra `session:{sid}` còn trên Redis và `user_id` khớp `sub`; gắn `req.user = { userId, role, sessionId }`. Thứ tự guard toàn cục: Throttler → SessionGuard → RolesGuard.
+- Sai mật khẩu / phone không tồn tại / `status != ACTIVE` ⇒ cùng một lỗi 401. Sai ≥ `LOGIN_MAX_ATTEMPTS` lần ⇒ khóa phone `LOGIN_LOCK_MINUTES` phút (429, tính cả phone không tồn tại). `/auth/login` còn bị giới hạn 10 lần/phút/IP.
+- Mật khẩu hash argon2id (`auth/password.ts`). User chuyển sang `DEACTIVE`/`DELETED` ⇒ gọi `SessionService.revokeAllSessions(userId)` (token cũ bị 401 ngay).
+
+### Phân quyền
+- `@Roles(...)` + `RolesGuard`; decorator `@Public()`, `@CurrentUser()` ở `auth/decorators.ts`.
+- Phạm vi theo `users.refer_user_id` (cấp trên trực tiếp), kiểm tra trong `PermissionService.assertCanManage()`: **ADMIN chỉ thao tác USER có `refer_user_id = admin.user_id`; HOST chỉ thao tác ADMIN có `refer_user_id = host.user_id`**. Không ai thao tác / cấp điểm cho chính mình (`assertCanGrantPoints`). Target không tồn tại hoặc ngoài phạm vi đều trả 403. Mọi API mới thao tác trên user khác PHẢI gọi hàm này.
+- Xóa (soft delete) User chỉ ADMIN được làm; HOST chỉ kích hoạt / hủy kích hoạt ADMIN.
+- `POST /api/users` `{ phone_number, password (>= 12 ký tự) }`: HOST tạo ADMIN, ADMIN tạo USER. Role do server suy ra từ người gọi (`PermissionService.managedRole`), `refer_user_id` luôn là người gọi; body không nhận `role` / `refer_user_id`. Phone trùng ⇒ 409.
+
+### SSE (đang giữ lại)
+`GET /api/stream` hiện đang `@Public()` (EventSource không gửi được `Authorization`). Kế hoạch: `POST /api/realtime/ticket` → ticket một lần, TTL 30s trong Redis, SSE nhận `?ticket=` (tuyệt đối không đưa access token lên query string), và đóng SSE khi session bị thu hồi. Chưa làm.
+
+### Bảo mật chung
+Helmet, CORS chỉ cho `CORS_ORIGINS` (`credentials: true`), throttler lưu Redis, `ValidationPipe` global (`whitelist`, `forbidNonWhitelisted`, `transform`), body tối đa 100kb, exception filter global (không lộ stack / lỗi DB), cột `users.password` là `select: false`, không log mật khẩu / token. Thiếu `JWT_SECRET`, `JWT_REFRESH_SECRET`, `REDIS_URL`, `DATABASE_URL`, `CORS_ORIGINS` thì app dừng ngay (`config/env.validation.ts`). `SameSite=Strict` ⇒ ở production web và api phải cùng site.
+
+### Tạo user đầu tiên
+Migration `db/migrations/V4__seed_default_host.sql` seed sẵn một HOST (phone `0000000000`) với mật khẩu ban đầu đã biết và nằm trong repo ⇒ **phải đổi / vô hiệu hóa trước khi deploy ngoài local** (hiện chưa có API đổi mật khẩu; cập nhật hash trực tiếp trong DB hoặc tạo migration mới, không sửa file V4). Có thể tạo thêm HOST bằng CLI bên dưới.
+
+```bash
+NEW_USER_PHONE=... NEW_USER_PASSWORD=... pnpm --filter @toolhackchain/api create-host      # thiếu env thì hỏi (mật khẩu được ẩn), tối thiểu 12 ký tự
+pnpm --filter @toolhackchain/api create-user --role ADMIN --refer-phone <phone của HOST>   # USER thì refer tới ADMIN
+```
+
+---
+
 ## Phạm vi phase 1 / phase 2
 
 **Phase 1 (bắt buộc có):** toàn bộ mục *Quy tắc bất biến về tiền*, lọc event ở server, ID sinh trước khi vào batch, unique constraint, status của game_session, settlement và hoàn tiền.
@@ -190,7 +228,7 @@ Các quy tắc dưới đây **không được phá vỡ**. Nếu một yêu c�
 
 ## Lệnh thường dùng
 
-> Node >= 18.18 (repo pin Node 20 trong `.nvmrc`, chạy `nvm use` trước). Tên package: `api`, `@toolhackchain/web-admin`, `@toolhackchain/web-portal`, `@toolhackchain/shared`.
+> Node >= 18.18 (repo pin Node 20 trong `.nvmrc`, chạy `nvm use` trước). Tên package: `@toolhackchain/api`, `@toolhackchain/web-admin`, `@toolhackchain/web-portal`, `@toolhackchain/shared`.
 
 ```bash
 # Hạ tầng (Postgres, Redis) + Flyway tự migrate. Lần đầu: cp .env.example .env và cp apps/api/.env.example apps/api/.env
@@ -205,11 +243,11 @@ pnpm db:validate   # kiểm tra checksum
 pnpm install
 pnpm dev                                          # chạy song song mọi package
 pnpm --filter @toolhackchain/shared dev           # build watch cho shared (api/web import từ đây)
-pnpm --filter api start:dev                       # API
+pnpm --filter @toolhackchain/api start:dev                       # API
 pnpm --filter @toolhackchain/web-admin dev        # admin, port 3000
 pnpm --filter @toolhackchain/web-portal dev       # portal, port 3001
 pnpm build                                        # build theo thứ tự shared -> api -> web-admin -> web-portal
-pnpm --filter api lint                            # oxlint
+pnpm --filter @toolhackchain/api lint                            # oxlint
 
 # Crawler (Python, cần Brave + CDP port 9222, xem apps/crawl-agent/README.md)
 pip install -r apps/crawl-agent/requirements.txt

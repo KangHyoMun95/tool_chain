@@ -4,6 +4,7 @@ import { Observable } from "rxjs";
 import { Redis } from "ioredis";
 import { RedisKeys } from "@toolhackchain/shared";
 import { REDIS } from "../redis/redis.module.js";
+import { Public } from "../auth/decorators.js";
 import { RealtimeHub } from "./realtime.hub.js";
 // import { SessionGuard } from "../auth/session.guard.js";
 // import { PermissionService } from "../auth/permission.service.js";
@@ -17,6 +18,9 @@ export class RealtimeController {
     @Inject(REDIS) private redis: Redis,
   ) {}
 
+  // TODO(sse-auth): tạm @Public để giữ nguyên hành vi hiện tại (EventSource không gửi được Bearer).
+  // Sẽ thay bằng ticket một lần (POST /api/realtime/ticket) ở bước làm SSE.
+  @Public()
   @Sse()
   // @UseGuards(SessionGuard, StreamItemsGuard)
   stream(@Query("items") itemsParam = ""): Observable<MessageEvent> {
