@@ -8,7 +8,7 @@ export class StreamItemsGuard implements CanActivate {
   async canActivate(ctx: ExecutionContext) {
     const req = ctx.switchToHttp().getRequest();
     const requested = String(req.query.items ?? "").split(",").filter(Boolean);
-    const allowed = await this.perms.allowedItems(req.user.id);
+    const allowed = await this.perms.allowedItems(req.user.userId);
     const items = requested.filter((i) => allowed.has(i));
     if (items.length === 0) throw new ForbiddenException();
     req.allowedItems = items;

@@ -8,10 +8,10 @@
   },
   "scripts": {
     "dev": "pnpm -r --parallel dev",
-    "build": "pnpm --filter @toolhackchain/shared build && pnpm --filter api build && pnpm --filter @toolhackchain/web-admin build && pnpm --filter @toolhackchain/web-portal build",
-    "dev:api": "pnpm --filter api start:dev",
+    "build": "pnpm --filter @toolhackchain/shared build && pnpm --filter @toolhackchain/api build && pnpm --filter @toolhackchain/web-admin build && pnpm --filter @toolhackchain/web-portal build",
+    "dev:api": "pnpm --filter @toolhackchain/api start:dev",
     "dev:web": "pnpm --filter @toolhackchain/web-admin dev",
-    "test": "pnpm --filter api test",
+    "test": "pnpm --filter @toolhackchain/api test",
     "dev:portal": "pnpm --filter @toolhackchain/web-portal dev",
     "db:migrate": "docker compose run --rm flyway migrate",
     "db:info": "docker compose run --rm flyway info",

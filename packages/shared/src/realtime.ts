@@ -13,4 +13,8 @@ export const RedisKeys = {
   latest: (itemId: string) => `latest:${itemId}`,
   perm: (userId: string) => `perm:user:${userId}`,
   session: (sid: string) => `session:${sid}`,
+  userSessions: (userId: string) => `user_sessions:${userId}`,
+  refresh: (sid: string) => `refresh:${sid}`,
+  loginFail: (phone: string) => `login_fail:${phone}`,
+  loginLock: (phone: string) => `login_lock:${phone}`,
 } as const;
