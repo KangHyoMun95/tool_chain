@@ -12,7 +12,7 @@ def dedup_key(h: str) -> str: return f"dedup:{h}"
 class CrawlPayload(TypedDict):
     """Payload gửi liên tục, nhiều lần cho cùng một ván.
 
-    Ghi DB: lobby_name, category_name, stream_name, stream_round, streamer_id, actual_result.
+    Ghi DB: lobby_name, category_name, stream_name, stream_shoe, stream_round, streamer_id, actual_result.
     Chỉ hiển thị (chỉ đi qua realtime/SSE, không ghi DB): player_count, player_value, status, total_B/P/T.
     stream_id là id text phía nguồn (không phải streams.stream_id), ingestion bỏ qua.
     """
@@ -20,7 +20,8 @@ class CrawlPayload(TypedDict):
     category_name: str
     stream_id: str
     stream_name: str
-    stream_round: Union[int, str]      # số nguyên
+    stream_shoe: Union[int, str]       # số nguyên (shoe hiện tại); round có thể reset khi đổi shoe
+    stream_round: Union[int, str]      # số nguyên (= game_sessions.road_count)
     streamer_id: str
     player_count: int
     player_value: float

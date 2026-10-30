@@ -6,4 +6,5 @@ export const RETRY_DELAY_MS = 1000;     // chờ trước khi thử lại khi gh
 export const ID_CACHE_TTL_SECONDS = 30 * 60;   // cache id lobby / category / stream trên Redis
 export const MEMORY_CACHE_MAX = 100_000;            // số mục tối đa mỗi cache trong bộ nhớ
 export const MAX_NAME_LENGTH = 255;                 // theo cột *_name / streamer_id
+export const INVALID_LOG_INTERVAL_MS = 60_000;     // log tick lỗi tối đa 1 lần / phút cho mỗi (item_id, lý do)
 export const MAX_RESULT_LENGTH = 50;                // theo cột game_sessions.result

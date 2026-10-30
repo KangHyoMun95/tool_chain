@@ -3,7 +3,7 @@ export const TICK_STREAM = "ticks";
 export const PERSIST_GROUP = "persist";
 
 // Payload crawler gửi liên tục (nhiều lần cho cùng một ván). Phải khớp CrawlPayload trong apps/crawl-agent/contract.py.
-// Ghi DB: lobby_name, category_name, stream_name, stream_round, streamer_id, actual_result.
+// Ghi DB: lobby_name, category_name, stream_name, stream_shoe, stream_round, streamer_id, actual_result.
 // Chỉ hiển thị (chỉ đi qua realtime/SSE, KHÔNG ghi DB): player_count, player_value, status, total_B/P/T.
 // stream_id là id text phía nguồn (không phải streams.stream_id) → ingestion bỏ qua.
 export type CrawlPayload = {
@@ -11,7 +11,8 @@ export type CrawlPayload = {
   category_name: string;
   stream_id: string;
   stream_name: string;
-  stream_round: number | string;     // số nguyên; một ván mới trong stream → một game_session
+  stream_shoe: number | string;      // số nguyên (shoe hiện tại); round có thể reset khi đổi shoe
+  stream_round: number | string;     // số nguyên (= game_sessions.road_count); (stream, stream_shoe, stream_round) = một game_session
   streamer_id: string;               // tên người live
   player_count: number;
   player_value: number;
@@ -34,6 +35,9 @@ export const RedisKeys = {
   lobby: (norm: string) => `lobby:${norm}`,
   category: (lobbyId: string, norm: string) => `category:${lobbyId}:${norm}`,
   stream: (keyId: string) => `stream:${keyId}`,
+  // trạng thái quan sát shoe/round của mỗi stream (chỉ để log, ingestion/shoe-observer.ts)
+  streamLast: (keyId: string) => `stream_last:${keyId}`,
+  streamShoes: (keyId: string) => `stream_shoes:${keyId}`,
   latest: (itemId: string) => `latest:${itemId}`,
   perm: (userId: string) => `perm:user:${userId}`,
   session: (sid: string) => `session:${sid}`,

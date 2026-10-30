@@ -12,10 +12,17 @@ import { GameSessionsService } from "../game-sessions/game-sessions.service.js";
 import { gameSessionId } from "../game-sessions/game-session-id.js";
 import { BoundedMap } from "./bounded-map.js";
 import { IdCache } from "./id-cache.service.js";
-import { MAX_NAME_LENGTH, MAX_RESULT_LENGTH, MEMORY_CACHE_MAX } from "./ingestion.constants.js";
+import { ShoeObserver } from "./shoe-observer.js";
+import { INVALID_LOG_INTERVAL_MS, MAX_NAME_LENGTH, MAX_RESULT_LENGTH, MEMORY_CACHE_MAX } from "./ingestion.constants.js";
 
 const PG_FOREIGN_KEY_VIOLATION = "23503";
 const MAX_INT4 = 2_147_483_647;
+
+/** Số nguyên không âm, vừa int4; nhận number hoặc chuỗi số (đã trim). */
+function toInt(v: unknown): number | null {
+  const n = typeof v === "number" ? v : typeof v === "string" && /^\d+$/.test(v.trim()) ? Number(v.trim()) : NaN;
+  return Number.isInteger(n) && n >= 0 && n <= MAX_INT4 ? n : null;
+}
 
 type Parsed = {
   keyId: string;
@@ -23,11 +30,12 @@ type Parsed = {
   category: string; categoryNorm: string;
   stream: string;
   streamer: string | null;
+  shoe: number;
   round: number;
   result: string | null;
 };
 type StreamGroup = Pick<Parsed, "keyId" | "lobby" | "lobbyNorm" | "category" | "categoryNorm" | "stream"> & { streamer: string | null };
-type SessionGroup = { id: string; keyId: string; round: number; result: string | null };
+type SessionGroup = { id: string; keyId: string; shoe: number; round: number; result: string | null };
 type SessionState = { result: string | null; warned?: string };
 
 @Injectable()
@@ -36,10 +44,12 @@ export class IngestionService {
   // Trạng thái đã biết, để tick lặp lại không phải chạm DB.
   private sessions = new BoundedMap<string, SessionState>(MEMORY_CACHE_MAX);
   private streamers = new BoundedMap<string, string>(MEMORY_CACHE_MAX);   // stream_id → streamer_id
+  private lastInvalidLog = new BoundedMap<string, number>(MEMORY_CACHE_MAX); // chống spam log tick lỗi
 
   constructor(
     @InjectDataSource() private ds: DataSource,
     private ids: IdCache,
+    private shoes: ShoeObserver,
     private lobbies: LobbiesService,
     private categories: CategoriesService,
     private streams: StreamsService,
@@ -65,11 +75,21 @@ export class IngestionService {
       this.streamers.clear();
       await this.run(parsed);
     }
+    // Chỉ quan sát shoe/round sau khi DB đã commit (retry batch không log trùng); không bao giờ ném lỗi.
+    await this.shoes.observe(parsed.map((p) => ({ keyId: p.keyId, stream: p.stream, shoe: p.shoe, round: p.round })));
   }
 
   private parse(t: Tick): Parsed | null {
     const d = t?.data as Record<string, unknown> | undefined;
-    const fail = (why: string): null => { this.log.warn(`Bỏ qua tick ${t?.id}: ${why}`); return null; };
+    const fail = (why: string): null => {
+      const k = `${t?.item_id}\u0000${why}`;
+      const now = Date.now();
+      if (now - (this.lastInvalidLog.get(k) ?? 0) >= INVALID_LOG_INTERVAL_MS) {
+        this.lastInvalidLog.set(k, now);
+        this.log.warn(`Bỏ qua tick ${t?.id} (${t?.item_id}): ${why}`);
+      }
+      return null;
+    };
     if (!d || typeof d !== "object") return fail("thiếu data");
 
     const names: string[] = [];
@@ -82,9 +102,11 @@ export class IngestionService {
     }
     const [lobby, category, stream] = names;
 
-    const r = d.stream_round;
-    const round = typeof r === "number" ? r : typeof r === "string" && /^\d+$/.test(r.trim()) ? Number(r.trim()) : NaN;
-    if (!Number.isInteger(round) || round < 0 || round > MAX_INT4) return fail("stream_round phải là số nguyên");
+    // stream_shoe và stream_round đều là số nguyên, bắt buộc: sai thì bỏ cả tick (realtime là luồng khác, không bị ảnh hưởng)
+    const shoe = toInt(d.stream_shoe);
+    if (shoe === null) return fail("stream_shoe phải là số nguyên");
+    const round = toInt(d.stream_round);
+    if (round === null) return fail("stream_round phải là số nguyên");
 
     let result: string | null = null;
     const ar = d.actual_result;
@@ -105,12 +127,12 @@ export class IngestionService {
       lobby: displayName(lobby), lobbyNorm: normalizeName(lobby),
       category: displayName(category), categoryNorm: normalizeName(category),
       stream: displayName(stream),
-      streamer, round, result,
+      streamer, shoe, round, result,
     };
   }
 
   private async run(parsed: Parsed[]): Promise<void> {
-    // 1) Gộp theo stream (giữ tên hiển thị lần đầu, streamer mới nhất) và theo (stream, round).
+    // 1) Gộp theo stream (giữ tên hiển thị lần đầu, streamer mới nhất) và theo (stream, shoe, round).
     const streamGroups = new Map<string, StreamGroup>();
     const sessionGroups = new Map<string, SessionGroup>();
     for (const p of parsed) {
@@ -118,9 +140,9 @@ export class IngestionService {
       if (!sg) streamGroups.set(p.keyId, { ...p });
       else if (p.streamer) sg.streamer = p.streamer;
 
-      const sk = `${p.keyId}\u0000${p.round}`;
+      const sk = `${p.keyId}\u0000${p.shoe}\u0000${p.round}`;
       const ses = sessionGroups.get(sk);
-      if (!ses) sessionGroups.set(sk, { id: gameSessionId(p.keyId, p.round), keyId: p.keyId, round: p.round, result: p.result });
+      if (!ses) sessionGroups.set(sk, { id: gameSessionId(p.keyId, p.shoe, p.round), keyId: p.keyId, shoe: p.shoe, round: p.round, result: p.result });
       else if (p.result !== null) {
         if (ses.result === null) ses.result = p.result;
         else if (ses.result !== p.result) {
@@ -237,7 +259,7 @@ export class IngestionService {
 
   private async writeSessions(m: EntityManager, todo: SessionGroup[], streamIds: Map<string, string>): Promise<[string, SessionState][]> {
     if (todo.length === 0) return [];
-    await this.gameSessions.insertMany(m, todo.map((g) => ({ id: g.id, streamId: streamIds.get(g.keyId)!, round: g.round })));
+    await this.gameSessions.insertMany(m, todo.map((g) => ({ id: g.id, streamId: streamIds.get(g.keyId)!, shoe: g.shoe, round: g.round })));
 
     const withResult = todo.filter((g): g is SessionGroup & { result: string } => g.result !== null);
     const stored = await this.gameSessions.applyResults(m, withResult.map((g) => ({ id: g.id, result: g.result })));

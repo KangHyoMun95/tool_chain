@@ -2,7 +2,7 @@
 import { Injectable } from "@nestjs/common";
 import type { EntityManager } from "typeorm";
 
-export type NewSession = { id: string; streamId: string; round: number };
+export type NewSession = { id: string; streamId: string; shoe: number; round: number };
 export type SessionResult = { id: string; result: string };
 
 @Injectable()
@@ -11,10 +11,10 @@ export class GameSessionsService {
   async insertMany(m: EntityManager, items: NewSession[]): Promise<void> {
     if (items.length === 0) return;
     await m.query(
-      `INSERT INTO game_sessions (game_session_id, stream_id, road_count)
-       SELECT * FROM unnest($1::uuid[], $2::bigint[], $3::int[])
+      `INSERT INTO game_sessions (game_session_id, stream_id, road_shoe, road_count)
+       SELECT * FROM unnest($1::uuid[], $2::bigint[], $3::int[], $4::int[])
        ON CONFLICT DO NOTHING`,
-      [items.map((i) => i.id), items.map((i) => i.streamId), items.map((i) => i.round)],
+      [items.map((i) => i.id), items.map((i) => i.streamId), items.map((i) => i.shoe), items.map((i) => i.round)],
     );
   }
 

@@ -15,6 +15,6 @@ function uuidV5(name: string, namespace: string): string {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
-/** Cùng một ván (stream + stream_round) luôn ra cùng ID → retry / batch lặp lại vẫn idempotent. */
-export const gameSessionId = (keyId: string, streamRound: number): string =>
-  uuidV5(`${keyId}|${streamRound}`, GAME_SESSION_NAMESPACE);
+/** Cùng một ván (stream + shoe + round) luôn ra cùng ID → retry / batch lặp lại vẫn idempotent. */
+export const gameSessionId = (keyId: string, roadShoe: number, streamRound: number): string =>
+  uuidV5(`${keyId}|${roadShoe}|${streamRound}`, GAME_SESSION_NAMESPACE);
