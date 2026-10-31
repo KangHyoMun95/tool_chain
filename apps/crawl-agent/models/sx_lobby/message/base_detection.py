@@ -3,6 +3,7 @@ import time
 from datetime import datetime, timezone, timedelta
 
 VN_TZ = timezone(timedelta(hours=7))
+FORMAT_DATETIME = "%Y-%m-%d %H:%M:%S"
 
 class BaseDetection(ABC):
     message: dict = {}
@@ -35,9 +36,9 @@ class BaseDetection(ABC):
     def get_time(self, key_name: str) -> int | None:
         return self._seconds_from_now(self.get_key(key_name)) if self.get_key(key_name) else None
 
-    def ms_to_dt(self, key_name: str, tz=VN_TZ) -> datetime | None:
+    def ms_to_dt(self, key_name: str, tz=VN_TZ) -> str | None:
         """Unix timestamp (mili giây) -> datetime có múi giờ."""
-        return datetime.fromtimestamp(self.get_key(key_name) / 1000, tz) if self.get_key(key_name) else None
+        return datetime.fromtimestamp(self.get_key(key_name) / 1000, tz).strftime(FORMAT_DATETIME) if self.get_key(key_name) else None
 
     @classmethod
     def _seconds_from_now(cls, ms: int | None) -> float | None:
