@@ -7,7 +7,7 @@ import asyncio
 import msgpack
 
 from exception import CycleError
-from models.base_detection import BaseDetection
+from models.sx_lobby.message.base_detection import BaseDetection
 from store.token_store import TokenStore
 
 
@@ -131,7 +131,7 @@ def destructure_message(message: dict):
         "dealer_id": dealer_id,
         "event_type": event_type,
         "table_id": table_id,
-        # "game_round": game_round,
+        "game_round": game_round,
         # "game_shoe": game_shoe,
         # "round_start_time": round_start_time,
         # "timestamp": timestamp,
@@ -139,9 +139,9 @@ def destructure_message(message: dict):
         "current_bet": current_bet,
         # "repaint_time": repaint_time,
         "win_counts": win_counts,
-        "good_road_type": good_road_type,
-        "good_road_count": good_road_count,
-        "prev_good_road_json": prev_good_road_json,
+        # "good_road_type": good_road_type,
+        # "good_road_count": good_road_count,
+        # "prev_good_road_json": prev_good_road_json,
         # "curr_good_road_json": curr_good_road_json,
         # "big_roads": big_roads,
         # "stamp_time": stamp_time,
@@ -186,22 +186,23 @@ async def listen_ws(store: TokenStore, on_message=None, token_wait: float = 120)
                             print(f"[ws] Connecting: status={msg.get('status')}")
                         elif mtype == "GameHallInfo":
                             val = destructure_message(message)
-                            if val.get("table_id") != TABLE_ID:
-                                continue
-                            new_record = {k: v for k, v in val.items() if v is not None}
-                            result = get_win(new_record.get("win_counts"), record_debugging.get("win_counts", [0, 0, 0]))
-                            if "handler" not in record_debugging or record_debugging["handler"] is None:
-                                record_debugging["handler"] = set()
-                            record_debugging["handler"].add(handler)
-                            record_debugging = {
-                                **record_debugging,
-                                **new_record,
-                                "result": result,
-                            }
-                            if len(record_debugging["handler"]) == 4:
-                                print(get_information(record_debugging))
-                            else:
-                                print("Đang nạp dữ liệu.........")
+                            print(val)
+                            # if val.get("table_id") != TABLE_ID:
+                            #     continue
+                            # new_record = {k: v for k, v in val.items() if v is not None}
+                            # result = get_win(new_record.get("win_counts"), record_debugging.get("win_counts", [0, 0, 0]))
+                            # if "handler" not in record_debugging or record_debugging["handler"] is None:
+                            #     record_debugging["handler"] = set()
+                            # record_debugging["handler"].add(handler)
+                            # record_debugging = {
+                            #     **record_debugging,
+                            #     **new_record,
+                            #     "result": result,
+                            # }
+                            # if len(record_debugging["handler"]) == 4:
+                            #     print(get_information(record_debugging))
+                            # else:
+                            #     print("Đang nạp dữ liệu.........")
                         else:
                             print(f"[ws] {mtype}: {msg}")
                     else:
