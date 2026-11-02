@@ -5,7 +5,7 @@ import { GameSessionStatus } from "@toolhackchain/shared";
 @Entity("game_sessions")
 export class GameSessionEntity {
   @PrimaryColumn({ name: "game_session_id", type: "uuid" }) gameSessionId!: string;
-  @Column({ name: "stream_id", type: "bigint" }) streamId!: string;
+  @Column({ name: "stream_id", type: "uuid" }) streamId!: string;
   @Column({ name: "road_shoe", type: "integer" }) roadShoe!: number;
   // stream_shoe / stream_round của crawler (số nguyên) → road_shoe / road_count; unique (stream_id, road_shoe, road_count)
   @Column({ name: "road_count", type: "integer", nullable: true }) roadCount!: number | null;

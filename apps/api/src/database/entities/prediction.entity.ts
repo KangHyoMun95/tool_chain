@@ -4,7 +4,7 @@ import { Column, CreateDateColumn, Entity, PrimaryColumn } from "typeorm";
 @Entity("predictions")
 export class PredictionEntity {
   @PrimaryColumn({ name: "prediction_id", type: "uuid" }) predictionId!: string;
-  @Column({ name: "stream_id", type: "bigint" }) streamId!: string;
+  @Column({ name: "stream_id", type: "uuid" }) streamId!: string;
   @Column({ name: "game_session_id", type: "uuid", unique: true }) gameSessionId!: string;
   @Column({ name: "predict_result", length: 50 }) predictResult!: string;
   @Column({ name: "confidence_score", type: "numeric", precision: 5, scale: 4, nullable: true }) confidenceScore!: string | null;

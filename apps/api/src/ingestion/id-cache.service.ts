@@ -6,6 +6,7 @@ import { BoundedMap } from "./bounded-map.js";
 import { ID_CACHE_TTL_SECONDS, MEMORY_CACHE_MAX } from "./ingestion.constants.js";
 
 const PATTERNS = ["lobby:*", "category:*", "stream:*"];
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Cache key → id (bộ nhớ trước, Redis sau). Chỉ ghi sau khi DB đã commit. */
 @Injectable()
@@ -19,7 +20,7 @@ export class IdCache {
     if (missIdx.length === 0) return out;
     const vals = await this.redis.mget(missIdx.map((i) => keys[i]));
     vals.forEach((v, n) => {
-      if (v === null) return;
+      if (v === null || !UUID_RE.test(v)) return;   // id cũ dạng số (trước V7) coi như cache miss
       out[missIdx[n]] = v;
       this.mem.set(keys[missIdx[n]], v);
     });

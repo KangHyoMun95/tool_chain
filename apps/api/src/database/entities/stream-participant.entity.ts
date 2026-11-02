@@ -2,9 +2,9 @@ import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeor
 
 @Entity("stream_participants")
 export class StreamParticipantEntity {
-  @PrimaryGeneratedColumn("identity", { name: "stream_participant_id", type: "bigint", generatedIdentity: "ALWAYS" }) streamParticipantId!: string;
-  @Column({ name: "user_id", type: "bigint" }) userId!: string;
-  @Column({ name: "stream_id", type: "bigint" }) streamId!: string;
+  @PrimaryGeneratedColumn("uuid", { name: "stream_participant_id" }) streamParticipantId!: string;
+  @Column({ name: "user_id", type: "uuid" }) userId!: string;
+  @Column({ name: "stream_id", type: "uuid" }) streamId!: string;
   @Column({ name: "last_seen_at", type: "timestamptz", default: () => "now()" }) lastSeenAt!: Date;
   @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
 }

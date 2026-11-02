@@ -11,7 +11,7 @@ export class StreamInformationService {
     if (items.length === 0) return;
     await m.query(
       `INSERT INTO stream_information (stream_id, streamer_id)
-       SELECT * FROM unnest($1::bigint[], $2::text[])
+       SELECT * FROM unnest($1::uuid[], $2::text[])
        ON CONFLICT (stream_id) DO UPDATE SET streamer_id = EXCLUDED.streamer_id
        WHERE stream_information.streamer_id IS DISTINCT FROM EXCLUDED.streamer_id`,
       [items.map((i) => i.streamId), items.map((i) => i.streamerId)],
