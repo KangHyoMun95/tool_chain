@@ -1,7 +1,7 @@
 "use client";
 
 import { useI18n } from "@/src/i18n/provider";
-import type { ConfidencePoint } from "@/src/lib/portal-data";
+import type { ConfidencePoint } from "@/src/lib/mock-stats";
 
 const WIDTH = 600;
 const HEIGHT = 224;

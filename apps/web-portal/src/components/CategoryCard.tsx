@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useI18n } from "@/src/i18n/provider";
-import type { Category } from "@/src/lib/portal-data";
+import type { Category } from "@/src/lib/api/catalog";
+import { getCategoryWinRate } from "@/src/lib/mock-stats";
 
 export function CategoryCard({ category }: { category: Category }) {
   const { t } = useI18n();
@@ -16,7 +17,7 @@ export function CategoryCard({ category }: { category: Category }) {
       <div className="category-foot">
         <div>
           <p className="micro-label">{t("categories.aiWinRate")}</p>
-          <p className="metric metric-amber">{category.aiWinRate.toFixed(1)}%</p>
+          <p className="metric metric-amber">{getCategoryWinRate(category.id).toFixed(1)}%</p>
         </div>
         <Link href={`/categories/${category.id}`} className="btn btn-amber btn-sm">
           {t("categories.openStreams")}

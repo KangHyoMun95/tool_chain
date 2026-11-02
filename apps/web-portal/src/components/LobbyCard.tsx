@@ -1,7 +1,7 @@
 "use client";
 
 import { useI18n } from "@/src/i18n/provider";
-import type { Lobby } from "@/src/lib/portal-data";
+import type { Lobby } from "@/src/lib/api/catalog";
 
 export function LobbyCard({
   lobby,
@@ -25,10 +25,9 @@ export function LobbyCard({
         <span className="lobby-initial">{lobby.initial}</span>
         <span className="lobby-text">
           <span className="lobby-name">{lobby.name}</span>
-          <span className="lobby-desc">{lobby.description}</span>
         </span>
       </span>
-      <span className="chip chip-count">{t("lobbies.tables", { count: lobby.tableCount })}</span>
+      <span className="chip chip-count">{t("lobbies.tables", { count: lobby.streamCount })}</span>
     </button>
   );
 }

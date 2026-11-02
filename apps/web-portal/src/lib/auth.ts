@@ -4,6 +4,9 @@
 // NEXT_PUBLIC_API_URL có thể là gốc (http://host:4000) hoặc đã kèm /api; luôn chuẩn hóa về <gốc>/api.
 const API_BASE = `${(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/+$/, "").replace(/\/api$/, "")}/api`;
 
+/** URL đầy đủ của một đường dẫn API (vd "/stream"). */
+export const apiUrl = (path: string): string => `${API_BASE}${path}`;
+
 export type AuthErrorCode = "invalid_input" | "invalid_credentials" | "locked" | "network" | "unknown";
 
 export class AuthError extends Error {
@@ -55,18 +58,42 @@ async function isTokenValid(token: string): Promise<boolean> {
 }
 
 // Refresh token được xoay mỗi lần gọi và dùng lại token cũ sẽ thu hồi cả phiên ⇒ KHÔNG được gọi đồng thời
-// (vd React StrictMode chạy effect hai lần). Mọi lời gọi dùng chung một promise đang chạy.
-async function refreshAccessToken(): Promise<boolean> {
-  try {
-    const res = await fetch(`${API_BASE}/auth/refresh`, { method: "POST", credentials: "include" });
-    if (!res.ok) return false;
-    const token = await readAccessToken(res);
-    if (token === null) return false;
-    accessToken = token;
-    return true;
-  } catch {
-    return false;
+// (vd React StrictMode chạy effect hai lần, hoặc nhiều request cùng gặp 401). Mọi lời gọi dùng chung một promise đang chạy.
+let refreshing: Promise<boolean> | null = null;
+
+function refreshAccessToken(): Promise<boolean> {
+  if (refreshing) return refreshing;
+  refreshing = (async () => {
+    try {
+      const res = await fetch(`${API_BASE}/auth/refresh`, { method: "POST", credentials: "include" });
+      if (!res.ok) return false;
+      const token = await readAccessToken(res);
+      if (token === null) return false;
+      accessToken = token;
+      return true;
+    } catch {
+      return false;
+    }
+  })().finally(() => {
+    refreshing = null;
+  });
+  return refreshing;
+}
+
+/**
+ * fetch tới API kèm Bearer. Gặp 401 (access token hết hạn) thì làm mới token MỘT lần rồi gọi lại;
+ * nhiều request cùng hết hạn chia sẻ một lần refresh. Lỗi mạng thì ném TypeError như fetch.
+ */
+export async function authFetch(path: string, init: RequestInit = {}): Promise<Response> {
+  const send = () =>
+    fetch(`${API_BASE}${path}`, { ...init, headers: { ...init.headers, Authorization: `Bearer ${accessToken ?? ""}` } });
+  const res = await send();
+  if (res.status !== 401) return res;
+  if (!(await refreshAccessToken())) {
+    accessToken = null;
+    return res;
   }
+  return send();
 }
 
 let restoring: Promise<boolean> | null = null;

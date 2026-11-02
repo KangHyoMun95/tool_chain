@@ -14,14 +14,16 @@
   "lobbies": {
     "title": "1. Choose an Analysis Lobby",
     "count": "{count} VIP Lobbies",
-    "tables": "{count} Tables"
+    "tables": "{count} Tables",
+    "empty": "No active lobbies yet."
   },
   "categories": {
     "title": "2. Game Types ({lobby} Lobby)",
     "hint": "Press \"Live Tables\" to see the list",
     "liveTables": "{count} LIVE Tables Active",
     "aiWinRate": "AI Win Rate",
-    "openStreams": "Live Tables →"
+    "openStreams": "Live Tables →",
+    "empty": "This lobby has no game types yet."
   },
   "streams": {
     "subtitle": "Tables currently running live analysis",
@@ -30,7 +32,9 @@
     "live": "LIVE",
     "winStreak": "Win Streak",
     "recentResults": "Last {count} Rounds",
-    "viewDetail": "AI Prediction Details →"
+    "viewDetail": "AI Prediction Details →",
+    "empty": "No tables in this game type yet.",
+    "streamer": "Streamer: {name}"
   },
   "detail": {
     "badge": "REAL-TIME AI ANALYSIS",
@@ -100,5 +104,11 @@
     "registerSuccess": "Your phone number has been received. Your managing Admin will issue an account for you.",
     "registerLoading": "SENDING...",
     "checking": "Checking your session..."
+  },
+  "common": {
+    "loading": "Loading data...",
+    "error": "Could not load data. Please try again.",
+    "errorNetwork": "Cannot reach the server. Please try again.",
+    "retry": "Retry"
   }
 }
