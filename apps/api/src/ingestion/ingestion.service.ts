@@ -37,8 +37,8 @@ type Parsed = {
   result: string | null;
 };
 type StreamGroup = Pick<Parsed, "keyId" | "lobby" | "lobbyNorm" | "category" | "categoryNorm" | "stream"> & { streamer: string | null };
-type SessionGroup = { id: string; keyId: string; shoe: number; round: number; result: string | null };
-type SessionState = { result: string | null; warned?: string };
+type SessionGroup = { id: string; keyId: string; stream: string; shoe: number; round: number; result: string | null };
+type SessionState = { result: string | null; warned?: string; cancelled?: boolean };
 
 @Injectable()
 export class IngestionService {
@@ -147,7 +147,7 @@ export class IngestionService {
 
       const sk = `${p.keyId}\u0000${p.shoe}\u0000${p.round}`;
       const ses = sessionGroups.get(sk);
-      if (!ses) sessionGroups.set(sk, { id: gameSessionId(p.keyId, p.shoe, p.round), keyId: p.keyId, shoe: p.shoe, round: p.round, result: p.result });
+      if (!ses) sessionGroups.set(sk, { id: gameSessionId(p.keyId, p.shoe, p.round), keyId: p.keyId, stream: p.stream, shoe: p.shoe, round: p.round, result: p.result });
       else if (p.result !== null) {
         if (ses.result === null) ses.result = p.result;
         else if (ses.result !== p.result) {
@@ -161,7 +161,7 @@ export class IngestionService {
     for (const g of sessionGroups.values()) {
       const known = this.sessions.get(g.id);
       if (!known) { todo.push(g); continue; }
-      if (g.result === null) continue;
+      if (g.result === null || known.cancelled) continue;   // ván CANCELLED đã cảnh báo rồi, không hỏi lại DB
       if (known.result === null) { todo.push(g); continue; }
       if (known.result !== g.result && known.warned !== g.result) {
         known.warned = g.result;
@@ -267,9 +267,13 @@ export class IngestionService {
     await this.gameSessions.insertMany(m, todo.map((g) => ({ id: g.id, streamId: streamIds.get(g.keyId)!, shoe: g.shoe, round: g.round })));
 
     const withResult = todo.filter((g): g is SessionGroup & { result: string } => g.result !== null);
-    const stored = await this.gameSessions.applyResults(m, withResult.map((g) => ({ id: g.id, result: g.result })));
+    const { stored, cancelled } = await this.gameSessions.applyResults(m, withResult.map((g) => ({ id: g.id, result: g.result })));
 
     return todo.map((g) => {
+      if (cancelled.has(g.id)) {
+        this.log.warn(`Ván ${g.id} (stream "${g.stream}", shoe ${g.shoe}, round ${g.round}) đã CANCELLED nhưng nhận result "${g.result}", không cập nhật`);
+        return [g.id, { result: null, cancelled: true }] as [string, SessionState];
+      }
       const existing = stored.get(g.id);
       if (g.result !== null && existing !== undefined && existing !== g.result) {
         this.warnConflict(g.id, existing, g.result);
