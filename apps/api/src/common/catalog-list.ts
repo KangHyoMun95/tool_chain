@@ -18,6 +18,11 @@ export class CatalogListQueryDto {
 /** id là UUID (V7). */
 export const IdQuery = () => IsUUID();
 
+/** Tham số :id của các endpoint chi tiết. */
+export class IdParamDto {
+  @IsUUID() id!: string;
+}
+
 export type Page<T> = { items: T[]; total: number; page: number; limit: number };
 
 /** USER chỉ thấy bản ghi ACTIVE; HOST / ADMIN lọc theo status tùy ý (không truyền thì lấy tất cả). */

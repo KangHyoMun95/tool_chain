@@ -1,5 +1,5 @@
 // src/streams/streams.service.ts
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import type { EntityManager, Repository } from "typeorm";
 import { CatalogStatus, type Role } from "@toolhackchain/shared";
@@ -13,32 +13,48 @@ export type StreamItem = {
   lobby_id: string; lobby_name: string; streamer_id: string | null; status: string;
 };
 
+const STREAM_COLUMNS = [
+  "s.streamId AS stream_id", "s.streamName AS stream_name",
+  "s.categoryId AS category_id", "c.categoryName AS category_name",
+  "c.lobbyId AS lobby_id", "l.lobbyName AS lobby_name",
+  "si.streamerId AS streamer_id", "s.status AS status",
+];
+
 export type StreamInput = { categoryId: string; name: string };
 
 @Injectable()
 export class StreamsService {
   constructor(@InjectRepository(StreamEntity) private repo: Repository<StreamEntity>) {}
 
-  async list(role: Role, dto: StreamListQueryDto): Promise<Page<StreamItem>> {
+  /** Query gốc: USER chỉ thấy stream ACTIVE có category + lobby cha ACTIVE. */
+  private base(role: Role) {
     const qb = this.repo.createQueryBuilder("s")
       .innerJoin(CategoryEntity, "c", "c.categoryId = s.categoryId")
       .innerJoin(LobbyEntity, "l", "l.lobbyId = c.lobbyId")
       .leftJoin(StreamInformationEntity, "si", "si.streamId = s.streamId");
+    if (role === "USER") {
+      qb.andWhere("s.status = :visible AND c.status = :visible AND l.status = :visible", { visible: CatalogStatus.ACTIVE });
+    }
+    return qb;
+  }
+
+  async getOne(role: Role, id: string): Promise<StreamItem> {
+    const row = await this.base(role).andWhere("s.streamId = :id", { id }).select(STREAM_COLUMNS).getRawOne<StreamItem>();
+    if (!row) throw new NotFoundException();
+    return row;
+  }
+
+  async list(role: Role, dto: StreamListQueryDto): Promise<Page<StreamItem>> {
+    const qb = this.base(role);
     const status = effectiveStatus(role, dto.status);
     if (status) qb.andWhere("s.status = :status", { status });
-    if (role === "USER") qb.andWhere("c.status = :parent AND l.status = :parent", { parent: CatalogStatus.ACTIVE });   // category + lobby cha phải ACTIVE
     if (dto.lobby_id) qb.andWhere("c.lobbyId = :lobbyId", { lobbyId: dto.lobby_id });
     if (dto.category_id) qb.andWhere("s.categoryId = :categoryId", { categoryId: dto.category_id });
     if (dto.q?.trim()) qb.andWhere("s.streamName ILIKE :q", { q: likePattern(dto.q) });
 
     const total = await qb.getCount();
     const rows = await qb
-      .select([
-        "s.streamId AS stream_id", "s.streamName AS stream_name",
-        "s.categoryId AS category_id", "c.categoryName AS category_name",
-        "c.lobbyId AS lobby_id", "l.lobbyName AS lobby_name",
-        "si.streamerId AS streamer_id", "s.status AS status",
-      ])
+      .select(STREAM_COLUMNS)
       .orderBy("l.lobbyName", "ASC").addOrderBy("c.categoryName", "ASC")
       .addOrderBy("s.streamName", "ASC").addOrderBy("s.streamId", "ASC")
       .offset((dto.page - 1) * dto.limit).limit(dto.limit)
