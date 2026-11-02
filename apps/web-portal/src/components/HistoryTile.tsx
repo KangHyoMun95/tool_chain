@@ -1,7 +1,7 @@
 "use client";
 
 import { useI18n } from "@/src/i18n/provider";
-import type { HistoryEntry } from "@/src/lib/portal-data";
+import type { HistoryEntry } from "@/src/lib/mock-stats";
 
 export function HistoryTile({ entry }: { entry: HistoryEntry }) {
   const { t } = useI18n();

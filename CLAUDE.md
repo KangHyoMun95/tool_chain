@@ -297,4 +297,6 @@ Khi tạo/sửa UI, PHẢI đọc và bám file design của đúng app; hai app
 - `apps/web-admin` — Dark SOC / Cyber-Threat: `.claude/designs/WEB-ADMIN.DESIGN.md` (nền `#0A0E14`, primary cyan `#22D3EE`, heading monospace, bảng severity nhất quán). Dùng skill `nextjs-frontend` (antd + pro-components).
 - `apps/web-portal` — Nexus AI Royale / Royal Purple Analytics (nguồn: Stitch `projects/10681042779717465733`): `.claude/designs/WEB-PORTAL.DESIGN.md` (nền sáng lavender `#F3E8FF`→`#F5D0FE`, header tím `#581C87`→`#7E22CE`, nhấn vàng amber `#F59E0B`, xanh lá/hồng đỏ chỉ cho đúng–sai, font Outfit + Plus Jakarta Sans, không monospace).
 
+- **Dữ liệu web-portal:** sảnh / loại game / bàn lấy từ API thật (`src/lib/api/catalog.ts` → `GET /lobbies`, `/categories`, `/streams`, `/categories/:id`, `/streams/:id`), fetch ở **client** kèm Bearer (`authFetch` tự làm mới token một lần khi gặp 401, `useApi` chỉ gọi khi đã đăng nhập). Số liệu AI (tỉ lệ thắng, chuỗi thắng, lịch sử, độ tin cậy, khung dự đoán) vẫn là **dữ liệu giả lập** trong `src/lib/mock-stats.ts`, chờ API prediction.
+
 Skills khác trong `.claude/skills/`: `rbac-guard` (scope dữ liệu theo cấp trên), `flyway-migration`, `security-review`.

@@ -10,6 +10,8 @@ type AuthContextValue = {
   status: AuthStatus;
   /** Gọi ngay sau khi đăng nhập thành công (token đã nằm trong bộ nhớ). */
   markAuthenticated: () => void;
+  /** Gọi khi API trả 401 mà không làm mới được token: các trang được bảo vệ sẽ chuyển sang /login. */
+  markUnauthenticated: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -29,7 +31,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const markAuthenticated = useCallback(() => setStatus("authenticated"), []);
-  const value = useMemo(() => ({ status, markAuthenticated }), [status, markAuthenticated]);
+  const markUnauthenticated = useCallback(() => setStatus("unauthenticated"), []);
+  const value = useMemo(
+    () => ({ status, markAuthenticated, markUnauthenticated }),
+    [status, markAuthenticated, markUnauthenticated],
+  );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 

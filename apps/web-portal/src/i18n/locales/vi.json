@@ -14,14 +14,16 @@
   "lobbies": {
     "title": "1. Chọn Sảnh Phân Tích",
     "count": "{count} Sảnh VIP",
-    "tables": "{count} Bàn"
+    "tables": "{count} Bàn",
+    "empty": "Chưa có sảnh nào đang hoạt động."
   },
   "categories": {
     "title": "2. Loại Trò Chơi (Sảnh {lobby})",
     "hint": "Bấm \"Bàn Live\" để xem danh sách",
     "liveTables": "{count} Bàn LIVE Active",
     "aiWinRate": "Tỷ Lệ Win AI",
-    "openStreams": "Bàn Live →"
+    "openStreams": "Bàn Live →",
+    "empty": "Sảnh này chưa có loại trò chơi nào."
   },
   "streams": {
     "subtitle": "Danh sách các bàn đang chạy phân tích trực tiếp",
@@ -30,7 +32,9 @@
     "live": "LIVE",
     "winStreak": "Chuỗi Thắng",
     "recentResults": "{count} Lượt Gần Nhất",
-    "viewDetail": "Chi Tiết AI Dự Đoán →"
+    "viewDetail": "Chi Tiết AI Dự Đoán →",
+    "empty": "Chưa có bàn nào trong loại trò chơi này.",
+    "streamer": "Streamer: {name}"
   },
   "detail": {
     "badge": "REAL-TIME AI ANALYSIS",
@@ -100,5 +104,11 @@
     "registerSuccess": "Đã ghi nhận số điện thoại của bạn. Admin quản lý sẽ cấp tài khoản cho bạn.",
     "registerLoading": "ĐANG GỬI...",
     "checking": "Đang kiểm tra phiên đăng nhập..."
+  },
+  "common": {
+    "loading": "Đang tải dữ liệu...",
+    "error": "Không tải được dữ liệu. Vui lòng thử lại.",
+    "errorNetwork": "Không kết nối được máy chủ. Vui lòng thử lại.",
+    "retry": "Thử lại"
   }
 }

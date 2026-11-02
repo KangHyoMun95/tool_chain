@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PREDICTION_KEYS, type PredictionKey } from "@/src/lib/portal-data";
+import { PREDICTION_KEYS, type PredictionKey } from "@/src/lib/mock-stats";
 
 export type PredictionPhase = "analyzing" | "result" | "flash";
 

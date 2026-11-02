@@ -2,6 +2,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { Tick } from "@toolhackchain/shared";
+import { apiUrl } from "@/src/lib/auth";
 
 // Trang demo /live nhận tick kiểu bất kỳ (BTC/ETH...), không phải CrawlPayload.
 type LiveTick = Tick<Record<string, unknown>>;
@@ -15,7 +16,7 @@ export function useLiveItems(items: string[]) {
   useEffect(() => {
     if (!key) return;
     const es = new EventSource(
-      `http://localhost:4000/api/stream?items=${encodeURIComponent(key)}`,
+      apiUrl(`/stream?items=${encodeURIComponent(key)}`),
       { withCredentials: true },
     );
     es.onopen = () => setStatus("live");
