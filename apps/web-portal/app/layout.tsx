@@ -3,6 +3,7 @@ import { Outfit, Plus_Jakarta_Sans } from 'next/font/google';
 import { cookies } from 'next/headers';
 import type { ReactNode } from 'react';
 import { DEFAULT_LOCALE, LOCALE_COOKIE, isLocale } from '@/src/i18n/config';
+import { AuthProvider } from '@/src/components/auth/AuthProvider';
 import { I18nProvider } from '@/src/i18n/provider';
 import './globals.css';
 
@@ -32,7 +33,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang={locale} className={`${headingFont.variable} ${bodyFont.variable}`}>
       <body>
-        <I18nProvider initialLocale={locale}>{children}</I18nProvider>
+        <I18nProvider initialLocale={locale}>
+          <AuthProvider>{children}</AuthProvider>
+        </I18nProvider>
       </body>
     </html>
   );
