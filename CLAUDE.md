@@ -213,7 +213,7 @@ Mọi route đều yêu cầu đăng nhập, trừ route gắn `@Public()`. Rout
 ### API danh mục (chỉ đọc)
 `GET /api/lobbies`, `GET /api/categories`, `GET /api/streams` (tạo/sửa nằm ở luồng ingestion, không có API ghi). Mọi role đã đăng nhập đều gọi được.
 - Query chung: `page` (>= 1, mặc định 1), `limit` (1–100, mặc định 20), `status` (`ACTIVE|DEACTIVE|ARCHIVE`), `q` (tên chứa chuỗi, không phân biệt hoa thường). Thêm: categories `lobby_id`; streams `lobby_id`, `category_id`. Tham số lạ hoặc sai kiểu ⇒ 400.
-- Response `{ items, total, page, limit }`, field snake_case, id `bigint` là chuỗi. categories kèm `lobby_name`; streams kèm `category_name`, `lobby_id`, `lobby_name`, `streamer_id` (null nếu chưa có).
+- Response `{ items, total, page, limit }`, field snake_case, id là UUID (chuỗi). categories kèm `lobby_name`; streams kèm `category_name`, `lobby_id`, `lobby_name`, `streamer_id` (null nếu chưa có).
 - **USER chỉ thấy bản ghi `ACTIVE`** (bỏ qua `status` truyền vào) và chỉ khi các cấp cha (lobby, category) cũng `ACTIVE`; HOST / ADMIN thấy tất cả và lọc được theo `status`.
 
 ### SSE (đang giữ lại)

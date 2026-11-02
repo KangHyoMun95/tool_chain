@@ -1,6 +1,6 @@
 // src/common/catalog-list.ts
 // Dùng chung cho các API GET danh sách lobbies / categories / streams.
-import { IsEnum, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min } from "class-validator";
+import { IsEnum, IsInt, IsOptional, IsString, IsUUID, Max, MaxLength, Min } from "class-validator";
 import { Type } from "class-transformer";
 import { CatalogStatus, type Role } from "@toolhackchain/shared";
 
@@ -15,9 +15,8 @@ export class CatalogListQueryDto {
   @IsOptional() @IsString() @MaxLength(100) q?: string;
 }
 
-/** id bigint ở dạng chuỗi số (tối đa 18 chữ số để không tràn bigint). */
-export const ID_PATTERN = /^\d{1,18}$/;
-export const IdQuery = () => Matches(ID_PATTERN, { message: "phải là số nguyên dương" });
+/** id là UUID (V7). */
+export const IdQuery = () => IsUUID();
 
 export type Page<T> = { items: T[]; total: number; page: number; limit: number };
 
