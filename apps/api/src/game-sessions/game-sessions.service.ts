@@ -17,7 +17,7 @@ export class GameSessionsService {
     if (items.length === 0) return;
     await m.query(
       `INSERT INTO game_sessions (game_session_id, stream_id, road_shoe, road_count)
-       SELECT * FROM unnest($1::uuid[], $2::bigint[], $3::int[], $4::int[])
+       SELECT * FROM unnest($1::uuid[], $2::uuid[], $3::int[], $4::int[])
        ON CONFLICT DO NOTHING`,
       [items.map((i) => i.id), items.map((i) => i.streamId), items.map((i) => i.shoe), items.map((i) => i.round)],
     );

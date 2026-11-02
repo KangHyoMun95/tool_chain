@@ -53,13 +53,13 @@ export class StreamsService {
     const names = items.map((i) => i.name);
     await m.query(
       `INSERT INTO streams (category_id, stream_name)
-       SELECT * FROM unnest($1::bigint[], $2::text[])
+       SELECT * FROM unnest($1::uuid[], $2::text[])
        ON CONFLICT (category_id, (${normSql("stream_name")})) DO NOTHING`,
       [categoryIds, names],
     );
     const rows = await m.query(
       `SELECT i.ord::text AS ord, s.stream_id::text AS id
-       FROM unnest($1::bigint[], $2::text[]) WITH ORDINALITY AS i(category_id, name, ord)
+       FROM unnest($1::uuid[], $2::text[]) WITH ORDINALITY AS i(category_id, name, ord)
        JOIN streams s ON s.category_id = i.category_id AND ${normSql("s.stream_name")} = ${normSql("i.name")}`,
       [categoryIds, names],
     );

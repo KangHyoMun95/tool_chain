@@ -147,9 +147,11 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 | `prediction_subscriptions` | prediction_subscription_id, user_id, prediction_id, fee_amount, refunded_at, created_at | unique (user_id, prediction_id) |
 | `transactions` | transaction_id, user_id, predictions_subscriptions_id (nullable), transaction_type, amount, balance_before, balance_after, created_by, created_at | |
 
+**Kiểu id:** mọi id là `UUID DEFAULT gen_random_uuid()` (V7), kể cả khóa ngoại; riêng `roles.role_id` giữ `SMALLINT`. Trong TS là `string`; DTO kiểm tra bằng `@IsUUID()`. `AppModule` đặt `installExtensions: false` cho TypeORM (không tự cài extension). Cache id trong Redis chứa giá trị không phải UUID (id số cũ) bị coi là cache miss.
+
 `transaction_type`: `MINT`, `TRANSFER_OUT`, `TRANSFER_IN`, `CHARGE`, `REFUND`.
 
-**ID của `game_sessions` và `predictions` phải được sinh trước khi vào batch** (natural key từ nguồn, hoặc UUID/ULID sinh trong code). Không dùng serial do DB sinh, vì subscription có thể tham chiếu tới prediction còn nằm trong buffer.
+**ID của `game_sessions` và `predictions` phải được sinh trước khi vào batch** (UUIDv5 xác định hoặc UUID sinh trong code, không để DB sinh vì không biết trước); các id còn lại do DB sinh bằng `gen_random_uuid()`. Không dùng serial, vì subscription có thể tham chiếu tới prediction còn nằm trong buffer.
 
 ---
 

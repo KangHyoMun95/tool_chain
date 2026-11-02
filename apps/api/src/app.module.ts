@@ -33,6 +33,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       entities,
       synchronize: false,
       migrationsRun: false,
+      installExtensions: false,   // id uuid dùng gen_random_uuid() của Postgres; không để TypeORM tự cài extension
     }),
     RedisModule,
     ThrottlerModule.forRootAsync({

@@ -249,7 +249,7 @@ export class IngestionService {
         if (needStreamInfo(id, s.streamer)) byStream.set(id, s.streamer!);
       }
       infoWrites = [...byStream].map(([streamId, streamer]) => ({ streamId, streamer }));
-      infoWrites.sort((a, b) => (BigInt(a.streamId) < BigInt(b.streamId) ? -1 : 1));
+      infoWrites.sort((a, b) => (a.streamId < b.streamId ? -1 : 1));
       await this.streamInfo.upsertMany(m, infoWrites.map((w) => ({ streamId: w.streamId, streamerId: w.streamer })));
 
       // game_sessions
