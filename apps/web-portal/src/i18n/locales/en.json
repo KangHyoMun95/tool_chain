@@ -72,5 +72,33 @@
     "title": "Page not found",
     "description": "The content you are looking for does not exist or was removed.",
     "action": "Back to home"
+  },
+  "auth": {
+    "tagline": "AI data prediction analytics platform",
+    "tabsLabel": "Sign in or sign up",
+    "tabLogin": "SIGN IN",
+    "tabRegister": "SIGN UP",
+    "phoneLabel": "Phone number",
+    "phonePlaceholder": "09xxxxxxxx",
+    "passwordLabel": "Password",
+    "passwordPlaceholder": "••••••••",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password",
+    "loginSubmit": "SIGN IN TO THE SYSTEM",
+    "loginLoading": "VERIFYING...",
+    "registerPhonePlaceholder": "Enter your phone number to sign up",
+    "registerHint": "After you sign up, your managing Admin will issue an account for this phone number.",
+    "registerSubmit": "CREATE ACCOUNT",
+    "errors": {
+      "invalidPhone": "Invalid phone number (6–20 digits).",
+      "passwordRequired": "Please enter your password.",
+      "invalidCredentials": "Incorrect phone number or password.",
+      "locked": "Too many attempts. Please wait a few minutes and try again.",
+      "network": "Cannot reach the server. Please try again.",
+      "generic": "Something went wrong. Please try again."
+    },
+    "registerSuccess": "Your phone number has been received. Your managing Admin will issue an account for you.",
+    "registerLoading": "SENDING...",
+    "checking": "Checking your session..."
   }
 }

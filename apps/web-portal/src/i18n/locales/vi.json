@@ -72,5 +72,33 @@
     "title": "Không tìm thấy trang",
     "description": "Nội dung bạn tìm không tồn tại hoặc đã bị gỡ.",
     "action": "Về trang chủ"
+  },
+  "auth": {
+    "tagline": "Hệ thống phân tích dự đoán dữ liệu AI",
+    "tabsLabel": "Đăng nhập hoặc đăng ký",
+    "tabLogin": "ĐĂNG NHẬP",
+    "tabRegister": "ĐĂNG KÝ",
+    "phoneLabel": "Số điện thoại",
+    "phonePlaceholder": "09xxxxxxxx",
+    "passwordLabel": "Mật khẩu",
+    "passwordPlaceholder": "••••••••",
+    "showPassword": "Hiện mật khẩu",
+    "hidePassword": "Ẩn mật khẩu",
+    "loginSubmit": "ĐĂNG NHẬP VÀO HỆ THỐNG",
+    "loginLoading": "ĐANG XÁC THỰC...",
+    "registerPhonePlaceholder": "Nhập số điện thoại để đăng ký",
+    "registerHint": "Sau khi đăng ký, Admin quản lý của bạn sẽ cấp tài khoản cho số điện thoại này.",
+    "registerSubmit": "TẠO TÀI KHOẢN NGAY",
+    "errors": {
+      "invalidPhone": "Số điện thoại không hợp lệ (6–20 chữ số).",
+      "passwordRequired": "Vui lòng nhập mật khẩu.",
+      "invalidCredentials": "Số điện thoại hoặc mật khẩu không đúng.",
+      "locked": "Thử quá nhiều lần. Vui lòng đợi ít phút rồi thử lại.",
+      "network": "Không kết nối được máy chủ. Vui lòng thử lại.",
+      "generic": "Có lỗi xảy ra. Vui lòng thử lại."
+    },
+    "registerSuccess": "Đã ghi nhận số điện thoại của bạn. Admin quản lý sẽ cấp tài khoản cho bạn.",
+    "registerLoading": "ĐANG GỬI...",
+    "checking": "Đang kiểm tra phiên đăng nhập..."
   }
 }

@@ -137,6 +137,7 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 |---|---|---|
 | `roles` | role_id, role_name | HOST / ADMIN / USER |
 | `users` | user_id, phone_number, password, role_id, refer_user_id, balance, status, created_at | password luôn hash; status: `ACTIVE` (default) \| `DEACTIVE` \| `DELETED` |
+| `users_register` | user_register_id, phone_number (unique) | số điện thoại đăng ký từ portal, chờ Admin cấp tài khoản; chỉ hai cột |
 | `lobbies` | lobby_id, lobby_name, created_at (default now), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `categories` | category_id, category_name, lobby_id, created_at (default now), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `streams` | stream_id, stream_name, category_id, status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
@@ -215,6 +216,9 @@ Mọi route đều yêu cầu đăng nhập, trừ route gắn `@Public()`. Rout
 - Query chung: `page` (>= 1, mặc định 1), `limit` (1–100, mặc định 20), `status` (`ACTIVE|DEACTIVE|ARCHIVE`), `q` (tên chứa chuỗi, không phân biệt hoa thường). Thêm: categories `lobby_id`; streams `lobby_id`, `category_id`. Tham số lạ hoặc sai kiểu ⇒ 400.
 - Response `{ items, total, page, limit }`, field snake_case, id là UUID (chuỗi). categories kèm `lobby_name`; streams kèm `category_name`, `lobby_id`, `lobby_name`, `streamer_id` (null nếu chưa có).
 - **USER chỉ thấy bản ghi `ACTIVE`** (bỏ qua `status` truyền vào) và chỉ khi các cấp cha (lobby, category) cũng `ACTIVE`; HOST / ADMIN thấy tất cả và lọc được theo `status`.
+
+### Đăng ký số điện thoại (công khai)
+`POST /api/users-register` `{ phone_number }` (`@Public()`, `@Throttle` 5 lần/phút/IP): ghi số điện thoại vào bảng `users_register` để Admin cấp tài khoản sau. **Không** tạo user, không đặt mật khẩu, không gửi SMS. `phone_number` chỉ chữ số, 6–20 ký tự (không khoảng trắng / dấu `+`; portal tự bỏ khoảng trắng và dấu `-` trước khi gửi). Idempotent: số đã đăng ký, hoặc đã là user, đều trả `201 { status: "received" }` y hệt số mới (không để dò số nào có trong hệ thống). Sai định dạng / có trường lạ ⇒ 400. Chưa có API đọc `users_register` cho Admin.
 
 ### SSE (đang giữ lại)
 `GET /api/stream` hiện đang `@Public()` (EventSource không gửi được `Authorization`). Kế hoạch: `POST /api/realtime/ticket` → ticket một lần, TTL 30s trong Redis, SSE nhận `?ticket=` (tuyệt đối không đưa access token lên query string), và đóng SSE khi session bị thu hồi. Chưa làm.

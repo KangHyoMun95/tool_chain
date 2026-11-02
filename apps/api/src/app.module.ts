@@ -13,6 +13,7 @@ import { validateEnv } from "./config/env.validation.js";
 import { RolesGuard } from "./auth/roles.guard.js";
 import { SessionGuard } from "./auth/session.guard.js";
 import { UsersModule } from "./users/users.module.js";
+import { UsersRegisterModule } from "./users-register/users-register.module.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { IngestionModule } from "./ingestion/ingestion.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
@@ -45,6 +46,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     }),
     AuthModule,
     UsersModule,
+    UsersRegisterModule,
     // ticks/ giữ lại để so sánh, KHÔNG đăng ký: cùng group "persist" + cùng consumer sẽ tranh tin với IngestionModule.
     IngestionModule,
     RealtimeModule,
