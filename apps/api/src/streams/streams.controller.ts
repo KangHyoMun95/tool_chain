@@ -1,7 +1,8 @@
 // src/streams/streams.controller.ts
-import { Controller, Get, Query } from "@nestjs/common";
+import { Controller, Get, Param, Query } from "@nestjs/common";
 import type { AuthUser } from "../auth/auth.types.js";
 import { CurrentUser } from "../auth/decorators.js";
+import { IdParamDto } from "../common/catalog-list.js";
 import { StreamListQueryDto } from "./dto/stream-list-query.dto.js";
 import { StreamsService } from "./streams.service.js";
 
@@ -13,5 +14,10 @@ export class StreamsController {
   @Get()
   list(@CurrentUser() actor: AuthUser, @Query() query: StreamListQueryDto) {
     return this.streams.list(actor.role, query);
+  }
+
+  @Get(":id")
+  getOne(@CurrentUser() actor: AuthUser, @Param() params: IdParamDto) {
+    return this.streams.getOne(actor.role, params.id);
   }
 }
