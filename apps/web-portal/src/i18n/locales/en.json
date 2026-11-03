@@ -110,40 +110,5 @@
     "error": "Could not load data. Please try again.",
     "errorNetwork": "Cannot reach the server. Please try again.",
     "retry": "Retry"
-  },
-  "live": {
-    "connection": {
-      "connecting": "Connecting...",
-      "live": "Live",
-      "reconnecting": "Connection lost, retrying...",
-      "revoked": "Session revoked"
-    },
-    "status": {
-      "IN_PROGRESS": "In progress",
-      "DONE": "Round complete",
-      "GET_RESULT": "Receiving result",
-      "SUMMARY_RESULT": "Summary",
-      "unknown": "Unknown",
-      "none": "Waiting for data"
-    },
-    "session": "Round {shoe}-{round}",
-    "waitingResult": "Waiting for result",
-    "result": "Result",
-    "prediction": "Prediction",
-    "historyTitle": "Round history (shoe {shoe})",
-    "historyEmpty": "No rounds yet",
-    "historyError": "Could not load history",
-    "debugTitle": "Time debug",
-    "debugConverted": "Vietnam time",
-    "tie": "TIE",
-    "boardTitle": "Live board",
-    "noData": "No data yet",
-    "country": "Streamer country",
-    "loadingData": "Loading data..."
-  },
-  "balance": {
-    "label": "Balance",
-    "topup": "Top up",
-    "topupSoon": "Coming soon"
   }
 }

@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useI18n } from "@/src/i18n/provider";
-import { BackButton, type BackLink } from "./BackButton";
-import { BalanceBadge } from "./BalanceBadge";
+import type { MessageKey } from "@/src/i18n/config";
 import { LanguageSwitcher } from "./LanguageSwitcher";
-import { CrownIcon } from "./icons";
+import { ArrowLeftIcon, CrownIcon } from "./icons";
+
+export type BackLink = { href: string; labelKey: MessageKey };
 
 export function RoyalHeader({ back }: { back?: BackLink }) {
   const { t } = useI18n();
@@ -22,8 +23,12 @@ export function RoyalHeader({ back }: { back?: BackLink }) {
         </span>
       </Link>
       <div className="header-actions">
-        {back && <BackButton back={back} />}
-        <BalanceBadge />
+        {back && (
+          <Link href={back.href} className="btn btn-amber">
+            <ArrowLeftIcon className="icon-sm" />
+            {t(back.labelKey)}
+          </Link>
+        )}
         <LanguageSwitcher />
       </div>
     </header>

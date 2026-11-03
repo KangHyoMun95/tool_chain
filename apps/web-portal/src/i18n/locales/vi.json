@@ -110,40 +110,5 @@
     "error": "Không tải được dữ liệu. Vui lòng thử lại.",
     "errorNetwork": "Không kết nối được máy chủ. Vui lòng thử lại.",
     "retry": "Thử lại"
-  },
-  "live": {
-    "connection": {
-      "connecting": "Đang kết nối...",
-      "live": "Đang trực tiếp",
-      "reconnecting": "Mất kết nối, đang thử lại...",
-      "revoked": "Phiên đã bị thu hồi"
-    },
-    "status": {
-      "IN_PROGRESS": "Đang tiến hành",
-      "DONE": "Hoàn tất tiến trình",
-      "GET_RESULT": "Nhận kết quả",
-      "SUMMARY_RESULT": "Tổng kết",
-      "unknown": "Không xác định",
-      "none": "Chờ dữ liệu"
-    },
-    "session": "Phiên {shoe}-{round}",
-    "waitingResult": "Đang chờ kết quả",
-    "result": "Kết quả",
-    "prediction": "Dự đoán",
-    "historyTitle": "Lịch sử ván (shoe {shoe})",
-    "historyEmpty": "Chưa có ván nào",
-    "historyError": "Không tải được lịch sử",
-    "debugTitle": "Debug thời gian",
-    "debugConverted": "Giờ Việt Nam",
-    "tie": "HÒA",
-    "boardTitle": "Bảng trực tiếp",
-    "noData": "Chưa có dữ liệu",
-    "country": "Quốc gia streamer",
-    "loadingData": "Đang nạp dữ liệu..."
-  },
-  "balance": {
-    "label": "Số Dư",
-    "topup": "Nạp",
-    "topupSoon": "Sắp có"
   }
 }

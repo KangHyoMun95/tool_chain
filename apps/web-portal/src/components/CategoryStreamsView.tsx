@@ -29,11 +29,9 @@ export function CategoryStreamsView({ categoryId }: { categoryId: string }) {
           <h2 className="page-title">{category.data.name}</h2>
           <p className="hint">{t("streams.subtitle")}</p>
         </div>
-        <div className="page-head-actions">
-          {streams.status === "success" && (
-            <span className="chip chip-dark">{t("streams.liveBadge", { count: streams.data.length })}</span>
-          )}
-        </div>
+        {streams.status === "success" && (
+          <span className="chip chip-dark">{t("streams.liveBadge", { count: streams.data.length })}</span>
+        )}
       </div>
       {streams.status === "loading" && <LoadingState />}
       {streams.status === "error" && <ErrorState error={streams.error} onRetry={streams.reload} />}

@@ -2,10 +2,14 @@
 // Chuẩn hóa tên CHỈ để chống trùng, không lưu DB (DB lưu tên đã trim).
 // Phải khớp biểu thức unique index ở db/migrations/V5__ingestion_unique_indexes.sql.
 
-export { normalizeName, buildKeyId } from "@toolhackchain/shared";
+export const normalizeName = (s: string): string => s.trim().replace(/\s+/g, " ").toLowerCase();
 
 /** Tên hiển thị lưu DB: bản trim của lần gặp đầu tiên. */
 export const displayName = (s: string): string => s.trim();
+
+/** key_id = <lobby>|<category>|<stream> đã chuẩn hóa. Chỉ dùng làm khóa cache / phòng realtime. */
+export const buildKeyId = (lobby: string, category: string, stream: string): string =>
+  [lobby, category, stream].map(normalizeName).join("|");
 
 /** Biểu thức SQL tương đương normalizeName() cho một cột/biểu thức text. */
 export const normSql = (col: string): string =>

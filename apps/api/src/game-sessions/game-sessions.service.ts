@@ -1,7 +1,6 @@
 // src/game-sessions/game-sessions.service.ts
 import { Injectable } from "@nestjs/common";
-import { InjectDataSource } from "@nestjs/typeorm";
-import type { DataSource, EntityManager } from "typeorm";
+import type { EntityManager } from "typeorm";
 import { GameSessionStatus } from "@toolhackchain/shared";
 
 export type NewSession = { id: string; streamId: string; shoe: number; round: number };
@@ -13,28 +12,6 @@ export type ApplyResultsOutcome = {
 
 @Injectable()
 export class GameSessionsService {
-  constructor(@InjectDataSource() private ds: DataSource) {}
-
-  /** Lịch sử ván FINISHED của một stream theo shoe (mặc định: shoe của ván mới nhất), round giảm dần. */
-  async history(streamId: string, shoe: number | undefined, page: number, limit: number) {
-    if (shoe === undefined) {
-      const latest: { road_shoe: number }[] = await this.ds.query(
-        `SELECT road_shoe FROM game_sessions WHERE stream_id = $1 ORDER BY created_at DESC LIMIT 1`, [streamId]);
-      if (latest.length === 0) return { shoe: null, items: [], total: 0, page, limit };
-      shoe = latest[0].road_shoe;
-    }
-    const where = `stream_id = $1 AND road_shoe = $2 AND status = $3`;
-    const args = [streamId, shoe, GameSessionStatus.FINISHED];
-    const [{ count }]: { count: string }[] = await this.ds.query(`SELECT count(*) AS count FROM game_sessions WHERE ${where}`, args);
-    const rows: { game_session_id: string; shoe: number; round: number; result: string | null; status: string; created_at: Date }[] =
-      await this.ds.query(
-        `SELECT game_session_id, road_shoe AS shoe, road_count AS round, result, status, created_at
-         FROM game_sessions WHERE ${where}
-         ORDER BY road_count DESC, game_session_id LIMIT $4 OFFSET $5`,
-        [...args, limit, (page - 1) * limit]);
-    return { shoe, items: rows, total: Number(count), page, limit };
-  }
-
   /** Chỉ insert ván chưa có; không set status (để mặc định của DB = RUNNING), không đụng ván đã tồn tại. */
   async insertMany(m: EntityManager, items: NewSession[]): Promise<void> {
     if (items.length === 0) return;

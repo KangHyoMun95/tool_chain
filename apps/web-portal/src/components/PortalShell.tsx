@@ -1,7 +1,6 @@
 import type { ReactNode } from "react";
 import { AuthGate } from "./auth/AuthGate";
-import type { BackLink } from "./BackButton";
-import { RoyalHeader } from "./RoyalHeader";
+import { RoyalHeader, type BackLink } from "./RoyalHeader";
 
 export function PortalShell({ back, children }: { back?: BackLink; children: ReactNode }) {
   return (

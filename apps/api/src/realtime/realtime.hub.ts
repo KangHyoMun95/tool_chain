@@ -1,9 +1,8 @@
 // src/realtime/realtime.hub.ts
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
 import { Redis } from "ioredis";
-import { RedisKeys, TICK_STREAM } from "@toolhackchain/shared";
+import { TICK_STREAM } from "@toolhackchain/shared";
 import { fieldsToObject, sleep, StreamEntry } from "../common/stream.util.js";
-import { IdCache } from "../ingestion/id-cache.service.js";
 
 type Listener = (tickJson: string) => void;
 
@@ -13,8 +12,6 @@ export class RealtimeHub implements OnApplicationBootstrap, OnModuleDestroy {
   private conn = new Redis(process.env.REDIS_URL!);
   private running = true;
   private listeners = new Map<string, Set<Listener>>();   // item_id -> listeners
-
-  constructor(private ids: IdCache) {}
 
   onApplicationBootstrap() { void this.loop(); }
 
@@ -29,27 +26,13 @@ export class RealtimeHub implements OnApplicationBootstrap, OnModuleDestroy {
         for (const [id, f] of res[0][1]) {
           last = id;
           const { item_id, tick } = fieldsToObject(f);
-          const fns = this.listeners.get(item_id);
-          if (!fns?.size) continue;
-          const out = await this.withStreamId(item_id, tick);
-          fns.forEach((fn) => fn(out));
+          this.listeners.get(item_id)?.forEach((fn) => fn(tick));
         }
       } catch (e) {
         if (!this.running) break;
         this.log.error(e);
         await sleep(1000);
       }
-    }
-  }
-
-  /** Gắn streams.stream_id (từ cache id) vào tick; chưa có trong cache thì null (ingestion sẽ ghi cache sau khi commit). */
-  async withStreamId(itemId: string, tickJson: string): Promise<string> {
-    try {
-      const [streamId] = await this.ids.getMany([RedisKeys.stream(itemId)]);
-      return JSON.stringify({ ...JSON.parse(tickJson), stream_id: streamId ?? null });
-    } catch (e) {
-      this.log.warn(`Không gắn được stream_id cho ${itemId}: ${e}`);
-      return tickJson;
     }
   }
 

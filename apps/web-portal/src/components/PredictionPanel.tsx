@@ -1,71 +1,69 @@
 "use client";
 
-import { usePrediction } from "@/src/hooks/use-prediction";
+import { usePredictionCycle } from "@/src/hooks/use-prediction-cycle";
 import { useI18n } from "@/src/i18n/provider";
 import { CpuIcon } from "./icons";
 
-type Props = {
-  streamId: string;
-  connection: "connecting" | "live" | "reconnecting" | "revoked";
-  shoe: number | null;
-  round: number | null;
-  status: string | null;   // status thô của message mới nhất
-  statusLabel: string;
-  result: string | null;   // actual_result của phiên hiện tại; null = đang chờ
-};
-
-export function PredictionPanel({ streamId, connection, shoe, round, status, statusLabel, result }: Props) {
+export function PredictionPanel({ sessionId }: { sessionId: number }) {
   const { t } = useI18n();
-  const { phase, prediction } = usePrediction(streamId, shoe, round, status);
-  const online = connection === "live";
+  const state = usePredictionCycle(sessionId);
 
-  // đúng: xanh, sai: đỏ, kết quả T (hòa): xám
-  const tone = !online || !prediction || result === null ? "" : result === "T" ? "draw" : prediction.pick === result ? "win" : "loss";
+  const flashClass =
+    state.phase === "flash" ? (state.correct ? " flash-win" : " flash-loss") : "";
 
   return (
-    <div className={`card card-glass prediction-panel${tone ? ` result-${tone}` : ""}`} aria-live="polite">
-      <div className="stack-sm prediction-state">
-        {!online ? (
-          <>
-            <span className="chip chip-dark chip-wide">Offline</span>
-            <p className="analyzing-hint">{t(`live.connection.${connection}` as "live.connection.live")}</p>
-          </>
-        ) : (
-          <>
-            <span className="chip chip-dark chip-wide">{statusLabel}</span>
-            {phase === "waiting" && <p className="analyzing-title">{t("live.loadingData")}</p>}
-            {phase === "analyzing" && (
-              <>
-                <div className="spinner">
-                  <span className="spinner-outer" />
-                  <span className="spinner-inner" />
-                  <CpuIcon className="spinner-icon" />
-                </div>
-                <p className="analyzing-title">{t("detail.analyzing")}</p>
-              </>
-            )}
-            {prediction && (
-              <>
-                <div>
-                  <p className="micro-label micro-label-light">{t("live.prediction")}</p>
-                  <p className="prediction-result">{prediction.pick}</p>
-                  <p className="prediction-confidence">
-                    {t("detail.confidence")}: <strong>{prediction.confidence.toFixed(1)}%</strong>
-                  </p>
-                </div>
-                {result !== null && (
-                  <div>
-                    <p className="prediction-result">{result}</p>
-                    <p className={`flash-title is-${tone}`}>
-                      {tone === "draw" ? t("live.tie") : tone === "win" ? `✓ ${t("detail.correct")}` : `✕ ${t("detail.wrong")}`}
-                    </p>
-                  </div>
-                )}
-              </>
-            )}
-          </>
-        )}
-      </div>
+    <div
+      className={`card card-glass prediction-panel${flashClass}`}
+      aria-live="polite"
+    >
+      {state.phase === "analyzing" && (
+        <div className="stack-sm prediction-state">
+          <div className="spinner">
+            <span className="spinner-outer" />
+            <span className="spinner-inner" />
+            <CpuIcon className="spinner-icon" />
+          </div>
+          <div>
+            <p className="analyzing-title">{t("detail.analyzing")}</p>
+            <p className="analyzing-hint">{t("detail.analyzingHint")}</p>
+          </div>
+          <div className="progress-track">
+            <div className="progress-fill scanner-line" />
+          </div>
+        </div>
+      )}
+
+      {state.phase === "result" && (
+        <div className="stack-sm prediction-state">
+          <span className="chip chip-dark chip-wide">{t("detail.newPrediction")}</span>
+          <div>
+            <p className="prediction-result">{t(`prediction.${state.prediction}`)}</p>
+            <p className="prediction-confidence">
+              {t("detail.confidence")}: <strong>{state.confidence.toFixed(1)}%</strong>
+            </p>
+          </div>
+          <div className="prediction-countdown">
+            <p className="micro-label micro-label-light">{t("detail.awaitingResult")}</p>
+            <p className="metric metric-amber-dark countdown">{`00:0${state.secondsLeft}s`}</p>
+          </div>
+        </div>
+      )}
+
+      {state.phase === "flash" && (
+        <div className="stack-sm prediction-state">
+          <div className={`flash-icon ${state.correct ? "is-win" : "is-loss"}`}>
+            {state.correct ? "✓" : "✕"}
+          </div>
+          <h3 className={`flash-title ${state.correct ? "is-win" : "is-loss"}`}>
+            {state.correct ? t("detail.winTitle") : t("detail.lossTitle")}
+          </h3>
+          <p className="flash-subtitle">
+            {state.correct
+              ? t("detail.winSubtitle", { id: state.sessionId })
+              : t("detail.lossSubtitle")}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
