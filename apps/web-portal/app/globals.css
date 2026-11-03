@@ -324,6 +324,11 @@ button { font: inherit; color: inherit; }
 .flash-subtitle { font-size: 12px; font-weight: 700; color: #334155; }
 .flash-win { animation: flashWin 1.2s ease-in-out forwards; }
 .flash-loss { animation: flashLoss 1.2s ease-in-out forwards; }
+/* Kết quả của ván hiện tại: nền giữ nguyên đến khi sang ván mới (đúng xanh, sai đỏ, hòa xám) */
+.result-win { background: var(--win-flash); border-color: var(--win-flash-border); }
+.result-loss { background: var(--loss-soft); border-color: var(--loss-border); }
+.result-draw { background: #e5e7eb; border-color: #9ca3af; }
+.flash-title.is-draw { color: #374151; }
 
 .confidence-chart { width: 100%; height: auto; max-height: 240px; }
 .chart-grid { stroke: rgba(192, 132, 252, 0.3); stroke-width: 1; }
@@ -344,6 +349,8 @@ button { font: inherit; color: inherit; }
   padding: 2px 8px; border-radius: 9999px; font-size: 10px; font-weight: 800; color: #fff;
 }
 .history-tile.is-win .history-badge { background: var(--win-strong); }
+.history-tile.is-draw { background: #e5e7eb; border-color: #9ca3af; color: #374151; }
+.history-tile.is-draw .history-badge { background: #6b7280; }
 .history-tile.is-loss .history-badge { background: var(--loss-strong); }
 
 .not-found { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; }
@@ -459,3 +466,56 @@ button { font: inherit; color: inherit; }
 .auth-spinner-light { border-color: var(--amber-400); border-top-color: transparent; }
 .auth-checking { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; min-height: 100vh; }
 .data-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 40px 16px; text-align: center; }
+
+/* ---------- Bảng trực tiếp (LiveBoard) ---------- */
+.board { display: grid; grid-template-columns: 1fr 2fr; gap: 12px; }
+.board-left { display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+.board-right { display: grid; grid-template-rows: 4fr 1fr; gap: 12px; min-width: 0; }
+.board-grid {
+  display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: repeat(6, 1fr);
+  grid-auto-flow: column; gap: 2px;
+}
+.board-cell {
+  display: flex; align-items: center; justify-content: center; aspect-ratio: 1; border-radius: 50%;
+  font-size: 9px; font-weight: 800; color: #fff; background: var(--purple-100);
+}
+.cell-B { background: #dc2626; }
+.cell-P { background: #2563eb; }
+.cell-T { background: #16a34a; }
+.cell-other { background: #d1d5db; color: #374151; }
+.board-totals {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-around; gap: 8px;
+  font-family: var(--font-heading-stack); font-size: 18px; font-weight: 700;
+}
+
+.total-B { color: #dc2626; }
+.total-P { color: #2563eb; }
+.total-T { color: #16a34a; }
+
+/* ---------- Số dư (header) & hành động ở page-head ---------- */
+.page-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.balance {
+  display: flex; align-items: center; gap: 12px; padding: 8px 14px; border-radius: 16px;
+  background: rgba(59, 7, 100, 0.7); border: 1px solid rgba(251, 191, 36, 0.4);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2); backdrop-filter: blur(8px);
+}
+.balance-icon {
+  display: flex; align-items: center; justify-content: center; width: 32px; height: 32px;
+  border-radius: 12px; background: rgba(245, 158, 11, 0.2); color: var(--amber-400);
+}
+.balance-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #d8b4fe; }
+.balance-value { font-family: var(--font-heading-stack); font-size: 14px; font-weight: 800; line-height: 1; color: var(--amber-400); }
+.balance-topup {
+  display: inline-flex; align-items: center; gap: 4px; margin-left: 4px; padding: 4px 10px; border: 0;
+  border-radius: 8px; font-size: 11px; font-weight: 800; color: var(--purple-950);
+  background: linear-gradient(90deg, var(--amber-500), var(--amber-600)); cursor: not-allowed; opacity: 0.6;
+}
+.icon-xs { width: 12px; height: 12px; }
+
+/* Chấm Live ở page-head (nền sáng): xanh / xám / đỏ theo trạng thái SSE */
+.chip-live-on { background: rgba(16, 185, 129, 0.15); color: #047857; border-color: rgba(16, 185, 129, 0.5); }
+.chip-live-off { background: rgba(107, 114, 128, 0.15); color: #4b5563; border-color: rgba(107, 114, 128, 0.5); }
+.chip-live-off .live-dot { background: #9ca3af; }
+.chip-live-off .live-dot::after { display: none; }
+.chip-live-error { background: rgba(225, 29, 72, 0.12); color: #be123c; border-color: rgba(225, 29, 72, 0.5); }
+.chip-live-error .live-dot, .chip-live-error .live-dot::after { background: #e11d48; }

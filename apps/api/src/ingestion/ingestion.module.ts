@@ -8,10 +8,12 @@ import { GameSessionsModule } from "../game-sessions/game-sessions.module.js";
 import { IdCache } from "./id-cache.service.js";
 import { ShoeObserver } from "./shoe-observer.js";
 import { IngestionService } from "./ingestion.service.js";
+import { CacheWarmup } from "./cache-warmup.service.js";
 import { TickPersister } from "./tick-persister.service.js";
 
 @Module({
   imports: [LobbiesModule, CategoriesModule, StreamsModule, StreamInformationModule, GameSessionsModule],
-  providers: [IdCache, ShoeObserver, IngestionService, TickPersister],
+  providers: [IdCache, ShoeObserver, IngestionService, TickPersister, CacheWarmup],
+  exports: [IdCache],
 })
 export class IngestionModule {}
