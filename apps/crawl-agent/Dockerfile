@@ -13,6 +13,8 @@ RUN apt-get update && apt-get install -y \
 
 # Chạy bằng user thường: Brave chạy bằng root sẽ đòi --no-sandbox
 RUN useradd -m bot && mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
+# Tạo sẵn thư mục mount với chủ sở hữu bot: named volume mới sẽ kế thừa quyền này (nếu không sẽ là root và Brave không ghi được profile)
+RUN mkdir -p /home/bot/.brave-automation /home/bot/app/debug && chown -R bot:bot /home/bot/.brave-automation /home/bot/app
 USER bot
 WORKDIR /home/bot/app
 

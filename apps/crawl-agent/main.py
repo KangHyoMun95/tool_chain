@@ -245,6 +245,24 @@ def access_lobby(page: Page):
     logger.info("[6] Đã vào sảnh")
 
 
+def clean_after_login(context, pg, pages_before, wait_ms: int = 3_000):
+    """Sau login: chờ popup hiện ra hết, rồi đóng mọi tab/cửa sổ mới và popup trong trang."""
+    pg.wait_for_timeout(wait_ms)            # chờ các popup/tab kịp bật lên
+
+    # 1. Đóng mọi tab/cửa sổ mới (giữ tab chính và các tab có sẵn từ trước)
+    for p in context.pages:
+        if p != pg and p not in pages_before and not p.is_closed():
+            logger.info(f"[clean] Đóng tab: {p.url}")
+            try:
+                p.close()
+            except Exception:
+                pass
+
+    # 2. Đóng popup/modal trong trang chính
+    pg.bring_to_front()
+    dismiss_popups(pg)
+    logger.info("[clean] Đã dọn popup sau login")
+
 def handle_token_response(res, store: TokenStore):
     """Đọc response getToken -> đẩy path/token/cookie vào store."""
     try:
@@ -326,7 +344,7 @@ def browser_worker(store: TokenStore, stop_event: Event, report):
                 if need_login(pg, account_text=APP_USER):
                     login_website(pg)
                     check_bot(pg)
-
+                clean_after_login(context, pg, pages_before)
                 # Bật nghe TRƯỚC khi click ACCESS_LOBBY, để không lỡ getToken đầu tiên
                 context.on("response", on_response)
                 access_lobby(pg)

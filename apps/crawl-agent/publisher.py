@@ -6,7 +6,7 @@ REDIS_URL = os.environ.get("REDIS_URL")
 if not REDIS_URL:
     raise RuntimeError("Thiếu REDIS_URL, ví dụ redis://:123456@localhost:6379")
 
-r = redis.Redis(host="localhost", port=6379, password="123456", decode_responses=True)
+r = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 r.ping()
 
 def publish(item_id: str, data: dict, source_ts: float) -> bool:

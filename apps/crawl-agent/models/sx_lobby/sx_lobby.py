@@ -106,7 +106,7 @@ class SXLobby:
         self.round_start_time = parent_cls.ms_to_dt("roundStartTime") or self.round_start_time
         self.repaint_time = parent_cls.ms_to_dt("repaintTime") or self.repaint_time
 
-    def _get_streamer(self, dealer_id: str):
+    def _get_streamer(self, dealer_id):
         if dealer_id is None:
             return [self.streamer_name, self.streamer_country, None]
         dl = dealer_id.split("/")
@@ -165,14 +165,26 @@ class SXLobby:
             for i in roads
         ]
 
+    def to_dict(self, obj):
+        if isinstance(obj, dict):
+            return {k: self.to_dict(v) for k, v in obj.items()}
+
+        if isinstance(obj, (list, tuple, set)):
+            return [self.to_dict(v) for v in obj]
+
+        if hasattr(obj, "__dict__"):
+            return self.to_dict(obj.__dict__)
+
+        return obj
+
     @staticmethod
     def _is_empty(val: str):
         return not val or not val.strip()
 
-    def _is_full(self):
+    def _is_missing_fields(self):
         return self._is_empty(self.lobby_name) or self._is_empty(self.category_name) or self._is_empty(self.stream_name) or self._is_empty(self.streamer_id)
 
     def shot_message(self):
-        if not self._is_full():
+        if self._is_missing_fields():
             return None
-        return json.dumps(self.__dict__, default=lambda obj: obj.__dict__, ensure_ascii=False, indent=2)
+        return self.to_dict(self.__dict__)

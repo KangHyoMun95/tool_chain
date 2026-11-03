@@ -1,3 +1,5 @@
+from time import time
+
 import websockets
 import json
 import zlib
@@ -6,8 +8,11 @@ import asyncio
 
 import msgpack
 
+from contract import build_key_id
 from exception import CycleError
 from models.sx_lobby.message.base_detection import BaseDetection
+from models.sx_lobby.sx_lobby import SXLobby
+from publisher import publish
 from store.token_store import TokenStore
 
 
@@ -179,14 +184,13 @@ async def listen_ws(store: TokenStore, on_message=None, token_wait: float = 120)
 
                     if isinstance(msg, dict):
                         mtype = msg.get("messageType")
-                        message = msg.get("message")
+                        message = msg.get("message", {})
                         handler = msg.get("handler")
 
                         if mtype == "Connecting":
                             print(f"[ws] Connecting: status={msg.get('status')}")
                         elif mtype == "GameHallInfo":
-                            val = destructure_message(message)
-                            print(val)
+                            shot_message(message)
                             # if val.get("table_id") != TABLE_ID:
                             #     continue
                             # new_record = {k: v for k, v in val.items() if v is not None}
@@ -226,7 +230,21 @@ async def listen_ws(store: TokenStore, on_message=None, token_wait: float = 120)
         if v > version:
             version, (path, token, cookie) = v, data
 
-
-if __name__ == "__main__":
-    msg = {'tableID': 1018, 'gameShoe': 6317, 'gameRound': 36, 'betCount': 327, 'currentBet': 5205.4375272835}
-    destructure_message(msg)
+manage_record = {}
+def shot_message(message_dict: dict):
+    cls = BaseDetection(message=message_dict)
+    table_id = str(cls.get_key("tableID"))
+    rd = manage_record.get(table_id, SXLobby())
+    rd.destructure_message(message_dict)
+    manage_record.update({table_id: rd})
+    message_shot = rd.shot_message()
+    if message_shot:
+        publish(
+            item_id=build_key_id(
+                lobby_name=rd.lobby_name,
+                stream_name=rd.stream_name,
+                category_name=rd.category_name
+            ),
+            data=message_shot,
+            source_ts=time()
+        )
