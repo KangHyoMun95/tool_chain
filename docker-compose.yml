@@ -91,7 +91,7 @@ services:
     container_name: tool-chain-web-portal
     restart: unless-stopped
     ports:
-      - "${PORTAL_PORT:-3001}:3001"
+      - "${PORTAL_PORT:-5001}:3001"
     depends_on:
       - api
   crawl-agent:
