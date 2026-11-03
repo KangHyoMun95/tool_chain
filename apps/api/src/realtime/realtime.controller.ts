@@ -32,7 +32,7 @@ export class RealtimeController {
     return new Observable<MessageEvent>((sub) => {
       // 1) Snapshot
       this.redis.mget(items.map(RedisKeys.latest))
-        .then((snaps) => snaps.forEach((s) => s && sub.next({ data: s })))
+        .then((snaps) => Promise.all(snaps.map(async (s, i) => s && sub.next({ data: await this.hub.withStreamId(items[i], s) }))))
         .catch((e) => sub.error(e));
 
       // 2) Realtime
