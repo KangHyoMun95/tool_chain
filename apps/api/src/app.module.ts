@@ -31,6 +31,10 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     TypeOrmModule.forRoot({
       type: "postgres",
       url: process.env.DATABASE_URL,
+      // Managed Postgres (vd Aiven) cần TLS; CA riêng thì đặt DB_SSL_REJECT_UNAUTHORIZED=false hoặc thêm CA sau.
+      ssl: process.env.DB_SSL === "true"
+        ? { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false" }
+        : false,
       entities,
       synchronize: false,
       migrationsRun: false,
