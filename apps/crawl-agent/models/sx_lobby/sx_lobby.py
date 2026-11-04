@@ -1,4 +1,4 @@
-import json
+from config import SX_LOBBY, SX_CATEGORY_1
 
 from models.sx_lobby.message.base_detection import BaseDetection
 from datetime import datetime, timezone, timedelta
@@ -65,8 +65,8 @@ class SXLobby:
     repaint_time: str = None
 
     def __init__(self):
-        self.lobby_name = "ABC_LOBBY"
-        self.category_name = "ABC_CATEGORY"
+        self.lobby_name = SX_LOBBY
+        self.category_name = SX_CATEGORY_1
 
     def destructure_message(self, message: dict):
         parent_cls = BaseDetection(message=message)
