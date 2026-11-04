@@ -16,6 +16,10 @@ if pgrep -f -- "--user-data-dir=$PROFILE_DIR" >/dev/null; then
   exit 1
 fi
 
+# Đến đây chắc chắn không có Brave nào dùng profile này => file khóa còn lại là của lần chạy trước (vd container cũ
+# đã bị tạo lại với hostname khác: "profile in use by another computer"). Xóa để Brave mở được; cookie/phiên giữ nguyên.
+rm -f "$PROFILE_DIR/SingletonLock" "$PROFILE_DIR/SingletonSocket" "$PROFILE_DIR/SingletonCookie"
+
 # Tắt các hộp "Lưu mật khẩu?", "Lưu địa chỉ/thẻ?" của trình duyệt
 mkdir -p "$PROFILE_DIR/Default"
 python3 - "$PREFS" <<'EOF'
