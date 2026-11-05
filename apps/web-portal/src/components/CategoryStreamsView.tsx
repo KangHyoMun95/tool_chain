@@ -4,8 +4,9 @@ import { useApi } from "@/src/hooks/use-api";
 import { useI18n } from "@/src/i18n/provider";
 import { getCategory, listStreams } from "@/src/lib/api/catalog";
 import { PageBanner } from "./catalog/PageBanner";
+import { PageBannerSkeleton, StreamGridSkeleton } from "./catalog/Skeletons";
 import { StreamCard } from "./catalog/StreamCard";
-import { EmptyState, ErrorState, LoadingState } from "./DataStates";
+import { EmptyState, ErrorState } from "./DataStates";
 import { NotFoundView } from "./NotFoundView";
 import { AppShell } from "./shell/AppShell";
 
@@ -18,7 +19,7 @@ export function CategoryStreamsView({ categoryId }: { categoryId: string }) {
   const streams = useApi(() => listStreams(categoryId), [categoryId], { refreshMs: STREAMS_REFRESH_MS });
 
   let body;
-  if (category.status === "loading") body = <LoadingState />;
+  if (category.status === "loading") body = <><PageBannerSkeleton /><StreamGridSkeleton /></>;
   else if (category.status === "error") {
     body = category.error.status === 404 || category.error.status === 400
       ? <NotFoundView />
@@ -28,7 +29,7 @@ export function CategoryStreamsView({ categoryId }: { categoryId: string }) {
       <>
         {/* Quay lại trang lobby chứa category này */}
         <PageBanner title={category.data.name} backHref={`/lobbies/${category.data.lobbyId}`} />
-        {streams.status === "loading" && <LoadingState />}
+        {streams.status === "loading" && <StreamGridSkeleton />}
         {streams.status === "error" && <ErrorState error={streams.error} onRetry={streams.reload} />}
         {streams.status === "success" &&
           (streams.data.length === 0 ? (

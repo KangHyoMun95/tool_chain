@@ -4,10 +4,11 @@ import { useState } from "react";
 import { useApi } from "@/src/hooks/use-api";
 import { useI18n } from "@/src/i18n/provider";
 import { listLobbies } from "@/src/lib/api/catalog";
-import { EmptyState, ErrorState, LoadingState } from "../DataStates";
+import { EmptyState, ErrorState } from "../DataStates";
 import { CatalogCard } from "./CatalogCard";
 import { HeroBanner } from "./HeroBanner";
 import { NoticeTicker } from "./NoticeTicker";
+import { CatalogGridSkeleton } from "./Skeletons";
 
 /** Trang chủ: banner, thẻ các lobby đang có trong DB, dải thông báo. */
 export function HomeView() {
@@ -18,7 +19,7 @@ export function HomeView() {
   return (
     <>
       <HeroBanner />
-      {lobbies.status === "loading" && <LoadingState />}
+      {lobbies.status === "loading" && <CatalogGridSkeleton />}
       {lobbies.status === "error" && <ErrorState error={lobbies.error} onRetry={lobbies.reload} />}
       {lobbies.status === "success" &&
         (lobbies.data.length === 0 ? (

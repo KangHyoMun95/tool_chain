@@ -4,11 +4,12 @@ import { useState } from "react";
 import { useApi } from "@/src/hooks/use-api";
 import { useI18n } from "@/src/i18n/provider";
 import { listCategories, listLobbies } from "@/src/lib/api/catalog";
-import { EmptyState, ErrorState, LoadingState } from "../DataStates";
+import { EmptyState, ErrorState } from "../DataStates";
 import { NotFoundView } from "../NotFoundView";
 import { CatalogCard } from "./CatalogCard";
 import { HeroBanner } from "./HeroBanner";
 import { NoticeTicker } from "./NoticeTicker";
+import { CatalogGridSkeleton } from "./Skeletons";
 
 /** Trang lobby: banner + thẻ các loại game (category) của lobby. */
 export function LobbyView({ lobbyId }: { lobbyId: string }) {
@@ -27,7 +28,7 @@ export function LobbyView({ lobbyId }: { lobbyId: string }) {
       ) : (
         <>
           <HeroBanner />
-          {categories.status === "loading" && <LoadingState />}
+          {categories.status === "loading" && <CatalogGridSkeleton />}
           {categories.status === "error" && <ErrorState error={categories.error} onRetry={categories.reload} />}
           {categories.status === "success" &&
             (categories.data.length === 0 ? (
