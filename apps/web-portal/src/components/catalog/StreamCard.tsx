@@ -11,6 +11,7 @@ import { ResultBeads } from "../ResultBeads";
 export function StreamCard({ stream, index }: { stream: Stream; index: number }) {
   const { t } = useI18n();
   const stats = getStreamStats(stream.id);
+  const title = `${stream.categoryName} ${stream.name}`;   // giống tiêu đề trang chi tiết
 
   return (
     <article
@@ -19,7 +20,7 @@ export function StreamCard({ stream, index }: { stream: Stream; index: number })
     >
       <div>
         <div className="flex items-center justify-between gap-2 border-b border-gray-800/80 pb-2">
-          <span className="truncate font-mono text-3xl font-black tracking-tight text-neon">{stream.name}</span>
+          <span className="truncate font-mono text-2xl font-black tracking-tight text-neon" title={title}>{title}</span>
           <span className="inline-flex shrink-0 animate-live-pulse items-center gap-1.5 rounded-full border border-emerald-500/50 bg-[#0d2a1a] px-2.5 py-0.5 font-mono text-[11px] font-bold text-emerald-400 shadow-[0_0_8px_rgba(34,197,94,0.8)]">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
             {t("streams.live")}
