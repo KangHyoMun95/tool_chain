@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { useI18n } from "@/src/i18n/provider";
+import { Spinner } from "../ui/Spinner";
 import { useAuth } from "./AuthProvider";
 
 // Bọc các trang cần đăng nhập: kiểm tra token trước, chưa hợp lệ thì chuyển sang /login (đăng nhập / đăng ký).
@@ -19,9 +20,9 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (status !== "authenticated") {
     return (
-      <div className="auth-checking" role="status">
-        <span className="auth-spinner auth-spinner-lg" aria-hidden="true" />
-        <p className="hint">{t("auth.checking")}</p>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3" role="status">
+        <Spinner className="h-8 w-8 border-neon/30 border-t-neon" />
+        <p className="font-mono text-xs uppercase tracking-widest text-slate-hud">{t("auth.checking")}</p>
       </div>
     );
   }
