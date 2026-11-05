@@ -3,9 +3,13 @@
 import { createContext, useContext } from "react";
 
 /** Trạng thái "đang thoát trang" dùng chung cho sidebar, hero, thẻ: bấm thẻ ⇒ leaving = true rồi mới chuyển trang. */
-export type ShellExit = { leaving: boolean; go: (href: string) => void };
+export type ShellExit = {
+  leaving: boolean;        // nội dung trang đang thoát (banner, thẻ)
+  leavingMenu: boolean;    // menu sidebar đang rút đi (chỉ khi trang đích không có sidebar)
+  go: (href: string, menu?: boolean) => void;
+};
 
-export const ShellExitContext = createContext<ShellExit>({ leaving: false, go: () => undefined });
+export const ShellExitContext = createContext<ShellExit>({ leaving: false, leavingMenu: false, go: () => undefined });
 export const useShellExit = (): ShellExit => useContext(ShellExitContext);
 
 // Lớp thoát (cố định chuỗi để Tailwind sinh CSS). Thời gian/độ trễ đặt qua style.

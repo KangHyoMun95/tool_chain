@@ -6,7 +6,6 @@ import { useI18n } from "@/src/i18n/provider";
 import { listCategories, listLobbies } from "@/src/lib/api/catalog";
 import { EmptyState, ErrorState, LoadingState } from "../DataStates";
 import { NotFoundView } from "../NotFoundView";
-import { AppShell } from "../shell/AppShell";
 import { CatalogCard } from "./CatalogCard";
 import { HeroBanner } from "./HeroBanner";
 import { NoticeTicker } from "./NoticeTicker";
@@ -22,7 +21,7 @@ export function LobbyView({ lobbyId }: { lobbyId: string }) {
   const missing = lobbies.status === "success" && !lobbies.data.some((l) => l.id === lobbyId);
 
   return (
-    <AppShell sidebar activeLobbyId={lobbyId}>
+    <>
       {missing ? (
         <NotFoundView />
       ) : (
@@ -53,6 +52,6 @@ export function LobbyView({ lobbyId }: { lobbyId: string }) {
           <NoticeTicker />
         </>
       )}
-    </AppShell>
+    </>
   );
 }

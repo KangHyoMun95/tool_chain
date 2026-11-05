@@ -5,7 +5,6 @@ import { useApi } from "@/src/hooks/use-api";
 import { useI18n } from "@/src/i18n/provider";
 import { listLobbies } from "@/src/lib/api/catalog";
 import { EmptyState, ErrorState, LoadingState } from "../DataStates";
-import { AppShell } from "../shell/AppShell";
 import { CatalogCard } from "./CatalogCard";
 import { HeroBanner } from "./HeroBanner";
 import { NoticeTicker } from "./NoticeTicker";
@@ -17,7 +16,7 @@ export function HomeView() {
   const [clicked, setClicked] = useState<string | null>(null);
 
   return (
-    <AppShell sidebar>
+    <>
       <HeroBanner />
       {lobbies.status === "loading" && <LoadingState />}
       {lobbies.status === "error" && <ErrorState error={lobbies.error} onRetry={lobbies.reload} />}
@@ -42,6 +41,6 @@ export function HomeView() {
           </section>
         ))}
       <NoticeTicker />
-    </AppShell>
+    </>
   );
 }

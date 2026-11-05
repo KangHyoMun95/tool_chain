@@ -30,7 +30,7 @@ export function CatalogCard({ kind, name, subtitle, href, index, total, clicked,
         if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
         e.preventDefault();
         onClick();
-        go(href);
+        go(href, kind === "categories");   // trang danh sách bàn không có sidebar ⇒ menu rút đi
       }}
       className={cn(
         "neon-panel group flex items-center justify-between bg-[#0e0e13] p-3.5 transition-all hover:border-red-400 hover:shadow-neon-md",

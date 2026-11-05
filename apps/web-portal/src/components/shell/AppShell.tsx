@@ -10,13 +10,12 @@ import { Sidebar } from "./Sidebar";
 
 type Props = {
   children: ReactNode;
-  /** Hiện sidebar (trang chủ / lobby). `activeLobbyId` đánh dấu mục lobby đang xem; bỏ trống = Trang chủ. */
+  /** Hiện sidebar (trang chủ / lobby); mục đang xem lấy theo đường dẫn. */
   sidebar?: boolean;
-  activeLobbyId?: string;
 };
 
 /** Khung chung của các trang cần đăng nhập: header + (sidebar) + nội dung. Cung cấp trạng thái thoát trang cho các khối con. */
-export function AppShell({ children, sidebar, activeLobbyId }: Props) {
+export function AppShell({ children, sidebar }: Props) {
   const exit = useExitNavigation();
 
   return (
@@ -26,7 +25,7 @@ export function AppShell({ children, sidebar, activeLobbyId }: Props) {
           <AppHeader />
           {sidebar ? (
             <div className="flex flex-1 flex-col gap-3.5 lg:flex-row">
-              <Sidebar activeLobbyId={activeLobbyId} />
+              <Sidebar />
               <main className="flex min-w-0 flex-1 flex-col gap-3.5">{children}</main>
             </div>
           ) : (
