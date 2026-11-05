@@ -37,7 +37,7 @@ export function CatalogCard({ kind, name, subtitle, href, index, total, clicked,
         leaving ? EXIT_CARD : "animate-slide-in-right",
         clicked && "scale-[0.96] !border-[#ff0055] shadow-[0_0_35px_rgba(255,23,68,1),inset_0_0_20px_rgba(255,23,68,0.8)]",
       )}
-      style={leaving ? { transitionDelay: `${(total - 1 - index) * 70}ms` } : stagger(index, 80, 150)}
+      style={leaving ? { animationDelay: `${(total - 1 - index) * 50}ms` } : stagger(index, 80, 150)}
     >
       <span className="flex min-w-0 items-center gap-3">
         <SlugImage kind={kind} name={name} className="h-14 w-14 shrink-0 transition-transform group-hover:scale-105" />

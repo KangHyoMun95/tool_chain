@@ -12,7 +12,7 @@ export type ShellExit = {
 export const ShellExitContext = createContext<ShellExit>({ leaving: false, leavingMenu: false, go: () => undefined });
 export const useShellExit = (): ShellExit => useContext(ShellExitContext);
 
-// Lớp thoát (cố định chuỗi để Tailwind sinh CSS). Thời gian/độ trễ đặt qua style.
-export const EXIT_ITEM = "-translate-x-[60px] opacity-0 pointer-events-none transition-all duration-500 ease-in-out";
-export const EXIT_CARD = "translate-x-20 opacity-0 pointer-events-none transition-all duration-500 ease-in-out";
-export const EXIT_HERO = "-translate-y-[50px] opacity-0 pointer-events-none transition-all duration-[600ms] ease-in-out";
+// Lớp thoát (keyframe trong tailwind.config.ts). Độ trễ so le đặt qua `animationDelay`.
+export const EXIT_ITEM = "animate-exit-menu pointer-events-none";   // menu: rút đi từ phải qua trái
+export const EXIT_CARD = "animate-exit-card pointer-events-none";   // thẻ: trượt từ trái sang phải
+export const EXIT_HERO = "animate-exit-hero pointer-events-none";   // banner: trượt lên và mờ dần

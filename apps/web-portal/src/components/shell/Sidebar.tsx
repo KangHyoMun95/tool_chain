@@ -73,8 +73,8 @@ export function Sidebar() {
             const cls = cn(ITEM, item.active ? ACTIVE : IDLE, "whitespace-nowrap transition-colors");
             // Thoát: rút đi theo thứ tự ngược (cuối → đầu)
             const motion = leavingMenu
-              ? { className: EXIT_ITEM, style: { transitionDelay: `${(items.length - 1 - i) * 45}ms` } }
-              : { className: "animate-slide-in-right", style: stagger(i, 60, 60) };
+              ? { className: EXIT_ITEM, style: { animationDelay: `${(items.length - 1 - i) * 30}ms` } }
+              : { className: "animate-slide-in-left", style: stagger(i, 60, 60) };
             const body = (
               <>
                 {item.icon}
