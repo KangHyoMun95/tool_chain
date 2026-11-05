@@ -1,10 +1,10 @@
 import { NotFoundView } from '@/src/components/NotFoundView';
-import { PortalShell } from '@/src/components/PortalShell';
+import { AppShell } from '@/src/components/shell/AppShell';
 
 export default function NotFound() {
   return (
-    <PortalShell>
+    <AppShell>
       <NotFoundView />
-    </PortalShell>
+    </AppShell>
   );
 }

@@ -8,31 +8,21 @@
     "backToStreams": "Quay Lại Bàn LIVE",
     "language": "Ngôn ngữ"
   },
-  "banner": {
-    "realtime": "HỆ THỐNG MÁY HỌC - CẬP NHẬT CHU KỲ DỰ ĐOÁN REAL-TIME DƯỚI 3 GIÂY"
-  },
   "lobbies": {
-    "title": "1. Chọn Sảnh Phân Tích",
-    "count": "{count} Sảnh VIP",
-    "tables": "{count} Bàn",
-    "empty": "Chưa có sảnh nào đang hoạt động."
+    "empty": "Chưa có sảnh nào đang hoạt động.",
+    "categoryCount": "{count} loại game"
   },
   "categories": {
-    "title": "2. Loại Trò Chơi (Sảnh {lobby})",
-    "hint": "Bấm \"Bàn Live\" để xem danh sách",
-    "liveTables": "{count} Bàn LIVE Active",
-    "aiWinRate": "Tỷ Lệ Win AI",
-    "openStreams": "Bàn Live →",
-    "empty": "Sảnh này chưa có loại trò chơi nào."
+    "empty": "Sảnh này chưa có loại trò chơi nào.",
+    "tableCount": "{count} bàn"
   },
   "streams": {
-    "subtitle": "Danh sách các bàn đang chạy phân tích trực tiếp",
-    "liveBadge": "{count} BÀN LIVE",
     "session": "Phiên #{id}",
     "live": "LIVE",
-    "winStreak": "Chuỗi Thắng",
+    "winRate": "TỶ LỆ WIN AI",
+    "winStreak": "CHUỖI THẮNG",
     "recentResults": "{count} Lượt Gần Nhất",
-    "viewDetail": "Chi Tiết AI Dự Đoán →",
+    "viewDetail": "Chi Tiết AI Dự Đoán",
     "empty": "Chưa có bàn nào trong loại trò chơi này.",
     "streamer": "Streamer: {name}"
   },
@@ -153,14 +143,37 @@
     "country": "Quốc gia streamer",
     "loadingData": "Đang nạp dữ liệu..."
   },
-  "balance": {
-    "label": "Số Dư",
-    "topup": "Nạp",
-    "topupSoon": "Sắp có"
-  },
   "status": {
     "live": "LIVE",
     "offline": "OFFLINE",
     "reconnecting": "MẤT KẾT NỐI"
+  },
+  "shell": {
+    "greeting": "Xin chào",
+    "balance": "Số dư",
+    "deposit": "NẠP TIỀN",
+    "notifications": "Thông báo",
+    "menu": "Mở menu"
+  },
+  "sidebar": {
+    "label": "Điều hướng",
+    "home": "Trang chủ",
+    "stats": "Thống kê",
+    "vip": "VIP",
+    "news": "Tin tức",
+    "support": "CSKH"
+  },
+  "hero": {
+    "slogan": "Bí quyết chiến thắng nằm trong dữ liệu",
+    "badgeAi": "AI THÔNG MINH",
+    "badgeAccurate": "CHÍNH XÁC CAO",
+    "badgeOptimize": "TỐI ƯU HÓA",
+    "badgeSafe": "AN TOÀN 100%"
+  },
+  "notice": {
+    "label": "THÔNG BÁO",
+    "before": "Chào mừng bạn đến với",
+    "after": "- Hệ thống phân tích thuật toán chuyên nghiệp!",
+    "more": "Xem chi tiết"
   }
 }

@@ -3,7 +3,7 @@
 | File | Dùng ở | Ghi chú |
 |---|---|---|
 | `logo.png` | header, đăng nhập | logo TOOL HACK AI (nền trong suốt) |
-| `banner-home.png` | banner trang chủ / lobby | |
+| `banner-home.webp` | banner trang chủ / lobby | WebP 1800px (~60KB); bản PNG gốc 1.4MB gây giật khi chạy hiệu ứng |
 | `hud-frame.png` | nền đăng nhập mobile | khung HUD neon đỏ |
 | `pedestal-bg.png` | nền các khối của chi tiết bàn | `mix-blend-screen` |
 | `lobbies/<slug>.png` | thẻ lobby, sidebar | ảnh 112×112 (hiển thị 56×56), PNG/WebP nền trong suốt |

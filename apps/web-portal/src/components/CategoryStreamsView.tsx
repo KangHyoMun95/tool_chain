@@ -3,9 +3,12 @@
 import { useApi } from "@/src/hooks/use-api";
 import { useI18n } from "@/src/i18n/provider";
 import { getCategory, listStreams } from "@/src/lib/api/catalog";
-import { EmptyState, ErrorState, LoadingState } from "./DataStates";
+import { PageBanner } from "./catalog/PageBanner";
+import { PageBannerSkeleton, StreamGridSkeleton } from "./catalog/Skeletons";
+import { StreamCard } from "./catalog/StreamCard";
+import { EmptyState, ErrorState } from "./DataStates";
 import { NotFoundView } from "./NotFoundView";
-import { StreamCard } from "./StreamCard";
+import { AppShell } from "./shell/AppShell";
 
 // Danh sách bàn tự làm mới ngầm mỗi 10 giây (streamer, bàn mới / bàn bị ẩn...).
 const STREAMS_REFRESH_MS = 10_000;
@@ -15,38 +18,32 @@ export function CategoryStreamsView({ categoryId }: { categoryId: string }) {
   const category = useApi(() => getCategory(categoryId), [categoryId]);
   const streams = useApi(() => listStreams(categoryId), [categoryId], { refreshMs: STREAMS_REFRESH_MS });
 
-  if (category.status === "loading") return <LoadingState />;
-  if (category.status === "error") {
-    return category.error.status === 404 || category.error.status === 400
+  let body;
+  if (category.status === "loading") body = <><PageBannerSkeleton /><StreamGridSkeleton /></>;
+  else if (category.status === "error") {
+    body = category.error.status === 404 || category.error.status === 400
       ? <NotFoundView />
       : <ErrorState error={category.error} onRetry={category.reload} />;
+  } else {
+    body = (
+      <>
+        {/* Quay lại trang lobby chứa category này */}
+        <PageBanner title={category.data.name} backHref={`/lobbies/${category.data.lobbyId}`} />
+        {streams.status === "loading" && <StreamGridSkeleton />}
+        {streams.status === "error" && <ErrorState error={streams.error} onRetry={streams.reload} />}
+        {streams.status === "success" &&
+          (streams.data.length === 0 ? (
+            <EmptyState message={t("streams.empty")} />
+          ) : (
+            <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {streams.data.map((stream, i) => (
+                <StreamCard key={stream.id} stream={stream} index={i} />
+              ))}
+            </section>
+          ))}
+      </>
+    );
   }
 
-  return (
-    <>
-      <div className="card card-glass page-head">
-        <div>
-          <h2 className="page-title">{category.data.name}</h2>
-          <p className="hint">{t("streams.subtitle")}</p>
-        </div>
-        <div className="page-head-actions">
-          {streams.status === "success" && (
-            <span className="chip chip-dark">{t("streams.liveBadge", { count: streams.data.length })}</span>
-          )}
-        </div>
-      </div>
-      {streams.status === "loading" && <LoadingState />}
-      {streams.status === "error" && <ErrorState error={streams.error} onRetry={streams.reload} />}
-      {streams.status === "success" &&
-        (streams.data.length === 0 ? (
-          <EmptyState message={t("streams.empty")} />
-        ) : (
-          <div className="lgrid grid-3">
-            {streams.data.map((stream) => (
-              <StreamCard key={stream.id} stream={stream} />
-            ))}
-          </div>
-        ))}
-    </>
-  );
+  return <AppShell>{body}</AppShell>;
 }

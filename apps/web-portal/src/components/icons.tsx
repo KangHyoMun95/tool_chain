@@ -147,3 +147,84 @@ export const ShieldCheckIcon = (props: IconProps) => (
     <path d="m9 12 2 2 4-4" />
   </Icon>
 );
+
+export const HomeIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="m3 11 9-8 9 8" />
+    <path d="M5 10v10h5v-6h4v6h5V10" />
+  </Icon>
+);
+
+export const BarChartIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M5 21V11M12 21V4M19 21v-7" />
+  </Icon>
+);
+
+export const StarIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <polygon points="12 2 15 9 22 9.5 16.5 14.5 18 22 12 18 6 22 7.5 14.5 2 9.5 9 9" />
+  </Icon>
+);
+
+export const NewspaperIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M4 4h12v16H6a2 2 0 0 1-2-2z" />
+    <path d="M16 8h4v10a2 2 0 0 1-2 2M8 8h4M8 12h4M8 16h4" />
+  </Icon>
+);
+
+export const LifeBuoyIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <circle cx="12" cy="12" r="4" />
+    <path d="m5.6 5.6 3.5 3.5M14.9 14.9l3.5 3.5M5.6 18.4l3.5-3.5M14.9 9.1l3.5-3.5" />
+  </Icon>
+);
+
+export const BellIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M6 8a6 6 0 1 1 12 0c0 7 3 8 3 8H3s3-1 3-8" />
+    <path d="M10.3 20a2 2 0 0 0 3.4 0" />
+  </Icon>
+);
+
+export const MenuIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M4 6h16M4 12h16M4 18h16" />
+  </Icon>
+);
+
+export const UserIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="12" cy="8" r="4" />
+    <path d="M4 21a8 8 0 0 1 16 0" />
+  </Icon>
+);
+
+export const CheckCircleIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="m8.5 12.5 2.5 2.5 4.5-5" />
+  </Icon>
+);
+
+export const CogIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="3" />
+    <path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" />
+  </Icon>
+);
+
+export const MegaphoneIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3 11v2a1 1 0 0 0 1 1h3l8 4V6L7 10H4a1 1 0 0 0-1 1z" />
+    <path d="M18 9a4 4 0 0 1 0 6" />
+  </Icon>
+);
+
+export const ChevronRightIcon = (props: IconProps) => (
+  <Icon {...props} strokeWidth={3}>
+    <path d="m9 5 7 7-7 7" />
+  </Icon>
+);

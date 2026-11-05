@@ -36,9 +36,13 @@ const config: Config = {
       keyframes: {
         slideInLeft: { '0%': { opacity: '0', transform: 'translateX(-40px)' }, '100%': { opacity: '1', transform: 'translateX(0)' } },
         slideInRight: { '0%': { opacity: '0', transform: 'translateX(50px)' }, '100%': { opacity: '1', transform: 'translateX(0)' } },
-        bannerFadeIn: { '0%': { opacity: '0', transform: 'translateY(-20px) scale(0.98)' }, '100%': { opacity: '1', transform: 'translateY(0) scale(1)' } },
+        bannerFadeIn: { '0%': { opacity: '0', transform: 'translateY(-24px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
         cardFadeSlideDown: { '0%': { opacity: '0', transform: 'translateY(-20px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
         entranceSlideDown: { '0%': { opacity: '0', transform: 'translateY(-60px)' }, '100%': { opacity: '1', transform: 'translateY(0)' } },
+        // Hiệu ứng thoát dùng keyframe (không dùng transition): transition không chạy khi vừa gỡ animation `vào`.
+        exitMenu: { '0%': { opacity: '1', transform: 'translateX(0)' }, '100%': { opacity: '0', transform: 'translateX(-80px)' } },
+        exitCard: { '0%': { opacity: '1', transform: 'translateX(0)' }, '100%': { opacity: '0', transform: 'translateX(80px)' } },
+        exitHero: { '0%': { opacity: '1', transform: 'translateY(0)' }, '100%': { opacity: '0', transform: 'translateY(-50px)' } },
         notifyShake: {
           '0%, 100%': { transform: 'scale(1) rotate(0deg)' },
           '10%, 30%': { transform: 'scale(1.03) rotate(-1.5deg)' },
@@ -64,9 +68,12 @@ const config: Config = {
       animation: {
         'slide-in-left': 'slideInLeft 0.6s cubic-bezier(0.16, 1, 0.3, 1) both',
         'slide-in-right': 'slideInRight 0.65s cubic-bezier(0.16, 1, 0.3, 1) both',
-        'banner-in': 'bannerFadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both',
+        'banner-in': 'bannerFadeIn 1s cubic-bezier(0.22, 1, 0.36, 1) both',
         'card-in': 'cardFadeSlideDown 0.65s cubic-bezier(0.16, 1, 0.3, 1) both',
         'entrance-down': 'entranceSlideDown 0.85s cubic-bezier(0.16, 1, 0.3, 1) both',
+        'exit-menu': 'exitMenu 0.4s cubic-bezier(0.4, 0, 0.2, 1) both',
+        'exit-card': 'exitCard 0.4s cubic-bezier(0.4, 0, 0.2, 1) both',
+        'exit-hero': 'exitHero 0.5s cubic-bezier(0.4, 0, 0.2, 1) both',
         'notify-shake': 'notifyShake 4s ease-in-out infinite',
         'live-pulse': 'livePulse 1.8s infinite',
         'radar-spin': 'radarSpin 2.2s linear infinite',

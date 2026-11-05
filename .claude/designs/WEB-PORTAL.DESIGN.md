@@ -80,7 +80,7 @@ Mọi hiệu ứng tắt khi người dùng bật "giảm chuyển động" (`pr
 |---|---|---|
 | `slide-in-left` | mục sidebar (trang chủ/lobby), cột trái chi tiết bàn | 0.6s, so le 60ms |
 | `slide-in-right` | thẻ lobby/category, cột phải chi tiết bàn | 0.65s, so le 80ms |
-| `banner-in` | hero banner | 0.8s |
+| `banner-in` | hero banner (chỉ chạy sau khi ảnh nền giải mã xong) | 1s, trượt xuống 24px + mờ → rõ |
 | `card-in` | thẻ bàn ở danh sách | 0.65s, so le 100ms |
 | `entrance-down` | thẻ đăng nhập | 0.85s |
 | thoát khi bấm thẻ (`useExitNavigation`) | sidebar rút lên theo thứ tự ngược, thẻ trượt phải, banner trượt lên; sau 0.6s mới chuyển trang | |
@@ -93,4 +93,4 @@ Theo class Tailwind của thiết kế: 12 cột ở `lg` (chi tiết bàn 5/7),
 
 # 8. Ảnh
 
-Trong `apps/web-portal/public/images/` (xem README ở đó): `logo.png`, `banner-home.png`, `hud-frame.png`, `pedestal-bg.png`; ảnh thẻ theo `lobbies/<slug>.png`, `categories/<slug>.png` (`slugify` ở `src/lib/slug.ts`).
+Trong `apps/web-portal/public/images/` (xem README ở đó): `logo.png`, `banner-home.webp`, `hud-frame.png`, `pedestal-bg.png`; ảnh thẻ theo `lobbies/<slug>.png`, `categories/<slug>.png` (`slugify` ở `src/lib/slug.ts`).
