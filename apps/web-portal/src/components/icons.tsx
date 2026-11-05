@@ -228,3 +228,23 @@ export const ChevronRightIcon = (props: IconProps) => (
     <path d="m9 5 7 7-7 7" />
   </Icon>
 );
+
+export const GemIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M6 3h12l4 6-10 12L2 9z" />
+    <path d="M2 9h20M12 21 8 9l4-6 4 6z" />
+  </Icon>
+);
+
+export const CheckIcon = (props: IconProps) => (
+  <Icon {...props} strokeWidth={3}>
+    <path d="m5 12 5 5 9-10" />
+  </Icon>
+);
+
+export const ChartIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M3 3v18h18" />
+    <path d="m7 15 4-4 3 3 5-6" />
+  </Icon>
+);

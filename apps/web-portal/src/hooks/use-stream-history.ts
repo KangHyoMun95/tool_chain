@@ -8,7 +8,7 @@ export type HistoryRow = { shoe: number; round: number; result: string | null };
 
 type ApiHistory = { shoe: number | null; items: { shoe: number; round: number; result: string | null }[] };
 
-const LIMIT = 72;   // đủ cho lưới 12x6 của bảng kết quả
+const LIMIT = 60;   // đủ cho bảng kết quả 6 hàng x 10 cột
 const REFETCH_DELAY_MS = 4000;   // lớn hơn chu kỳ ghi batch của API (3s)
 
 const rowKey = (r: { shoe: number; round: number }) => `${r.shoe}:${r.round}`;
