@@ -8,32 +8,22 @@
     "backToStreams": "Back to LIVE Tables",
     "language": "Language"
   },
-  "banner": {
-    "realtime": "MACHINE LEARNING SYSTEM - REAL-TIME PREDICTION CYCLE UPDATES IN UNDER 3 SECONDS"
-  },
   "lobbies": {
-    "title": "1. Choose an Analysis Lobby",
-    "count": "{count} VIP Lobbies",
-    "tables": "{count} Tables",
-    "empty": "No active lobbies yet."
+    "empty": "No lobby is active yet.",
+    "categoryCount": "{count} games"
   },
   "categories": {
-    "title": "2. Game Types ({lobby} Lobby)",
-    "hint": "Press \"Live Tables\" to see the list",
-    "liveTables": "{count} LIVE Tables Active",
-    "aiWinRate": "AI Win Rate",
-    "openStreams": "Live Tables →",
-    "empty": "This lobby has no game types yet."
+    "empty": "This lobby has no games yet.",
+    "tableCount": "{count} tables"
   },
   "streams": {
-    "subtitle": "Tables currently running live analysis",
-    "liveBadge": "{count} LIVE TABLES",
-    "session": "Session #{id}",
+    "session": "Round #{id}",
     "live": "LIVE",
-    "winStreak": "Win Streak",
-    "recentResults": "Last {count} Rounds",
-    "viewDetail": "AI Prediction Details →",
-    "empty": "No tables in this game type yet.",
+    "winRate": "AI WIN RATE",
+    "winStreak": "WIN STREAK",
+    "recentResults": "Last {count} rounds",
+    "viewDetail": "AI Prediction Details",
+    "empty": "No tables in this game yet.",
     "streamer": "Streamer: {name}"
   },
   "detail": {
@@ -153,14 +143,37 @@
     "country": "Streamer country",
     "loadingData": "Loading data..."
   },
-  "balance": {
-    "label": "Balance",
-    "topup": "Top up",
-    "topupSoon": "Coming soon"
-  },
   "status": {
     "live": "LIVE",
     "offline": "OFFLINE",
     "reconnecting": "RECONNECTING"
+  },
+  "shell": {
+    "greeting": "Hello",
+    "balance": "Balance",
+    "deposit": "DEPOSIT",
+    "notifications": "Notifications",
+    "menu": "Open menu"
+  },
+  "sidebar": {
+    "label": "Navigation",
+    "home": "Home",
+    "stats": "Statistics",
+    "vip": "VIP",
+    "news": "News",
+    "support": "Support"
+  },
+  "hero": {
+    "slogan": "The winning edge is in the data",
+    "badgeAi": "SMART AI",
+    "badgeAccurate": "HIGH ACCURACY",
+    "badgeOptimize": "OPTIMIZED",
+    "badgeSafe": "100% SAFE"
+  },
+  "notice": {
+    "label": "NOTICE",
+    "before": "Welcome to",
+    "after": "- the professional algorithm analytics system!",
+    "more": "Details"
   }
 }

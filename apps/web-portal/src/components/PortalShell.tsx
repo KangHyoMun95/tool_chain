@@ -1,15 +1,13 @@
 import type { ReactNode } from "react";
-import { AuthGate } from "./auth/AuthGate";
-import type { BackLink } from "./BackButton";
-import { RoyalHeader } from "./RoyalHeader";
+import { BackButton, type BackLink } from "./BackButton";
+import { AppShell } from "./shell/AppShell";
 
+// TẠM THỜI (xóa ở PR 4): chỉ còn StreamDetailView dùng, vì trang chi tiết chưa chuyển giao diện.
 export function PortalShell({ back, children }: { back?: BackLink; children: ReactNode }) {
   return (
-    <AuthGate>
-      <div className="shell">
-        <RoyalHeader back={back} />
-        <main className="stack">{children}</main>
-      </div>
-    </AuthGate>
+    <AppShell>
+      {back && <div><BackButton back={back} /></div>}
+      <div className="stack">{children}</div>
+    </AppShell>
   );
 }
