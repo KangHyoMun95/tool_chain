@@ -109,7 +109,8 @@
     "loading": "Loading data...",
     "error": "Could not load data. Please try again.",
     "errorNetwork": "Cannot reach the server. Please try again.",
-    "retry": "Retry"
+    "retry": "Retry",
+    "comingSoon": "Coming soon"
   },
   "live": {
     "connection": {
@@ -145,5 +146,10 @@
     "label": "Balance",
     "topup": "Top up",
     "topupSoon": "Coming soon"
+  },
+  "status": {
+    "live": "LIVE",
+    "offline": "OFFLINE",
+    "reconnecting": "RECONNECTING"
   }
 }

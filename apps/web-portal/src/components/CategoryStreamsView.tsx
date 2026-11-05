@@ -41,7 +41,7 @@ export function CategoryStreamsView({ categoryId }: { categoryId: string }) {
         (streams.data.length === 0 ? (
           <EmptyState message={t("streams.empty")} />
         ) : (
-          <div className="grid grid-3">
+          <div className="lgrid grid-3">
             {streams.data.map((stream) => (
               <StreamCard key={stream.id} stream={stream} />
             ))}

@@ -14,7 +14,7 @@ export function SessionHistory({ streamId, shoe, rows, error }: Props) {
       <h3 className="section-title">{t("live.historyTitle", { shoe: shoe ?? "—" })}</h3>
       {error && <p className="hint">{t("live.historyError")}</p>}
       {rows.length === 0 && !error && <p className="hint">{t("live.historyEmpty")}</p>}
-      <div className="grid grid-history">
+      <div className="lgrid grid-history">
         {rows.map((r) => {
           const pick = mockPredictionSync(streamId, r.shoe, r.round).pick;
           const tone = r.result === "T" ? "draw" : r.result !== null && pick === r.result ? "win" : "loss";
