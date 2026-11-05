@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/src/i18n/provider";
 import { cn } from "@/src/lib/cn";
 import { CheckCircleIcon, CogIcon, ShieldCheckIcon, ZapIcon } from "../icons";
@@ -16,20 +17,33 @@ const BADGES = [
 export function HeroBanner() {
   const { t } = useI18n();
   const { leaving } = useShellExit();
+  // Chỉ chạy hiệu ứng vào khi ảnh nền đã giải mã xong, tránh giật vì vừa chạy hiệu ứng vừa giải mã ảnh lớn.
+  const [ready, setReady] = useState(false);
+  const img = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const el = img.current;
+    if (el?.complete) void el.decode().then(() => setReady(true), () => setReady(true));
+    const fallback = setTimeout(() => setReady(true), 800);   // ảnh lỗi/chậm thì vẫn hiện banner
+    return () => clearTimeout(fallback);
+  }, []);
 
   return (
     <section
       className={cn(
-        "neon-panel relative flex min-h-[220px] items-center overflow-hidden px-6 py-6 sm:px-10 lg:min-h-[260px]",
-        leaving ? EXIT_HERO : "animate-banner-in",
+        "neon-panel relative flex min-h-[220px] items-center overflow-hidden px-6 py-6 will-change-[transform,opacity] sm:px-10 lg:min-h-[260px]",
+        leaving ? EXIT_HERO : ready ? "animate-banner-in" : "opacity-0",
       )}
-      style={{
-        backgroundImage:
-          "linear-gradient(to right, rgba(5,5,8,0.85) 0%, rgba(5,5,8,0.5) 50%, rgba(5,5,8,0.7) 100%), url(/images/banner-home.png)",
-        backgroundSize: "cover",
-        backgroundPosition: "center",
-      }}
     >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        ref={img}
+        src="/images/banner-home.webp"
+        alt=""
+        decoding="async"
+        onLoad={(e) => void e.currentTarget.decode().then(() => setReady(true), () => setReady(true))}
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+      />
+      <div className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(to right, rgba(5,5,8,0.85) 0%, rgba(5,5,8,0.5) 50%, rgba(5,5,8,0.7) 100%)" }} />
       <div className="pointer-events-none absolute inset-0 opacity-15" style={{ backgroundImage: "radial-gradient(#ff1e42 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
       <div className="relative z-10 flex w-full flex-col items-center justify-between gap-6 md:flex-row">
         <div className="flex-1 text-center md:text-left">
