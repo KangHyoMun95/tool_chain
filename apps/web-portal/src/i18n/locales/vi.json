@@ -109,7 +109,8 @@
     "loading": "Đang tải dữ liệu...",
     "error": "Không tải được dữ liệu. Vui lòng thử lại.",
     "errorNetwork": "Không kết nối được máy chủ. Vui lòng thử lại.",
-    "retry": "Thử lại"
+    "retry": "Thử lại",
+    "comingSoon": "Tính năng sắp ra mắt (Coming soon)"
   },
   "live": {
     "connection": {
@@ -145,5 +146,10 @@
     "label": "Số Dư",
     "topup": "Nạp",
     "topupSoon": "Sắp có"
+  },
+  "status": {
+    "live": "LIVE",
+    "offline": "OFFLINE",
+    "reconnecting": "MẤT KẾT NỐI"
   }
 }

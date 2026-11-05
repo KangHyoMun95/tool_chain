@@ -302,10 +302,10 @@ bash apps/crawl-agent/run_server.sh
 
 ## Theme / Design (mỗi web app một design contract riêng)
 
-Khi tạo/sửa UI, PHẢI đọc và bám file design của đúng app; hai app KHÔNG dùng chung theme. Đặt token màu/typography tập trung (vd `ConfigProvider theme` trong `app/providers.tsx`), không hardcode hex rải rác.
+Khi tạo/sửa UI, PHẢI đọc và bám file design của đúng app; hai app KHÔNG dùng chung theme. Đặt token màu/typography tập trung (web-admin: `ConfigProvider theme` trong `app/providers.tsx`; web-portal: `tailwind.config.ts`), không hardcode hex rải rác.
 
 - `apps/web-admin` — Dark SOC / Cyber-Threat: `.claude/designs/WEB-ADMIN.DESIGN.md` (nền `#0A0E14`, primary cyan `#22D3EE`, heading monospace, bảng severity nhất quán). Dùng skill `nextjs-frontend` (antd + pro-components).
-- `apps/web-portal` — Nexus AI Royale / Royal Purple Analytics (nguồn: Stitch `projects/10681042779717465733`): `.claude/designs/WEB-PORTAL.DESIGN.md` (nền sáng lavender `#F3E8FF`→`#F5D0FE`, header tím `#581C87`→`#7E22CE`, nhấn vàng amber `#F59E0B`, xanh lá/hồng đỏ chỉ cho đúng–sai, font Outfit + Plus Jakarta Sans, không monospace).
+- `apps/web-portal` — Cyberpunk Neon Red HUD (nguồn: Stitch `projects/7952075426934119946`, design system "Cyberpunk Neon Red HUD"): `.claude/designs/WEB-PORTAL.DESIGN.md` (nền obsidian `#050507`, neon đỏ `#FF1E42`, vàng chỉ cho số dư, xanh lá cho LIVE/thắng, font Space Grotesk + JetBrains Mono + Outfit). Dùng **Tailwind 3** (token trong `apps/web-portal/tailwind.config.ts`, component dùng chung ở `src/components/ui/`), KHÔNG dùng antd. `app/legacy.css` (Royal Purple cũ) chỉ còn cho các trang chưa chuyển, sẽ xóa khi hoàn tất.
 
 - **Dữ liệu web-portal:** sảnh / loại game / bàn lấy từ API thật (`src/lib/api/catalog.ts` → `GET /lobbies`, `/categories`, `/streams`, `/categories/:id`, `/streams/:id`), fetch ở **client** kèm Bearer (`authFetch` tự làm mới token một lần khi gặp 401, `useApi` chỉ gọi khi đã đăng nhập). Số liệu AI (tỉ lệ thắng, chuỗi thắng, lịch sử, độ tin cậy, khung dự đoán) vẫn là **dữ liệu giả lập** trong `src/lib/mock-stats.ts`, chờ API prediction.
 

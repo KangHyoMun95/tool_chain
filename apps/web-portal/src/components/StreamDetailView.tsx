@@ -63,7 +63,7 @@ function StreamDetail({ stream }: { stream: Stream }) {
         <section className="split-side stack">
           <PredictionPanel streamId={id} connection={live.connection} shoe={live.shoe} round={live.round} status={live.latest?.status ?? null} statusLabel={statusLabel} result={live.result} />
           <LiveBoard country={live.country} totals={live.totals} rows={live.history.rows} />
-          <div className="grid grid-2 grid-tight">
+          <div className="lgrid grid-2 grid-tight">
             <StatTile label={t("detail.currentWinRate")} value={`${stats.aiWinRate.toFixed(1)}%`} />
             <StatTile label={t("detail.liveWinStreak")} value={`${stats.winStreak} 🔥`} tone="amber" />
           </div>

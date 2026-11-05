@@ -50,7 +50,7 @@ export function LobbyBrowser() {
           (categories.data.length === 0 ? (
             <EmptyState message={t("categories.empty")} />
           ) : (
-            <div className="grid grid-2">
+            <div className="lgrid grid-2">
               {categories.data.map((category) => (
                 <CategoryCard key={category.id} category={category} />
               ))}
