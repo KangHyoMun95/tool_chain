@@ -14,6 +14,6 @@ Ví dụ lobby "Casino" → `lobbies/casino.png`, category "Baccarat" → `categ
 Chưa có ảnh thì UI hiện ô placeholder (chữ cái đầu), không cần sửa code khi thêm ảnh.
 
 ## Còn thiếu (chưa lấy được từ Stitch, cần copy tay nếu muốn đúng thiết kế)
-- `pedestal-base.png` (bệ đỡ chữ dự đoán, 339×29), `rice-left.png`, `rice-right.png` (hai cây lúa, 71×117)
+- `pedestal-base.png` (bệ đỡ chữ dự đoán, 339×29), `rice-left.png`, `rice-right.png` (hai cây lúa, 71×117) — khung dự đoán của trang chi tiết bàn tự bỏ qua khi thiếu file
 - `mascot.png` (nhân vật hacker ở banner trang chủ), `login-bg.jpg` (nền đăng nhập desktop)
 Các chỗ dùng chúng có dự phòng bằng CSS nên giao diện vẫn chạy khi thiếu file.

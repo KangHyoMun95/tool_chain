@@ -6,7 +6,6 @@ import { DEFAULT_LOCALE, LOCALE_COOKIE, isLocale } from '@/src/i18n/config';
 import { AuthProvider } from '@/src/components/auth/AuthProvider';
 import { I18nProvider } from '@/src/i18n/provider';
 import './globals.css';
-import './legacy.css';   // Royal Purple cũ, chỉ cho các trang chưa chuyển giao diện (xóa ở PR 4)
 
 const bodyFont = Outfit({
   subsets: ['latin', 'latin-ext'],

@@ -22,23 +22,24 @@ function toVietnamTime(raw: string): string | null {
 
 export const SHOW_STREAM_DEBUG = process.env.NEXT_PUBLIC_SHOW_STREAM_DEBUG === "true";
 
+/** Khung debug 5 trường time của message mới nhất; chỉ hiện khi NEXT_PUBLIC_SHOW_STREAM_DEBUG=true. */
 export function StreamDebugPanel({ data }: { data: CrawlPayload | undefined }) {
   const { t } = useI18n();
   if (!SHOW_STREAM_DEBUG) return null;
   return (
-    <details className="card card-glass">
-      <summary className="section-title">{t("live.debugTitle")}</summary>
-      <table>
+    <details className="hud-card p-3.5 text-sm">
+      <summary className="cursor-pointer font-display font-bold tracking-wide text-white">{t("live.debugTitle")}</summary>
+      <table className="mt-2 w-full font-mono text-xs">
         <tbody>
           {FIELDS.map((f) => {
             const v = data?.[f];
             const raw = v == null ? null : String(v);
             const converted = raw === null ? null : toVietnamTime(raw);
             return (
-              <tr key={f}>
-                <td className="hint">{f}</td>
-                <td>{raw ?? "—"}</td>
-                <td className="hint">{converted ? `${t("live.debugConverted")}: ${converted}` : ""}</td>
+              <tr key={f} className="border-t border-white/10">
+                <td className="py-1 pr-3 text-slate-hud">{f}</td>
+                <td className="py-1 pr-3 text-white">{raw ?? "—"}</td>
+                <td className="py-1 text-slate-hud">{converted ? `${t("live.debugConverted")}: ${converted}` : ""}</td>
               </tr>
             );
           })}

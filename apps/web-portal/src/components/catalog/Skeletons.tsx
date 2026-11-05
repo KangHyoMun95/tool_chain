@@ -76,3 +76,21 @@ export function PageBannerSkeleton() {
     </HudCard>
   );
 }
+
+/** Khung chờ của trang chi tiết bàn (2 cột). */
+export function StreamDetailSkeleton() {
+  const { t } = useI18n();
+  return (
+    <div className="grid grid-cols-1 gap-3 lg:grid-cols-12" role="status" aria-busy="true" aria-label={t("common.loading")}>
+      <div className="flex flex-col gap-3 lg:col-span-5">
+        <HudCard className="h-[300px] animate-pulse" aria-hidden="true" />
+        <HudCard className="h-[150px] animate-pulse" aria-hidden="true" />
+        <HudCard className="h-[80px] animate-pulse" aria-hidden="true" />
+      </div>
+      <div className="flex flex-col gap-3 lg:col-span-7">
+        <HudCard className="h-[250px] animate-pulse" aria-hidden="true" />
+        <HudCard className="h-[200px] animate-pulse" aria-hidden="true" />
+      </div>
+    </div>
+  );
+}

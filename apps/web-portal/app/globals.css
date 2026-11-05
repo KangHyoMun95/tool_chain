@@ -33,6 +33,23 @@
   }
   .hud-card-glow { box-shadow: 0 0 25px rgba(255, 10, 40, 0.35), inset 0 0 20px rgba(255, 10, 40, 0.2); }
 
+  /* Khung dự đoán khi đã có kết quả: thắng xanh lá, thua đỏ đậm, hòa xám (đặt sau .hud-card để thắng về thứ tự) */
+  .hud-result-win {
+    border-color: rgba(16, 185, 129, 0.8);
+    background: linear-gradient(135deg, rgba(6, 78, 59, 0.85), rgba(2, 24, 16, 0.95));
+    box-shadow: 0 0 28px rgba(16, 185, 129, 0.45), inset 0 0 20px rgba(16, 185, 129, 0.2);
+  }
+  .hud-result-loss {
+    border-color: #ff1e42;
+    background: linear-gradient(135deg, rgba(153, 20, 35, 0.9), rgba(60, 5, 12, 0.95));
+    box-shadow: 0 0 30px rgba(255, 30, 66, 0.6), inset 0 0 24px rgba(255, 30, 66, 0.35);
+  }
+  .hud-result-draw {
+    border-color: rgba(156, 163, 175, 0.7);
+    background: linear-gradient(135deg, rgba(75, 85, 99, 0.7), rgba(24, 24, 27, 0.95));
+    box-shadow: 0 0 22px rgba(156, 163, 175, 0.35);
+  }
+
   /* Panel neon (trang chủ / Casino / sidebar / ticker) */
   .neon-panel {
     @apply rounded-[18px] border-[1.5px] border-neon;
@@ -51,10 +68,11 @@
 
   /* Radar (SVG): gốc xoay là tâm 150,150 của viewBox 300x300 */
   .radar-beam, .radar-ring { transform-origin: 150px 150px; }
-  .radar-beam { animation: radarSpin 2.2s linear infinite; }
-  .radar-ring { animation: radarPulse 3s ease-in-out infinite; }
-  .radar-blip-1 { transform-origin: 195px 105px; animation: blipFade1 2.2s ease-out infinite; }
-  .radar-blip-2 { transform-origin: 100px 185px; animation: blipFade2 2.2s ease-out infinite; }
+  /* @apply để Tailwind sinh @keyframes (keyframes chỉ được phát ra khi có class animate-* được dùng) */
+  .radar-beam { @apply animate-radar-spin; }
+  .radar-ring { @apply animate-radar-pulse; }
+  .radar-blip-1 { transform-origin: 195px 105px; @apply animate-blip-1; }
+  .radar-blip-2 { transform-origin: 100px 185px; @apply animate-blip-2; }
 }
 
 /* Người dùng bật "giảm chuyển động": tắt mọi hiệu ứng */

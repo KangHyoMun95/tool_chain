@@ -71,6 +71,7 @@ export function useStreamSession(stream: StreamRef) {
     shoe, round, status,
     result: currentResult,
     totals: toTotals(latest),
+    streamerName: latest?.streamer_name ?? null,
     country: latest?.streamer_country ?? null,
     history,
   };
