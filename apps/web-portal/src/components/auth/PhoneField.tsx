@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { useI18n } from "@/src/i18n/provider";
 import { PhoneIcon } from "../icons";
+import { AUTH_INPUT_CLASS, AuthField } from "./AuthField";
 
 export function PhoneField({
   value,
@@ -19,26 +20,20 @@ export function PhoneField({
   const id = useId();
 
   return (
-    <div className="field">
-      <label htmlFor={id} className="field-label">
-        {t("auth.phoneLabel")}
-      </label>
-      <div className="field-control">
-        <PhoneIcon className="field-icon" />
-        <input
-          id={id}
-          type="tel"
-          inputMode="tel"
-          autoComplete="tel"
-          required
-          maxLength={32}
-          autoFocus={autoFocus}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder={placeholder}
-          className="field-input"
-        />
-      </div>
-    </div>
+    <AuthField id={id} label={t("auth.phoneLabel")} icon={<PhoneIcon className="h-5 w-5" />}>
+      <input
+        id={id}
+        type="tel"
+        inputMode="tel"
+        autoComplete="tel"
+        required
+        maxLength={32}
+        autoFocus={autoFocus}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className={AUTH_INPUT_CLASS}
+      />
+    </AuthField>
   );
 }

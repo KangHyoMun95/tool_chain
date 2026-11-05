@@ -127,3 +127,23 @@ export const PlusIcon = (props: IconProps) => (
     <path d="M12 5v14" />
   </Icon>
 );
+
+export const CrosshairIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
+  </Icon>
+);
+
+export const ActivityIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <polyline points="22 12 18 12 15 21 9 3 6 12 2 12" />
+  </Icon>
+);
+
+export const ShieldCheckIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+    <path d="m9 12 2 2 4-4" />
+  </Icon>
+);

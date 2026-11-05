@@ -1,7 +1,7 @@
 {
   "brand": {
-    "name": "NEXUS AI ROYALE",
-    "tagline": "Professional algorithm analytics platform"
+    "name": "TOOL HACK AI",
+    "tagline": "Professional algorithm analytics system"
   },
   "nav": {
     "backToLobbies": "Back to Lobbies",
@@ -79,20 +79,17 @@
   },
   "auth": {
     "tagline": "AI data prediction analytics platform",
-    "tabsLabel": "Sign in or sign up",
-    "tabLogin": "SIGN IN",
-    "tabRegister": "SIGN UP",
     "phoneLabel": "Phone number",
     "phonePlaceholder": "09xxxxxxxx",
     "passwordLabel": "Password",
     "passwordPlaceholder": "••••••••",
     "showPassword": "Show password",
     "hidePassword": "Hide password",
-    "loginSubmit": "SIGN IN TO THE SYSTEM",
+    "loginSubmit": "SIGN IN",
     "loginLoading": "VERIFYING...",
     "registerPhonePlaceholder": "Enter your phone number to sign up",
     "registerHint": "After you sign up, your managing Admin will issue an account for this phone number.",
-    "registerSubmit": "CREATE ACCOUNT",
+    "registerSubmit": "REGISTER NOW",
     "errors": {
       "invalidPhone": "Invalid phone number (6–20 digits).",
       "passwordRequired": "Please enter your password.",
@@ -103,7 +100,21 @@
     },
     "registerSuccess": "Your phone number has been received. Your managing Admin will issue an account for you.",
     "registerLoading": "SENDING...",
-    "checking": "Checking your session..."
+    "checking": "Checking your session...",
+    "slogan": "PROFESSIONAL ALGORITHM ANALYTICS SYSTEM",
+    "badgeAccurate": "Accurate",
+    "badgeStable": "Stable",
+    "badgeSecure": "Secure",
+    "loginTitle": "Sign in",
+    "loginSubtitle": "Enter your details to sign in",
+    "registerTitle": "Create account",
+    "registerSubtitle": "Sign up quickly with just your phone number",
+    "noAccount": "No account yet?",
+    "registerNow": "Register now",
+    "haveAccount": "Already have an account?",
+    "loginNow": "Sign in now",
+    "sslNotice": "SSL 256-BIT ENCRYPTED SYSTEM",
+    "copyright": "TOOL HACK AI © {year}. All Rights Reserved."
   },
   "common": {
     "loading": "Loading data...",

@@ -1,13 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useId, useState } from "react";
+import { useState } from "react";
 import type { FormEvent } from "react";
 import type { MessageKey } from "@/src/i18n/config";
 import { useI18n } from "@/src/i18n/provider";
 import { AuthError, isValidPhone, login, normalizePhone, type AuthErrorCode } from "@/src/lib/auth";
-import { ArrowRightIcon, EyeIcon, EyeOffIcon, LockIcon } from "../icons";
+import { Spinner } from "../ui/Spinner";
+import { ArrowRightIcon } from "../icons";
 import { useAuth } from "./AuthProvider";
+import { PasswordField } from "./PasswordField";
 import { PhoneField } from "./PhoneField";
 
 const ERROR_KEYS: Record<AuthErrorCode, MessageKey> = {
@@ -22,10 +24,8 @@ export function LoginForm() {
   const { t } = useI18n();
   const router = useRouter();
   const { markAuthenticated } = useAuth();
-  const passwordId = useId();
   const [phone, setPhone] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<MessageKey | null>(null);
 
@@ -50,54 +50,30 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} noValidate className="auth-form">
+    <form onSubmit={onSubmit} noValidate className="space-y-4">
       <PhoneField value={phone} onChange={setPhone} placeholder={t("auth.phonePlaceholder")} autoFocus />
-
-      <div className="field">
-        <label htmlFor={passwordId} className="field-label">
-          {t("auth.passwordLabel")}
-        </label>
-        <div className="field-control">
-          <LockIcon className="field-icon" />
-          <input
-            id={passwordId}
-            type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
-            required
-            maxLength={128}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder={t("auth.passwordPlaceholder")}
-            className="field-input field-input-action"
-          />
-          <button
-            type="button"
-            className="field-toggle"
-            onClick={() => setShowPassword((v) => !v)}
-            aria-label={t(showPassword ? "auth.hidePassword" : "auth.showPassword")}
-            aria-pressed={showPassword}
-          >
-            {showPassword ? <EyeOffIcon className="icon-sm" /> : <EyeIcon className="icon-sm" />}
-          </button>
-        </div>
-      </div>
+      <PasswordField value={password} onChange={setPassword} placeholder={t("auth.passwordPlaceholder")} />
 
       {error && (
-        <p className="auth-message auth-message-error" role="alert">
+        <p className="rounded-lg border border-neon/50 bg-red-950/40 px-3 py-2 text-sm text-red-200" role="alert">
           {t(error)}
         </p>
       )}
 
-      <button type="submit" className="btn btn-block auth-submit" disabled={submitting}>
+      <button
+        type="submit"
+        disabled={submitting}
+        className="cyber-btn-red flex w-full items-center justify-center gap-2 rounded-xl border border-neon-soft py-3.5 font-display text-sm font-bold uppercase tracking-widest text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+      >
         {submitting ? (
           <>
-            <span className="auth-spinner" aria-hidden="true" />
+            <Spinner />
             {t("auth.loginLoading")}
           </>
         ) : (
           <>
             {t("auth.loginSubmit")}
-            <ArrowRightIcon className="icon-sm" />
+            <ArrowRightIcon className="h-4 w-4" />
           </>
         )}
       </button>

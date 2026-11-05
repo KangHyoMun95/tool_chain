@@ -1,6 +1,6 @@
 {
   "brand": {
-    "name": "NEXUS AI ROYALE",
+    "name": "TOOL HACK AI",
     "tagline": "Hệ thống phân tích thuật toán chuyên nghiệp"
   },
   "nav": {
@@ -79,20 +79,17 @@
   },
   "auth": {
     "tagline": "Hệ thống phân tích dự đoán dữ liệu AI",
-    "tabsLabel": "Đăng nhập hoặc đăng ký",
-    "tabLogin": "ĐĂNG NHẬP",
-    "tabRegister": "ĐĂNG KÝ",
     "phoneLabel": "Số điện thoại",
     "phonePlaceholder": "09xxxxxxxx",
     "passwordLabel": "Mật khẩu",
     "passwordPlaceholder": "••••••••",
     "showPassword": "Hiện mật khẩu",
     "hidePassword": "Ẩn mật khẩu",
-    "loginSubmit": "ĐĂNG NHẬP VÀO HỆ THỐNG",
+    "loginSubmit": "ĐĂNG NHẬP",
     "loginLoading": "ĐANG XÁC THỰC...",
     "registerPhonePlaceholder": "Nhập số điện thoại để đăng ký",
     "registerHint": "Sau khi đăng ký, Admin quản lý của bạn sẽ cấp tài khoản cho số điện thoại này.",
-    "registerSubmit": "TẠO TÀI KHOẢN NGAY",
+    "registerSubmit": "ĐĂNG KÝ NGAY",
     "errors": {
       "invalidPhone": "Số điện thoại không hợp lệ (6–20 chữ số).",
       "passwordRequired": "Vui lòng nhập mật khẩu.",
@@ -103,7 +100,21 @@
     },
     "registerSuccess": "Đã ghi nhận số điện thoại của bạn. Admin quản lý sẽ cấp tài khoản cho bạn.",
     "registerLoading": "ĐANG GỬI...",
-    "checking": "Đang kiểm tra phiên đăng nhập..."
+    "checking": "Đang kiểm tra phiên đăng nhập...",
+    "slogan": "HỆ THỐNG PHÂN TÍCH THUẬT TOÁN CHUYÊN NGHIỆP",
+    "badgeAccurate": "Chính xác",
+    "badgeStable": "Ổn định",
+    "badgeSecure": "Bảo mật",
+    "loginTitle": "Đăng nhập tài khoản",
+    "loginSubtitle": "Vui lòng nhập thông tin để đăng nhập",
+    "registerTitle": "Đăng ký tài khoản",
+    "registerSubtitle": "Tạo tài khoản nhanh chóng chỉ với số điện thoại",
+    "noAccount": "Chưa có tài khoản?",
+    "registerNow": "Đăng ký ngay",
+    "haveAccount": "Đã có tài khoản?",
+    "loginNow": "Đăng nhập ngay",
+    "sslNotice": "HỆ THỐNG MÃ HÓA SSL 256-BIT AN TOÀN",
+    "copyright": "TOOL HACK AI © {year}. All Rights Reserved."
   },
   "common": {
     "loading": "Đang tải dữ liệu...",
