@@ -15,18 +15,21 @@ export function useExitNavigation() {
   const router = useRouter();
   const pathname = usePathname();
   const reduced = useReducedMotion();
-  const [exit, setExit] = useState({ content: false, menu: false });
+  const [exit, setExit] = useState({ content: false, menu: false, from: "" });
   const timer = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => () => clearTimeout(timer.current), []);
-  useEffect(() => setExit({ content: false, menu: false }), [pathname]);
+  // Trạng thái thoát chỉ có hiệu lực ở trang đã bấm: khi đường dẫn đổi, trang mới mount với `leaving = false` ngay trong cùng
+  // lượt render (nếu đợi effect xóa thì banner/thẻ của trang mới bị áp lớp thoát một khung hình rồi mới chạy hiệu ứng vào ⇒ giật).
+  const active = exit.from === pathname;
+  useEffect(() => { if (exit.from && exit.from !== pathname) setExit({ content: false, menu: false, from: "" }); }, [exit.from, pathname]);
 
   const go = useCallback((href: string, menu = false) => {
-    if (exit.content) return;
+    if (exit.content && active) return;
     if (reduced) { router.push(href); return; }
-    setExit({ content: true, menu });
+    setExit({ content: true, menu, from: pathname });
     timer.current = setTimeout(() => router.push(href), EXIT_MS);
-  }, [exit.content, reduced, router]);
+  }, [exit.content, active, pathname, reduced, router]);
 
-  return { leaving: exit.content, leavingMenu: exit.menu, go };
+  return { leaving: exit.content && active, leavingMenu: exit.menu && active, go };
 }

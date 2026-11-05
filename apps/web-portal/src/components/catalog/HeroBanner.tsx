@@ -23,7 +23,7 @@ export function HeroBanner() {
   useEffect(() => {
     const el = img.current;
     if (el?.complete) void el.decode().then(() => setReady(true), () => setReady(true));
-    const fallback = setTimeout(() => setReady(true), 800);   // ảnh lỗi/chậm thì vẫn hiện banner
+    const fallback = setTimeout(() => setReady(true), 400);   // ảnh lỗi/chậm thì vẫn hiện banner
     return () => clearTimeout(fallback);
   }, []);
 
