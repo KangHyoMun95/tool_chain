@@ -54,10 +54,10 @@ export function StreamCard({ stream, index }: { stream: Stream; index: number })
 
       <Link
         href={`/streams/${stream.id}`}
-        className="mt-4 flex w-full items-center justify-center gap-1 rounded-xl py-2.5 text-center text-xs font-bold text-white shadow-[0_0_14px_rgba(255,30,66,0.6)] transition-all hover:brightness-110 md:text-sm"
+        className="btn-fx mt-4 flex w-full select-none items-center justify-center gap-1 rounded-xl py-2.5 text-center text-xs font-bold text-white shadow-[0_0_14px_rgba(255,30,66,0.6)] md:text-sm"
         style={{ background: "linear-gradient(90deg, #ff1e42 0%, #b91c1c 100%)" }}
       >
-        {t("streams.viewDetail")} <span className="text-base leading-none">→</span>
+        <span className="relative z-10">{t("streams.viewDetail")}</span> <span className="fx-arrow-right relative z-10 text-base leading-none">→</span>
       </Link>
     </article>
   );

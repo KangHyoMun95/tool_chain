@@ -18,11 +18,11 @@ export function PageBanner({ title, backHref, state = "live", backLabel = "nav.b
       </div>
       <Link
         href={backHref}
-        className="flex items-center gap-2 rounded-full border border-red-400 bg-gradient-to-r from-red-700 via-red-600 to-red-800 px-4 py-1.5 text-xs font-bold text-white shadow-[0_0_14px_rgba(255,26,64,0.6)] transition-all hover:brightness-110 sm:px-5 sm:py-2 sm:text-sm"
+        className="btn-fx group flex select-none items-center gap-2 rounded-full border border-red-400 bg-gradient-to-r from-red-700 via-red-600 to-red-800 px-4 py-1.5 text-xs font-bold text-white shadow-[0_0_14px_rgba(255,26,64,0.6)] sm:px-5 sm:py-2 sm:text-sm"
       >
-        <ArrowLeftIcon className="h-3.5 w-3.5" />
-        {t(backLabel)}
-        <span className="rounded-full border border-red-400/40 bg-red-950/80 px-2 py-0.5 text-[10px] font-black tracking-wider shadow-[0_0_8px_rgba(255,0,0,0.6)]">LIVE</span>
+        <ArrowLeftIcon className="fx-arrow-left h-3.5 w-3.5" />
+        <span className="relative z-10">{t(backLabel)}</span>
+        <span className="relative z-10 rounded-full border border-red-400/40 bg-red-950/80 px-2 py-0.5 text-[10px] font-black tracking-wider shadow-[0_0_8px_rgba(255,0,0,0.6)]">LIVE</span>
       </Link>
     </HudCard>
   );

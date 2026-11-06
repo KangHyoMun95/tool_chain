@@ -68,7 +68,7 @@ export function RegisterForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="cyber-btn-red flex w-full items-center justify-center gap-2 rounded-xl border border-neon-soft py-3.5 font-display text-sm font-bold uppercase tracking-widest text-white transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-70"
+        className="btn-fx cyber-btn-red flex w-full select-none items-center justify-center gap-2 rounded-xl border border-neon-soft py-3.5 font-display text-sm font-bold uppercase tracking-widest text-white disabled:cursor-not-allowed disabled:opacity-70"
       >
         {submitting ? (
           <>
@@ -78,7 +78,7 @@ export function RegisterForm() {
         ) : (
           <>
             {t("auth.registerSubmit")}
-            <ArrowRightIcon className="h-4 w-4" />
+            <ArrowRightIcon className="fx-arrow-right h-4 w-4" />
           </>
         )}
       </button>

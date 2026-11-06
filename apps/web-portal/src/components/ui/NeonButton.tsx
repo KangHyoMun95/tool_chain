@@ -5,8 +5,8 @@ import { cn } from "@/src/lib/cn";
 const BASE =
   "inline-flex items-center justify-center gap-2 rounded-full font-bold text-white transition-all disabled:cursor-not-allowed disabled:opacity-60";
 const VARIANTS = {
-  primary: "cyber-btn-red border border-neon-soft hover:scale-[1.02]",
-  ghost: "border border-neon/40 bg-neon/5 text-neon hover:bg-neon/15",
+  primary: "btn-fx cyber-btn-red border border-neon-soft",
+  ghost: "btn-fx border border-neon/40 bg-neon/5 text-neon hover:bg-neon/15",
 } as const;
 
 type Variant = keyof typeof VARIANTS;
