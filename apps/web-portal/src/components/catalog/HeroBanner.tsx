@@ -58,8 +58,8 @@ export function HeroBanner() {
           <p className="mb-5 mt-1 font-display text-sm font-bold uppercase tracking-widest text-gray-200 sm:text-base lg:text-lg">{t("hero.slogan")}</p>
           <ul className="grid max-w-xl grid-cols-2 gap-2 pt-1 font-mono sm:grid-cols-4">
             {BADGES.map(({ key, Icon }) => (
-              <li key={key} className="flex items-center justify-center gap-1.5 rounded-lg border border-neon/50 bg-black/60 px-2.5 py-1.5 shadow-neon-sm">
-                <Icon className="h-3.5 w-3.5 text-red-400" />
+              <li key={key} className="flex items-center justify-center gap-1.5 px-2.5 py-1.5">
+                <Icon className="h-[18px] w-[18px] text-red-400" />
                 <span className="whitespace-nowrap text-[11px] font-bold text-gray-200">{t(key)}</span>
               </li>
             ))}
