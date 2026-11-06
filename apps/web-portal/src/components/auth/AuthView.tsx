@@ -62,11 +62,11 @@ export function AuthView() {
 
   return (
     <div className="relative flex min-h-screen flex-col overflow-x-hidden">
-      {/* Nền: khung HUD mờ + lớp tối để dễ đọc */}
-      <div className="pointer-events-none fixed inset-0 z-0" aria-hidden="true">
+      {/* Nền: ảnh background-login (khung HUD đỏ, giữa tối) + lớp tối nhẹ để dễ đọc form */}
+      <div className="pointer-events-none fixed inset-0 z-0 bg-void" aria-hidden="true">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/images/hud-frame.png" alt="" className="h-full w-full scale-105 object-cover object-center opacity-45 mix-blend-screen" />
-        <div className="absolute inset-0 bg-gradient-to-b from-void/80 via-void/75 to-void/90" />
+        <img src="/images/background-login.png" alt="" decoding="async" className="h-full w-full object-cover object-center" />
+        <div className="absolute inset-0 bg-gradient-to-b from-void/30 via-transparent to-void/50" />
       </div>
 
       <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-1 items-center justify-center px-5 py-6 lg:px-12">
