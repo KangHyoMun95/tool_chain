@@ -44,14 +44,14 @@ export function HeroBanner() {
           decoding="async"
           onLoad={(e) => void e.currentTarget.decode().then(() => setReady(true), () => setReady(true))}
           // Tăng sáng/tương phản nhẹ để vệt sáng không bị chìm dưới lớp phủ (không quá chói)
-          className="h-full w-full object-cover [filter:brightness(1.2)_contrast(1.1)_saturate(1.15)]"
+          className="h-full w-full object-cover [filter:brightness(1)_contrast(1.05)_saturate(1.1)]"
         />
       </div>
       {/* Chỉ làm tối bên trái (vùng chữ); bên phải để trống để vệt sáng hiện rõ */}
       <div className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(to right, rgba(5,5,8,0.8) 0%, rgba(5,5,8,0.5) 35%, rgba(5,5,8,0) 62%)" }} />
       <div className="pointer-events-none absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(#ff1e42 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
       <div className="relative z-10 flex w-full flex-col items-center justify-between gap-6 md:flex-row">
-        <div className="flex-1 text-center md:text-left">
+        <div className="flex-1 text-center md:max-w-[55%] md:text-left">
           <h1 className="font-display text-3xl font-black italic tracking-wide text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] sm:text-4xl lg:text-5xl">
             TOOL <span className="neon-text-glow text-neon">HACK AI</span>
           </h1>
@@ -67,9 +67,9 @@ export function HeroBanner() {
         </div>
         {/* Từ md: logo đặt đúng điểm hội tụ của các vệt sáng trong GIF (~80% ngang, ~42% dọc); nhỏ hơn: xếp dưới chữ */}
         <div className="relative flex shrink-0 items-center justify-center md:absolute md:left-[80%] md:top-[42%] md:-translate-x-1/2 md:-translate-y-1/2">
-          <div className="absolute h-48 w-48 rounded-full bg-red-600/20 blur-2xl" />
+          <div className="absolute h-56 w-56 rounded-full bg-red-600/20 blur-2xl" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/logo.png" alt="" className="relative h-auto w-48 object-contain drop-shadow-[0_0_20px_rgba(255,20,50,0.9)] transition-transform duration-300 hover:scale-105 sm:w-60 md:w-52 lg:w-72 xl:w-80" />
+          <img src="/images/logo.png" alt="" className="relative h-auto w-48 object-contain drop-shadow-[0_0_20px_rgba(255,20,50,0.9)] transition-transform duration-300 hover:scale-105 sm:w-60 md:w-60 lg:w-80 xl:w-96" />
         </div>
       </div>
     </section>
