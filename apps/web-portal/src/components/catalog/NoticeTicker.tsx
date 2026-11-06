@@ -20,8 +20,8 @@ export function NoticeTicker() {
           {t("notice.before")} <span className="font-bold text-red-400">{t("brand.name")}</span> {t("notice.after")}
         </p>
       </div>
-      <button type="button" onClick={comingSoon} className="cyber-btn-red flex shrink-0 items-center gap-1 rounded-full px-4 py-1.5 text-xs font-bold text-white transition-all hover:brightness-110">
-        {t("notice.more")} <span className="text-sm leading-none">→</span>
+      <button type="button" onClick={comingSoon} className="btn-fx cyber-btn-red flex shrink-0 items-center gap-1 rounded-full px-4 py-1.5 text-xs font-bold text-white">
+        <span className="relative z-10">{t("notice.more")}</span> <span className="fx-arrow-right relative z-10 text-sm leading-none">→</span>
       </button>
     </section>
   );

@@ -56,7 +56,7 @@ export function AppHeader() {
           type="button"
           onClick={comingSoon}
           aria-label={t("shell.notifications")}
-          className="relative rounded-full border border-red-900/40 bg-[#14141c] p-2 text-gray-300 transition-all hover:bg-red-950/50 hover:text-white"
+          className="btn-fx-soft relative rounded-full border border-red-900/40 bg-[#14141c] p-2 text-gray-300 hover:bg-red-950/50 hover:text-white"
         >
           <BellIcon className="h-4 w-4 text-rose-500" />
           <span className="absolute right-1 top-1 h-2 w-2 animate-pulse rounded-full bg-neon shadow-neon-sm" />
@@ -66,7 +66,7 @@ export function AppHeader() {
           type="button"
           onClick={comingSoon}
           aria-label={t("shell.menu")}
-          className="rounded-lg border border-red-900/40 bg-[#14141c] p-2 text-gray-300 hover:text-white"
+          className="btn-fx-soft rounded-lg border border-red-900/40 bg-[#14141c] p-2 text-gray-300 hover:text-white"
         >
           <MenuIcon className="h-5 w-5" />
         </button>

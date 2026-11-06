@@ -66,6 +66,53 @@
   }
   .cyber-btn-red:hover:not(:disabled) { box-shadow: 0 0 22px rgba(255, 30, 66, 0.9); filter: brightness(1.1); }
 
+  /*
+   * Hiệu ứng nút (theo Stitch "Nút Quay Lại Sảnh"): nổi lên + phóng nhẹ + phát sáng, vệt sáng quét ngang,
+   * mũi tên nhích, nhấn xuống khi bấm, ripple tại điểm bấm (ButtonEffects chèn .fx-ripple).
+   * Dùng @apply animate-* để Tailwind phát ra @keyframes.
+   */
+  .btn-fx {
+    @apply relative overflow-hidden;
+    isolation: isolate;
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease, filter 0.3s ease, background-color 0.3s ease;
+  }
+  .btn-fx::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -120%;
+    width: 60%;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.4) 50%, rgba(255, 255, 255, 0) 100%);
+    transform: skewX(-25deg);
+    pointer-events: none;
+  }
+  .btn-fx:focus-visible { outline: 2px solid #ff8a9c; outline-offset: 2px; }
+  .btn-fx:active:not(:disabled) { transform: translateY(0) scale(0.95); transition-duration: 0.1s; }
+  .btn-fx:disabled { filter: saturate(0.6); }
+  /* Nút icon nhỏ (chuông, menu...): chỉ nổi + sáng viền, không quét vệt sáng */
+  .btn-fx-soft { transition: transform 0.25s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.25s ease, border-color 0.25s ease, background-color 0.25s ease, color 0.25s ease; }
+  .btn-fx-soft:focus-visible { outline: 2px solid #ff8a9c; outline-offset: 2px; }
+  .btn-fx-soft:active { transform: scale(0.92); transition-duration: 0.1s; }
+  @media (hover: hover) {
+    .btn-fx:hover:not(:disabled) {
+      transform: translateY(-2px) scale(1.05);
+      box-shadow: 0 0 20px rgba(255, 30, 66, 0.7), 0 0 35px rgba(255, 30, 66, 0.4);
+      border-color: rgba(255, 120, 140, 0.8);
+      filter: brightness(1.08);
+    }
+    .btn-fx:hover:not(:disabled)::after { @apply animate-shimmer-sweep; }
+    .btn-fx:hover .fx-arrow-left { @apply animate-arrow-left; }
+    .btn-fx:hover .fx-arrow-right { @apply animate-arrow-right; }
+    .btn-fx-soft:hover { transform: translateY(-1px) scale(1.08); box-shadow: 0 0 14px rgba(255, 30, 66, 0.55); border-color: rgba(255, 120, 140, 0.7); }
+  }
+  .fx-ripple {
+    @apply pointer-events-none absolute rounded-full animate-btn-ripple;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.8) 0%, rgba(255, 50, 80, 0.6) 50%, transparent 80%);
+    z-index: -1;   /* dưới chữ nhưng trên nền nút (nút có isolation: isolate) */
+  }
+  .fx-arrow-left, .fx-arrow-right { display: inline-block; }
+
   /* Radar (SVG): gốc xoay là tâm 150,150 của viewBox 300x300 */
   .radar-beam, .radar-ring { transform-origin: 150px 150px; }
   /* @apply để Tailwind sinh @keyframes (keyframes chỉ được phát ra khi có class animate-* được dùng) */
