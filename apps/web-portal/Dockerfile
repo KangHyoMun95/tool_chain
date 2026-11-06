@@ -27,6 +27,8 @@ WORKDIR /app
 # standalone output keeps the monorepo layout (apps/web-portal/server.js)
 COPY --from=build --chown=node:node /repo/apps/web-portal/.next/standalone ./
 COPY --from=build --chown=node:node /repo/apps/web-portal/.next/static ./apps/web-portal/.next/static
+# standalone does not bundle public/ (images, logo): copy it next to server.js
+COPY --from=build --chown=node:node /repo/apps/web-portal/public ./apps/web-portal/public
 USER node
 EXPOSE 3001
 CMD ["node", "apps/web-portal/server.js"]
