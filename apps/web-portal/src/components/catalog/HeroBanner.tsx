@@ -37,21 +37,23 @@ export function HeroBanner() {
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         ref={img}
-        src="/images/banner-home.webp"
+        src="/images/banner_trang_chu.gif"
         alt=""
         decoding="async"
         onLoad={(e) => void e.currentTarget.decode().then(() => setReady(true), () => setReady(true))}
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover"
+        // Tăng sáng/tương phản để các vệt sáng của GIF không bị chìm khi nằm dưới lớp phủ
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover [filter:brightness(1.35)_contrast(1.15)_saturate(1.2)]"
       />
-      <div className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(to right, rgba(5,5,8,0.85) 0%, rgba(5,5,8,0.5) 50%, rgba(5,5,8,0.7) 100%)" }} />
-      <div className="pointer-events-none absolute inset-0 opacity-15" style={{ backgroundImage: "radial-gradient(#ff1e42 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
+      {/* Chỉ làm tối bên trái (vùng chữ); bên phải để trống để vệt sáng hiện rõ */}
+      <div className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(to right, rgba(5,5,8,0.8) 0%, rgba(5,5,8,0.5) 35%, rgba(5,5,8,0) 62%)" }} />
+      <div className="pointer-events-none absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(#ff1e42 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
       <div className="relative z-10 flex w-full flex-col items-center justify-between gap-6 md:flex-row">
         <div className="flex-1 text-center md:text-left">
           <h1 className="font-display text-3xl font-black italic tracking-wide text-white drop-shadow-[0_2px_8px_rgba(0,0,0,0.9)] sm:text-4xl lg:text-5xl">
             TOOL <span className="neon-text-glow text-neon">HACK AI</span>
           </h1>
           <p className="mb-5 mt-1 font-display text-sm font-bold uppercase tracking-widest text-gray-200 sm:text-base lg:text-lg">{t("hero.slogan")}</p>
-          <ul className="grid max-w-xl grid-cols-2 gap-2 pt-1 font-mono sm:grid-cols-4">
+          <ul className="grid max-w-xl grid-cols-2 gap-2 pt-1 font-mono sm:grid-cols-4 md:grid-cols-2 xl:grid-cols-4">
             {BADGES.map(({ key, Icon }) => (
               <li key={key} className="flex items-center justify-center gap-1.5 rounded-lg border border-neon/50 bg-black/60 px-2.5 py-1.5 shadow-neon-sm">
                 <Icon className="h-3.5 w-3.5 text-red-400" />
@@ -60,10 +62,11 @@ export function HeroBanner() {
             ))}
           </ul>
         </div>
-        <div className="relative flex shrink-0 items-center justify-center">
-          <div className="absolute h-44 w-44 rounded-full bg-red-600/30 blur-2xl" />
+        {/* Từ md: logo đặt đúng điểm hội tụ của các vệt sáng trong GIF (~72% ngang, ~42% dọc); nhỏ hơn: xếp dưới chữ */}
+        <div className="relative flex shrink-0 items-center justify-center md:absolute md:left-[72%] md:top-[42%] md:-translate-x-1/2 md:-translate-y-1/2">
+          <div className="absolute h-40 w-40 rounded-full bg-red-600/20 blur-2xl" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/logo.png" alt="" className="relative h-auto w-48 object-contain drop-shadow-[0_0_20px_rgba(255,20,50,0.9)] transition-transform duration-300 hover:scale-105 sm:w-60 lg:w-72" />
+          <img src="/images/logo.png" alt="" className="relative h-auto w-48 object-contain drop-shadow-[0_0_20px_rgba(255,20,50,0.9)] transition-transform duration-300 hover:scale-105 sm:w-60 md:w-44 lg:w-56 xl:w-64" />
         </div>
       </div>
     </section>
