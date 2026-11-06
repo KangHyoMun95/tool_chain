@@ -34,16 +34,19 @@ export function HeroBanner() {
         leaving ? EXIT_HERO : ready ? "animate-banner-in" : "opacity-0",
       )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        ref={img}
-        src="/images/banner_trang_chu.gif"
-        alt=""
-        decoding="async"
-        onLoad={(e) => void e.currentTarget.decode().then(() => setReady(true), () => setReady(true))}
-        // Tăng sáng/tương phản để các vệt sáng của GIF không bị chìm khi nằm dưới lớp phủ
-        className="pointer-events-none absolute inset-0 h-full w-full object-cover [filter:brightness(1.35)_contrast(1.15)_saturate(1.2)]"
-      />
+      {/* Từ md: GIF chỉ phủ 72% bên phải (mép trái mờ dần vào nền) để điểm hội tụ của vệt sáng dời sang phải (~80%) */}
+      <div className="pointer-events-none absolute inset-y-0 right-0 w-full md:w-[72%] md:[mask-image:linear-gradient(to_right,transparent,#000_30%)]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          ref={img}
+          src="/images/banner_trang_chu.gif"
+          alt=""
+          decoding="async"
+          onLoad={(e) => void e.currentTarget.decode().then(() => setReady(true), () => setReady(true))}
+          // Tăng sáng/tương phản nhẹ để vệt sáng không bị chìm dưới lớp phủ (không quá chói)
+          className="h-full w-full object-cover [filter:brightness(1.2)_contrast(1.1)_saturate(1.15)]"
+        />
+      </div>
       {/* Chỉ làm tối bên trái (vùng chữ); bên phải để trống để vệt sáng hiện rõ */}
       <div className="pointer-events-none absolute inset-0" style={{ background: "linear-gradient(to right, rgba(5,5,8,0.8) 0%, rgba(5,5,8,0.5) 35%, rgba(5,5,8,0) 62%)" }} />
       <div className="pointer-events-none absolute inset-0 opacity-10" style={{ backgroundImage: "radial-gradient(#ff1e42 1px, transparent 1px)", backgroundSize: "24px 24px" }} />
@@ -62,11 +65,11 @@ export function HeroBanner() {
             ))}
           </ul>
         </div>
-        {/* Từ md: logo đặt đúng điểm hội tụ của các vệt sáng trong GIF (~72% ngang, ~42% dọc); nhỏ hơn: xếp dưới chữ */}
-        <div className="relative flex shrink-0 items-center justify-center md:absolute md:left-[72%] md:top-[42%] md:-translate-x-1/2 md:-translate-y-1/2">
-          <div className="absolute h-40 w-40 rounded-full bg-red-600/20 blur-2xl" />
+        {/* Từ md: logo đặt đúng điểm hội tụ của các vệt sáng trong GIF (~80% ngang, ~42% dọc); nhỏ hơn: xếp dưới chữ */}
+        <div className="relative flex shrink-0 items-center justify-center md:absolute md:left-[80%] md:top-[42%] md:-translate-x-1/2 md:-translate-y-1/2">
+          <div className="absolute h-48 w-48 rounded-full bg-red-600/20 blur-2xl" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/images/logo.png" alt="" className="relative h-auto w-48 object-contain drop-shadow-[0_0_20px_rgba(255,20,50,0.9)] transition-transform duration-300 hover:scale-105 sm:w-60 md:w-44 lg:w-56 xl:w-64" />
+          <img src="/images/logo.png" alt="" className="relative h-auto w-48 object-contain drop-shadow-[0_0_20px_rgba(255,20,50,0.9)] transition-transform duration-300 hover:scale-105 sm:w-60 md:w-52 lg:w-72 xl:w-80" />
         </div>
       </div>
     </section>
