@@ -30,7 +30,7 @@ export function HeroBanner() {
   return (
     <section
       className={cn(
-        "neon-panel relative flex min-h-[220px] items-center overflow-hidden px-6 py-6 will-change-[transform,opacity] sm:px-10 lg:min-h-[340px]",
+        "neon-panel relative flex min-h-[220px] items-center overflow-hidden px-6 py-6 will-change-[transform,opacity] sm:px-10 lg:min-h-[300px]",
         leaving ? EXIT_HERO : ready ? "animate-banner-in" : "opacity-0",
       )}
     >
@@ -65,8 +65,8 @@ export function HeroBanner() {
             ))}
           </ul>
         </div>
-        {/* Từ md: logo nằm sát phải, ngay vùng hội tụ của các vệt sáng; rộng 45% banner (tối đa 512px) nên luôn nằm gọn trong banner và không đè cột chữ (tối đa 50%); nhỏ hơn: xếp dưới chữ */}
-        <div className="relative flex shrink-0 items-center justify-center md:absolute md:right-[2%] md:top-1/2 md:w-[45%] md:max-w-[512px] md:-translate-y-1/2">
+        {/* Từ md: logo nằm sát phải, ngay vùng hội tụ của các vệt sáng; rộng 38% banner (tối đa 440px) nên luôn nằm gọn trong banner và không đè cột chữ (tối đa 50%); nhỏ hơn: xếp dưới chữ */}
+        <div className="relative flex shrink-0 items-center justify-center md:absolute md:right-[2%] md:top-1/2 md:w-[38%] md:max-w-[440px] md:-translate-y-1/2">
           <div className="absolute h-56 w-56 rounded-full bg-red-600/20 blur-2xl" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/images/logo.png" alt="" className="relative h-auto w-48 object-contain drop-shadow-[0_0_20px_rgba(255,20,50,0.9)] transition-transform duration-300 hover:scale-105 sm:w-60 md:w-full" />
