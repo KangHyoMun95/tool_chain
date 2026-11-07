@@ -13,3 +13,4 @@ coverage/
 
 # MCP config (may hold secrets)
 .mcp.json
+**/ai/imgs/*
