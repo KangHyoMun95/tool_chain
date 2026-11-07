@@ -14,6 +14,7 @@ from config import APP_PASSWORD, APP_USER, BRAVE_PATH, WEBSITE_URL
 from exception import CycleError, BotCheckError
 from listener_message import listen_ws
 from store.token_store import TokenStore
+from tracking_network import NetworkTracker
 
 logger = logging.getLogger("Crawler")
 
@@ -285,7 +286,7 @@ def handle_token_response(res, store: TokenStore):
 
 
 def watch_loop(context: BrowserContext, pg: Page, pending: list,
-               store: TokenStore, stop_event: Event):
+               store: TokenStore, stop_event: Event, tracker: NetworkTracker | None = None):
     """Nghe getToken mãi mãi + canh các lỗi. Gặp lỗi -> ném CycleError."""
     lobby_page = None
     last_token_at = time.time()
@@ -294,6 +295,8 @@ def watch_loop(context: BrowserContext, pg: Page, pending: list,
 
     while not stop_event.is_set():
         pg.wait_for_timeout(300)             # giữ Playwright xử lý event
+        if tracker:
+            tracker.drain()                  # đọc body ngay, trước khi trang điều hướng đi
 
         while pending:
             res = pending.pop(0)
@@ -331,6 +334,7 @@ def browser_worker(store: TokenStore, stop_event: Event, report):
         with sync_playwright() as playwright:
             _, context, pages_before, pg = reuse_browser(playwright)
             pending = []
+            tracker = None
 
             def on_response(res):
                 if TOKEN_API in res.url:
@@ -347,13 +351,18 @@ def browser_worker(store: TokenStore, stop_event: Event, report):
                 clean_after_login(context, pg, pages_before)
                 # Bật nghe TRƯỚC khi click ACCESS_LOBBY, để không lỡ getToken đầu tiên
                 context.on("response", on_response)
+                tracker = NetworkTracker(context, only_api=False)  # NetworkTracker(context, only_api=False) để lấy cả document/js/css
+                tracker.start()
+                tracker.drain()
                 access_lobby(pg)
-                watch_loop(context, pg, pending, store, stop_event)
+                watch_loop(context, pg, pending, store, stop_event, tracker)
             finally:
                 try:
                     context.remove_listener("response", on_response)
                 except Exception:
                     pass
+                if tracker:
+                    tracker.stop()
                 cleanup(context, pages_before)
     except BotCheckError as e:
         report(e)
