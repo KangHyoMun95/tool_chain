@@ -1,0 +1,25 @@
+# Dữ liệu runtime: mount bằng volume, không đưa vào image
+output/
+debug/
+
+# Bí mật: compose truyền lúc chạy qua env_file, không đóng vào image
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+.pytest_cache/
+
+# Không cần trong image
+.git/
+.gitignore
+.dockerignore
+docker-compose*.yml
+*.md
+*.log
+*.patch
+*.zip

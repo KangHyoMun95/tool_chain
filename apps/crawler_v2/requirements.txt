@@ -1,0 +1,5 @@
+playwright==1.64.1
+requests
+websockets==16.1.1
+msgpack==1.2.3
+redis==8.1.0
