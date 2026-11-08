@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 // Namespace cố định cho UUIDv5. TUYỆT ĐỐI không đổi: đổi là mọi ván cũ ra ID khác.
 const GAME_SESSION_NAMESPACE = "52491c65-79c8-4104-a85b-6a659735e9d7";
 
-function uuidV5(name: string, namespace: string): string {
+export function uuidV5(name: string, namespace: string): string {
   const hash = createHash("sha1")
     .update(Buffer.from(namespace.replace(/-/g, ""), "hex"))
     .update(name, "utf8")
