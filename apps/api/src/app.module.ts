@@ -17,6 +17,7 @@ import { UsersRegisterModule } from "./users-register/users-register.module.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { IngestionModule } from "./ingestion/ingestion.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
+import { PredictionsModule } from "./predictions/predictions.module.js";
 import { entities } from "./database/entities/index.js";
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
@@ -54,6 +55,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     // ticks/ giữ lại để so sánh, KHÔNG đăng ký: cùng group "persist" + cùng consumer sẽ tranh tin với IngestionModule.
     IngestionModule,
     RealtimeModule,
+    PredictionsModule,
   ],
   controllers: [AppController],
   providers: [

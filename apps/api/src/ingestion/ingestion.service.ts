@@ -4,6 +4,7 @@ import { InjectDataSource } from "@nestjs/typeorm";
 import type { DataSource, EntityManager } from "typeorm";
 import { RedisKeys, type Tick } from "@toolhackchain/shared";
 import { buildKeyId, displayName, normalizeName } from "../common/normalize.js";
+import { toInt } from "../common/to-int.js";
 import { LobbiesService } from "../lobbies/lobbies.service.js";
 import { CategoriesService } from "../categories/categories.service.js";
 import { StreamsService } from "../streams/streams.service.js";
@@ -17,14 +18,7 @@ import { pgErrorCode } from "./dead-letter.js";
 import { INVALID_LOG_INTERVAL_MS, MAX_NAME_LENGTH, MAX_RESULT_LENGTH, MEMORY_CACHE_MAX } from "./ingestion.constants.js";
 
 const PG_FOREIGN_KEY_VIOLATION = "23503";
-const MAX_INT4 = 2_147_483_647;
 const NUL = "\u0000";   // Postgres từ chối ký tự NUL trong text
-
-/** Số nguyên không âm, vừa int4; nhận number hoặc chuỗi số (đã trim). */
-function toInt(v: unknown): number | null {
-  const n = typeof v === "number" ? v : typeof v === "string" && /^\d+$/.test(v.trim()) ? Number(v.trim()) : NaN;
-  return Number.isInteger(n) && n >= 0 && n <= MAX_INT4 ? n : null;
-}
 
 type Parsed = {
   keyId: string;
