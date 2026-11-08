@@ -97,6 +97,8 @@
     "scanning": "ĐANG QUÉT DỮ LIỆU BÀN...",
     "prediction": "DỰ ĐOÁN",
     "confidence": "Tỷ lệ tin cậy",
+    "insufficientData": "Chưa đủ dữ liệu dự đoán",
+    "noPrediction": "Chưa có dự đoán cho ván này",
     "win": "THẮNG",
     "lose": "THUA",
     "tie": "HÒA",
