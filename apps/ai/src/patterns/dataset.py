@@ -1,40 +1,59 @@
-# src/ai/dataset.py
+# src/patterns/dataset.py
+import logging
 from pathlib import Path
+
 import pandas as pd
 from sqlalchemy import text
-from db import engine
-from patterns.config import RESET_ON_ROAD_DROP, MAX_GAP
 
-CACHE = Path("data/sessions.parquet")
+from .config import MAX_GAP, RESET_ON_ROAD_DROP
+from .db import engine
+
+log = logging.getLogger("pattern")
+
+CACHE = Path(__file__).parent / "data" / "sessions.parquet"
 
 QUERY = text("""
-    SELECT game_session_id, stream_id, road_count, created_at, result
+    SELECT game_session_id, stream_id, road_shoe, road_count, created_at, result
     FROM game_sessions
     WHERE result IS NOT NULL
       AND created_at >= :since
       AND status = 'FINISHED'
-    ORDER BY stream_id, created_at
+    ORDER BY stream_id, road_shoe, road_count
 """)
 
-def load_sessions(since: str = "2026-01-01", refresh: bool = False) -> pd.DataFrame:
-    """Lấy từ DB một lần, lưu parquet; các lần thử nghiệm sau đọc file cho nhanh."""
-    if CACHE.exists() and not refresh:
+
+def load_sessions(since: str = "2026-01-01", refresh: bool = False, source: str = "file") -> pd.DataFrame:
+    """source='file': đọc parquet (không có thì lấy từ DB và lưu); 'db': luôn lấy từ DB (không ghi file)."""
+    if source == "file" and CACHE.exists() and not refresh:
         return pd.read_parquet(CACHE)
     df = pd.read_sql(QUERY, engine(), params={"since": since})
-    CACHE.parent.mkdir(exist_ok=True)
-    df.to_parquet(CACHE, index=False)
+    if source == "file":
+        CACHE.parent.mkdir(exist_ok=True)
+        df.to_parquet(CACHE, index=False)
     return df
 
+
 def add_segments(df: pd.DataFrame) -> pd.DataFrame:
-    """Gán số đoạn: đổi stream, cách quá MAX_GAP, hoặc road_count giảm thì sang đoạn mới."""
+    """Gán số đoạn (một đoạn = một chuỗi liền mạch, bảng đếm không nối qua ranh giới đoạn).
+
+    Có road_shoe: đoạn = (stream_id, road_shoe), sắp theo road_count (số).
+    Thiếu road_shoe (file parquet cũ): đoán đoạn theo khoảng cách thời gian (MAX_GAP) / road_count giảm và CẢNH BÁO.
+    Cột `segment` tăng dần theo thứ tự thời gian của ván đầu đoạn trong từng stream.
+    """
+    if "road_shoe" in df.columns and df["road_shoe"].notna().all():
+        df = df.sort_values(["stream_id", "road_shoe", "road_count"]).copy()
+        df["segment"] = df.groupby(["stream_id", "road_shoe"], sort=False).ngroup()
+        return df
+
+    log.warning("Dữ liệu THIẾU road_shoe: chia chuỗi theo khoảng cách thời gian (%s) / road_count giảm, "
+                "có thể khác shoe thật. Chạy lại với --source db (hoặc --refresh) để có road_shoe.", MAX_GAP)
     df = df.sort_values(["stream_id", "created_at", "road_count"]).copy()
-    new_stream = df["stream_id"].ne(df["stream_id"].shift())
-    gap = df["created_at"].diff() > MAX_GAP
-    brk = new_stream | gap
+    brk = df["stream_id"].ne(df["stream_id"].shift()) | (df["created_at"].diff() > MAX_GAP)
     if RESET_ON_ROAD_DROP:
         brk |= df["road_count"].diff() < 0
     df["segment"] = brk.cumsum()
     return df
+
 
 # src/ai/dataset.py (tiếp)
 def _streak(s: pd.Series) -> pd.Series:
