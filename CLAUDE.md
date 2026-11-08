@@ -24,7 +24,7 @@ Mọi thành phần dùng **bản stable mới nhất**.
 | Message bus / cache | Redis (Redis Stream cho event, cache id lobby/category/stream) |
 | Auth | JWT, session lưu trên Redis |
 | Crawler | Python, quản lý dependency bằng pip (`pyproject.toml`) |
-| AI predict | Python (`apps/ai/`) |
+| AI predict | Python (`apps/ai/`, thuật toán pattern-v1 trong `src/patterns/`) |
 | Frontend | Next.js (web-admin, web-portal) |
 | Hạ tầng | docker-compose (cả local và production) |
 
@@ -47,15 +47,17 @@ tool_chain/
 │   │       ├── cli/                       # create-user / create-host
 │   │       ├── ingestion/                 # luồng ghi DB theo batch: tick-persister + IngestionService điều phối
 │   │       ├── lobbies/ categories/ streams/ stream-information/ game-sessions/   # mỗi bảng một service upsert
+│   │       ├── predictions/               # luồng dự đoán: trigger (ticks → predict:requests / ai:results), consumer predict:results → DB + SSE, GET current
 │   │       ├── ticks/                     # bản cũ, giữ để so sánh, KHÔNG đăng ký trong AppModule
 │   │       └── realtime/                  # luồng SSE đẩy xuống client
 │   ├── crawl-agent/         # Python — crawler, publish event vào Redis
-│   ├── ai/                  # Python — service AI predict, đọc dữ liệu từ DB
+│   ├── ai/                  # Python — service AI predict (src/patterns = service; src/ai = thử nghiệm, KHÔNG dùng), chỉ ĐỌC DB
 │   ├── web-admin/           # Next.js — CHỈ UI (Host/Admin)
 │   └── web-portal/          # Next.js — CHỈ UI (User)
 ├── db/migrations/           # Flyway SQL migration (nguồn sự thật của schema)
 ├── packages/shared/src/     # type/contract dùng chung TS
-│   └── realtime.ts          # schema event realtime
+│   ├── realtime.ts          # schema event realtime + RedisKeys
+│   └── ai.ts                # contract 3 stream dự đoán (predict:requests, ai:results, predict:results)
 ├── docker-compose.yml
 └── .env
 ```
@@ -64,12 +66,14 @@ tool_chain/
 - **`web-admin`, `web-portal`**: chỉ có UI. Không đặt business logic, không tính tiền, không lọc quyền ở client.
 - **`api`**: nơi duy nhất được đổi `balance`, tạo transaction và quyết định ai nhận event nào.
 - **`crawl-agent`**: chỉ thu thập và publish. Không ghi DB trực tiếp.
-- **`ai`**: đọc dữ liệu (game_sessions, lịch sử kết quả) từ DB và sinh dự đoán. **Không** được đổi `balance`, không ghi `prediction_subscriptions` hay `transactions`. Kết quả dự đoán phải đi qua `api` để chạy billing và đẩy SSE. <!-- TODO: chốt kênh AI trả kết quả về api (đề xuất: publish vào Redis Stream) -->
-- **Lưu ý độ trễ:** game_session được ghi DB theo batch (tối đa 3s), nên AI có thể thấy ván mới chậm tới vài giây sau khi crawler phát hiện. Prediction có thể về muộn hơn mức cần thiết. <!-- TODO: chốt cách AI biết có ván mới (polling DB / nhận event) -->
+- **`ai`**: chỉ ĐỌC DB (`game_sessions`, để dựng lại bảng đếm) và ghi Redis của riêng nó + stream `predict:results`. **Không** ghi bảng nghiệp vụ nào trong DB, không đổi `balance`, không ghi `prediction_subscriptions` hay `transactions`. AI trả kết quả về `api` qua Redis Stream; `api` lưu DB và đẩy SSE (billing sau này cũng nằm ở `api`). `api` là nơi duy nhất sinh `key_id`, `game_session_id` và ghi DB.
+- **Lưu ý độ trễ:** AI **không** chờ DB: `api` phát `predict:requests` ngay khi thấy tick `IN_PROGRESS` đầu tiên của ván và đưa kết quả các ván trước qua `ai:results` / `recent:*` (Redis), nên không phụ thuộc batch ghi DB (tối đa 3s). DB chỉ dùng để dựng lại bảng đếm lúc AI khởi động.
 - Auth: xem mục **Auth & bảo mật** bên dưới.
 
 ### Contract dùng chung
 `apps/crawl-agent/contract.py` và `packages/shared/src/realtime.ts` mô tả **cùng một schema event**. Sửa một bên thì **bắt buộc** sửa bên kia trong cùng một commit.
+
+Tương tự `packages/shared/src/ai.ts` và `apps/ai/src/patterns/contract.py` mô tả **cùng một schema** cho 3 stream dự đoán (`predict:requests`, `ai:results`, `predict:results`, `schema_version: 1`, mỗi entry một field `payload` là JSON), kèm namespace UUIDv5 của `prediction_id`. Cùng quy tắc: sửa một bên thì sửa bên kia trong cùng commit.
 
 ---
 
@@ -82,13 +86,19 @@ crawl-agent ──publish──► Redis Stream ──► api consumer
                                              └─► tick-persister → ghi DB theo batch (MAX_BATCH dòng hoặc MAX_WAIT_MS, xem ingestion/ingestion.constants.ts)
 ```
 
-### Luồng 2 — Dự đoán (phase 1, đi theo cùng mô hình)
+### Luồng 2 — Dự đoán
+Đã làm (chưa có billing, xem mục **Luồng dự đoán AI** bên dưới):
 ```
-crawler phát hiện ván mới → tạo game_session (RUNNING)
-   → gửi cho AI predict → prediction
+crawler → Redis "ticks" → api (PredictTriggerService)
+   ├─ tick IN_PROGRESS đầu tiên của ván → predict:requests ─► AI ─► predict:results ─► api (PredictResultConsumer)
+   └─ tick đầu tiên có actual_result    → recent:* + ai:results ─► AI (cập nhật bảng đếm)
+                                                      api: kiểm tra hạn chót → lưu predictions (DB) → SSE public
+```
+Chưa làm (phase 1 còn lại, theo mô hình trên):
+```
+dự đoán đã có
    → billing: trừ điểm các participant đang hoạt động
-   → SSE: chỉ đẩy predict_result cho user đã trừ thành công
-   → batch: ghi prediction xuống DB
+   → SSE: chỉ đẩy predict_result cho user đã trừ thành công (hiện đang đẩy kênh public)
 
 crawler có result → cập nhật game_session (FINISHED) → settlement: hoàn điểm nếu dự đoán sai
 stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn điểm toàn bộ
@@ -109,12 +119,30 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 - Batch: gộp tick theo `(stream, stream_round)` giữ bản mới nhất (giữ result nếu có), ghi theo thứ tự lobbies → categories → streams → stream_information → game_sessions trong **một DB transaction**, chỉ `XACK` sau khi commit. Tick lỗi validate: log, bỏ qua (vẫn XACK). Lỗi DB: giữ buffer, thử lại.
 - Tự kiểm tra: `apps/api/scripts/publish-sample-tick.mjs` (bắn tick mẫu) và `apps/api/scripts/ingestion-check.sql` (đếm dòng).
 
+### Luồng dự đoán AI (pattern-v1)
+- **3 Redis Stream** (contract ở `packages/shared/src/ai.ts` ↔ `apps/ai/src/patterns/contract.py`, `MAXLEN ~ 10000`):
+  - `predict:requests` — api ghi, AI đọc: `{game_session_id, stream_id, key_id, shoe, round, requested_at}`.
+  - `ai:results` — api ghi, AI đọc: `{game_session_id, stream_id, shoe, round, result B|P|T, received_at}`.
+  - `predict:results` — AI ghi, api đọc: `{prediction_id, game_session_id, stream_id, key_id, shoe, round, pick B|P|null, confidence 0–1, chosen, detail[], history_used, missing_previous, reason, model_version, created_at}`. `reason` ∈ `OK | NOT_ENOUGH_HISTORY | NO_ELIGIBLE_SUFFIX`; `pick` khác null khi và chỉ khi `reason = OK`. `prediction_id` = UUIDv5(`PREDICTION_NAMESPACE`, `game_session_id`), không đổi namespace.
+- **Redis key và chủ sở hữu (chỉ chủ sở hữu được ghi):**
+  - api: `round_status:{game_session_id}` (status mới nhất, **chỉ tiến** IN_PROGRESS < DONE < GET_RESULT < SUMMARY_RESULT, TTL 1h), `predict_req:{game_session_id}` (cờ đã phát yêu cầu, TTL 1h), `recent:{stream_id}:{shoe}` (HASH round → result B/P/T, `HSETNX` nên không ghi đè, TTL 24h).
+  - AI: `ai:counts:{stream_id}` (HASH `"<pattern>|<B/P>"` → số lần), `ai:counted:{stream_id}:{shoe}` (SET game_session_id đã đếm, TTL 48h).
+  - Các bước nhiều lệnh là **script Lua** (atomic): `advanceRoundStatus`, `recordResult` (`HSETNX` + `EXPIRE` + `XADD ai:results`, chỉ XADD khi HSETNX thêm mới), `requestPrediction` (`SET NX EX` + `XADD predict:requests`), và `count` phía AI (`SADD` đã đếm + `HINCRBY`).
+- **Consumer group** (tên consumer cố định, đọc PEL trước): api `predict-trigger` (trên `ticks`) và `predict-persist` (trên `predict:results`); AI `ai-counter` (trên `ai:results`) và `ai-predictor` (trên `predict:requests`). Tạo group ở `$` (tạo ở `0` sẽ replay lịch sử). `predict-trigger` bỏ qua **chỉ bước phát `predict:requests`** với tick cũ hơn 30s (tính theo thời gian trong ID message của stream); `round_status`, `recent`, `ai:results` vẫn xử lý khi replay.
+- **Hạn chót:** api chỉ lưu và đẩy prediction khi `round_status` của ván vẫn là `IN_PROGRESS` (không tồn tại cũng coi là quá hạn). Quá hạn ⇒ log INFO JSON `{"event":"late_prediction", key_id, stream_id, shoe, round, status, age_ms}` (dùng để đếm tần suất), không lưu. AI cũng bỏ qua request khi ván đã `DONE` trở đi.
+- **Thuật toán pattern-v1** (hàm thuần `choose_pick` trong `apps/ai/src/patterns/pattern.py`, dùng chung bởi service và backtest): chuỗi của một (stream, shoe) sắp theo round, **bỏ T**, không nối qua shoe; bảng đếm tách theo từng stream (gộp mọi shoe của stream). Với đuôi k = 3..10 của tối đa 10 kết quả gần nhất trong shoe hiện tại: `total = count_B + count_P`; đuôi hợp lệ khi `total ≥ 3` và `count_B ≠ count_P`. Chọn % của kết quả nhiều hơn cao nhất → `total` lớn hơn → k ngắn hơn. `confidence` = % đó (0–1). Dưới 3 kết quả ⇒ `NOT_ENOUGH_HISTORY`; không có đuôi hợp lệ ⇒ `NO_ELIGIBLE_SUFFIX` (đều `pick = null`). Cập nhật bảng đếm khi có kết quả B/P (T không đếm): với mỗi k có đủ k kết quả ngay trước trong cùng shoe thì `+1` cho `"<k kết quả trước>|<kết quả>"`.
+- **AI dựng lại bảng đếm** từ DB (game_sessions `FINISHED`) lúc khởi động, trước khi consume (restart để dựng lại). `python main.py verify` so Redis với đếm brute-force từ DB. Backtest: `python main.py backtest` (xem `apps/ai/README.md`; kết quả đo gần nhất cho thấy pattern-v1 chưa hơn baseline và `confidence` không phản ánh tỉ lệ đúng, nên chưa dựa vào nó để thu phí/quảng cáo).
+- **Lưu DB:** bảng `predictions` (V9): `predict_result` cho phép NULL (CHECK B/P), `detail jsonb` = `{chosen, rows, history_used, missing_previous}`, `model_version`, `reason`; CHECK: có `predict_result` khi và chỉ khi `reason = 'OK'`, `confidence_score` trong 0..1. Trước khi insert, api `INSERT game_sessions ... ON CONFLICT DO NOTHING` trong cùng transaction (khóa ngoại; ván có thể còn trong batch của ingestion), rồi `INSERT predictions ... ON CONFLICT (game_session_id) DO NOTHING RETURNING`; chỉ khi thêm dòng mới mới đẩy SSE.
+- **SSE prediction:** event `type: "prediction"` (`RealtimePrediction` ở `packages/shared`) đẩy tới phòng `key_id`, không chứa `detail`; tick giờ có `type: "tick"` (client coi event thiếu `type` là tick). ⚠️ **Prediction đang đi kênh public — PHẢI chuyển sang kênh riêng theo user trước khi làm billing** (xem mục SSE bên dưới).
+- **API đọc:** `GET /api/streams/:id/predictions/current` — prediction mới nhất của stream (theo thời điểm tạo) kèm `shoe`, `round`, `confidence` 0–1, không có `detail`; phạm vi nhìn thấy như `GET /streams/:id`; 404 khi chưa có prediction. Portal phải so `(shoe, round)` với ván đang xem.
+
 ### Stream detail realtime (web-portal `/streams/[streamId]`)
 - **`stream_id` gắn vào event SSE:** `RealtimeHub.withStreamId()` thêm `stream_id` (UUID DB) vào tick từ cache `stream:{key_id}` (`RealtimeTick` ở `packages/shared`); cache miss ⇒ `null`, **không upsert** (ingestion tạo stream và ghi cache sau khi commit). `CacheWarmup` nạp sẵn cache này từ DB lúc API khởi động. Portal subscribe theo `key_id` (`buildKeyId` ở `packages/shared`, api re-export) và chấp nhận tick nếu `stream_id` khớp HOẶC `null`.
 - **Trạng thái ván** (`StreamStatus`): `IN_PROGRESS` (Đang tiến hành), `DONE` (Hoàn tất tiến trình), `GET_RESULT` (Nhận kết quả), `SUMMARY_RESULT` (Tổng kết). Giá trị lạ ⇒ hiển thị trung tính + `console.warn`. Ván hiện tại = `(stream_shoe, stream_round)`; sang round mới ⇒ khung kết quả về trạng thái chờ.
 - **Message có kết quả = `actual_result != null`** (không dựa vào `status`). Nhiều message cùng mang kết quả một ván ⇒ chống trùng theo `(shoe, round)`, chỉ xử lý lần đầu. Kết quả giữ theo `(shoe, round)` vì các message sau của cùng ván có thể có `actual_result = null`.
 - **Khung dự đoán** (`PredictionPanel`, `use-prediction.ts`): workflow của một ván **chỉ bắt đầu khi nhận `IN_PROGRESS` của ván đó**. SSE không kết nối ⇒ OFFLINE / MẤT KẾT NỐI; chưa thấy `IN_PROGRESS` ⇒ radar "ĐANG NẠP DỮ LIỆU"; có `IN_PROGRESS` ⇒ radar "ĐANG PHÂN TÍCH" trong lúc lấy dự đoán **đúng một lần cho mỗi ván** (nhiều `IN_PROGRESS` liên tiếp không gọi lại; lỗi thì lần `IN_PROGRESS` kế tiếp thử lại) rồi hiện dự đoán; có `actual_result` ⇒ nền khung đổi màu (thắng xanh lá, thua đỏ đậm, hòa `T` xám) kèm nhãn THẮNG / THUA / HÒA; sang ván mới ⇒ lặp lại.
-- **Prediction:** thực tế là một luồng khác ghi prediction vào DB trước, portal chỉ đọc lại. Hiện `PredictionSource.getPrediction()` (`src/lib/prediction-source.ts`) là mock bất đồng bộ: giả vờ gọi API ~2.5s, giá trị xác định từ `(stream, shoe, round)`, dự đoán chỉ `B` hoặc `P`; thay bằng nguồn thật không cần sửa UI.
+- **Prediction:** `PredictionSource` (`src/lib/prediction-source.ts`) chọn bằng `NEXT_PUBLIC_PREDICTION_SOURCE=live|mock` (mặc định `live`, đọc lúc build). `live`: event SSE `prediction` vào `predictionStore` (`src/lib/prediction-store.ts`); `getPrediction(stream, shoe, round, signal)` chờ event khớp `(shoe, round)`, đồng thời gọi `/predictions/current` một lần (vào giữa ván / tải lại). `confidence` API 0–1 được đổi sang %. `pick = null` ⇒ "Chưa đủ dữ liệu dự đoán" (không có đúng/sai); hết `IN_PROGRESS` mà chưa có dự đoán ⇒ "Chưa có dự đoán cho ván này" (về muộn bị API bỏ). `mock`: giả vờ ~2.5s, giá trị xác định từ `(stream, shoe, round)`, chỉ `B`/`P`, để thử khi không chạy AI. Kết quả `T` ⇒ "Hòa" (chưa tính đúng/sai; quy tắc sẽ chốt khi làm settlement).
+- **Lịch sử và dự đoán:** ô lịch sử hiện dự đoán đã biết trong phiên (từ SSE / current); chưa biết ⇒ "—". API lịch sử `game-sessions` chưa trả kèm dự đoán, nên sau khi tải lại trang các ván trước chỉ hiện "—" (việc cần làm: `LEFT JOIN predictions`).
 - **Streamer + bảng kết quả** (`StreamerBoard`): tên streamer (`streamer_name`, dự phòng parse `streamer_id` "Tên/Quốc gia/Mã" của API) + cờ emoji theo quốc gia (`src/lib/country-flag.ts`, tên nước tiếng Anh → cờ; Windows không vẽ emoji cờ); bảng hạt cầu 6 hàng × 10 cột (60 ván gần nhất của shoe, điền theo cột, B đỏ / P xanh dương / T xanh lá); hàng pill `B: n · P: n · T: n` lấy trực tiếp từ `total_B/P/T` của message mới nhất (số liệu, không phải tỷ lệ; thiếu ⇒ "—"; không gọi API).
 - **Lịch sử ván:** `GET /api/streams/:id/game-sessions?shoe=&page=&limit=` (chỉ ván `FINISHED`, round giảm dần; bỏ `shoe` ⇒ shoe của ván mới nhất; response `{ shoe, items, total, page, limit }`; phạm vi nhìn thấy như `GET /streams/:id`). Portal lấy 60 ván (cho bảng) và hiện 10 ô mới nhất (`dự đoán → kết quả`, THẮNG / THUA / HÒA). Khi nhận kết quả lần đầu của một ván thì **thêm ngay (optimistic)** rồi **refetch MỘT lần sau ~4s** (> chu kỳ batch 3s), gộp theo `(shoe, round)`, không có logic thử lại. Shoe realtime khác shoe đang hiển thị ⇒ reset và fetch lại theo shoe realtime; kết nối lại SSE ⇒ refetch để bù event lỡ.
 - **Debug 5 trường time:** chỉ hiện khi `NEXT_PUBLIC_SHOW_STREAM_DEBUG=true` (xem `apps/web-portal/.env.example`), đặt cuối trang.
@@ -125,6 +153,7 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 - Khi khởi động: đọc PEL của chính mình (`XREADGROUP ... STREAMS key 0`) cho hết, sau đó mới đọc `>`.
 - **Chỉ `XACK` sau khi DB đã commit.**
 - Mọi handler phải **idempotent**, vì message có thể được xử lý lại.
+- Danh sách consumer group hiện có: `persist` (ingestion, trên `ticks`), `predict-trigger`, `predict-persist` (api), `ai-counter`, `ai-predictor` (ai). Mỗi group một consumer cố định (`CONSUMER_NAME` cho api, `AI_CONSUMER_NAME` cho ai).
 
 ---
 
@@ -153,7 +182,7 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 | `streams` | stream_id, stream_name, category_id, status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `stream_information` | stream_information_id, stream_id, streamer_id | `streamer_id` là **tên** người live (text), không phải FK |
 | `game_sessions` | game_session_id, stream_id, road_shoe (= stream_shoe), road_count (= stream_round), result, status, created_at | status: `RUNNING` → `FINISHED` \| `CANCELLED` |
-| `predictions` | prediction_id, stream_id, game_session_id (**unique**), predict_result, confidence_score, created_at | mỗi ván của mỗi stream chỉ có 1 prediction |
+| `predictions` | prediction_id, stream_id, game_session_id (**unique**), predict_result (NULL khi AI không dự đoán), confidence_score, detail (jsonb), model_version, reason, created_at | mỗi ván của mỗi stream chỉ có 1 prediction; ghi bởi api (không phải AI) |
 | `stream_participants` | stream_participant_id, user_id, stream_id, last_seen_at, created_at | unique (user_id, stream_id) |
 | `prediction_subscriptions` | prediction_subscription_id, user_id, prediction_id, fee_amount, refunded_at, created_at | unique (user_id, prediction_id) |
 | `transactions` | transaction_id, user_id, predictions_subscriptions_id (nullable), transaction_type, amount, balance_before, balance_after, created_by, created_at | |
@@ -233,6 +262,8 @@ Mọi route đều yêu cầu đăng nhập, trừ route gắn `@Public()`. Rout
 `POST /api/users-register` `{ phone_number }` (`@Public()`, `@Throttle` 5 lần/phút/IP): ghi số điện thoại vào bảng `users_register` để Admin cấp tài khoản sau. **Không** tạo user, không đặt mật khẩu, không gửi SMS. `phone_number` chỉ chữ số, 6–20 ký tự (không khoảng trắng / dấu `+`; portal tự bỏ khoảng trắng và dấu `-` trước khi gửi). Idempotent: số đã đăng ký, hoặc đã là user, đều trả `201 { status: "received" }` y hệt số mới (không để dò số nào có trong hệ thống). Sai định dạng / có trường lạ ⇒ 400. Chưa có API đọc `users_register` cho Admin.
 
 ### SSE (đang giữ lại)
+⚠️ Event `prediction` cũng đi kênh public này (mọi client biết `key_id` đều nhận được). **Phải chuyển sang kênh riêng theo user (và chỉ gửi cho user đã trừ điểm) trước khi làm billing.**
+
 `GET /api/stream` hiện đang `@Public()` (EventSource không gửi được `Authorization`). Kế hoạch: `POST /api/realtime/ticket` → ticket một lần, TTL 30s trong Redis, SSE nhận `?ticket=` (tuyệt đối không đưa access token lên query string), và đóng SSE khi session bị thu hồi. Chưa làm.
 
 ### Bảo mật chung
@@ -254,7 +285,7 @@ pnpm --filter @toolhackchain/api create-user --role ADMIN --refer-phone <phone c
 
 **Phase 2 (chưa làm, đừng tự ý triển khai):**
 - Phát lại prediction đã trả tiền khi reconnect (API lấy lại hoặc `Last-Event-ID`).
-- Bỏ qua prediction về muộn khi session không còn `RUNNING`. **Phase 1 vẫn phải log trường hợp này** để đo tần suất.
+- Bỏ qua prediction về muộn: phase 1 đã làm theo hạn chót `round_status` (xem **Luồng dự đoán AI**; log `late_prediction` để đo tần suất). Nếu sau này cần điều kiện dựa trên `game_sessions.status = RUNNING` thì làm ở phase 2.
 - UI bật/tắt tham gia và hiển thị phí mỗi ván.
 - Tối ưu fan-out cho phòng đông người.
 - Fee cấu hình theo stream/category (phase 1 dùng hằng số).
@@ -266,7 +297,8 @@ pnpm --filter @toolhackchain/api create-user --role ADMIN --refer-phone <phone c
 > Node >= 18.18 (repo pin Node 20 trong `.nvmrc`, chạy `nvm use` trước). Tên package: `@toolhackchain/api`, `@toolhackchain/web-admin`, `@toolhackchain/web-portal`, `@toolhackchain/shared`.
 
 ```bash
-# Hạ tầng (Postgres, Redis) + Flyway tự migrate. Lần đầu: cp .env.example .env và cp apps/api/.env.example apps/api/.env
+# Hạ tầng + Flyway tự migrate. Lần đầu: cp .env.example .env và cp apps/api/.env.example apps/api/.env
+# DB ngoài: đặt DB_HOST/DB_PORT/DB_SSL* trong .env. DB local: DB_HOST=db và thêm --profile local-db
 docker compose up -d
 
 # Flyway (schema)
@@ -283,6 +315,9 @@ pnpm --filter @toolhackchain/web-admin dev        # admin, port 3000
 pnpm --filter @toolhackchain/web-portal dev       # portal, port 3001
 pnpm build                                        # build theo thứ tự shared -> api -> web-admin -> web-portal
 pnpm --filter @toolhackchain/api lint                            # oxlint
+
+# AI (Python, xem apps/ai/README.md)
+cd apps/ai && python main.py serve        # hoặc backtest | verify | predict
 
 # Crawler (Python, cần Brave + CDP port 9222, xem apps/crawl-agent/README.md)
 pip install -r apps/crawl-agent/requirements.txt

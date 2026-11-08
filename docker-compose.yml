@@ -87,6 +87,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
         NEXT_PUBLIC_SHOW_STREAM_DEBUG: ${NEXT_PUBLIC_SHOW_STREAM_DEBUG:-false}
+        NEXT_PUBLIC_PREDICTION_SOURCE: ${NEXT_PUBLIC_PREDICTION_SOURCE:-live}
     image: tool-chain-web-portal
     container_name: tool-chain-web-portal
     restart: unless-stopped
@@ -94,6 +95,24 @@ services:
       - "${PORTAL_PORT:-5001}:3001"
     depends_on:
       - api
+  ai:
+    build: ./apps/ai
+    image: tool-chain-ai
+    container_name: tool-chain-ai
+    restart: unless-stopped
+    environment:
+      REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379
+      # AI chỉ ĐỌC DB. Ưu tiên user chỉ có SELECT (SQL tạo role: apps/ai/README.md); để trống thì dùng tài khoản chính.
+      DATABASE_URL_READONLY: ${AI_DATABASE_URL_READONLY:-}
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST:?set DB_HOST in .env}:${DB_PORT:-5432}/${POSTGRES_DB}?sslmode=${DB_SSLMODE:-prefer}
+      # Tên consumer cố định: không dùng `docker compose up --scale ai`; cần thêm instance thì khai báo service riêng với tên riêng
+      AI_CONSUMER_NAME: ai-worker-0
+      LOG_LEVEL: ${AI_LOG_LEVEL:-INFO}
+    depends_on:
+      redis:
+        condition: service_healthy
+      flyway:
+        condition: service_completed_successfully
   # crawl-agent:
   #   build: ./apps/crawl-agent
   #   image: crawl-agent

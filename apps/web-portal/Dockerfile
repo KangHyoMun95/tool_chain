@@ -8,8 +8,10 @@ FROM base AS build
 # NEXT_PUBLIC_* are inlined at build time, so they must be build args
 ARG NEXT_PUBLIC_API_URL
 ARG NEXT_PUBLIC_SHOW_STREAM_DEBUG=false
+ARG NEXT_PUBLIC_PREDICTION_SOURCE=live
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_PUBLIC_SHOW_STREAM_DEBUG=$NEXT_PUBLIC_SHOW_STREAM_DEBUG \
+    NEXT_PUBLIC_PREDICTION_SOURCE=$NEXT_PUBLIC_PREDICTION_SOURCE \
     NEXT_TELEMETRY_DISABLED=1
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/shared/package.json packages/shared/
