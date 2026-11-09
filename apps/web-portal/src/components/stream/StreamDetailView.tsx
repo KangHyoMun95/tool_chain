@@ -47,10 +47,10 @@ function StreamDetail({ stream }: { stream: Stream }) {
   const state: ConnectionState = live.connection === "live" ? "live" : live.connection === "reconnecting" ? "reconnecting" : "offline";
   // Tên + quốc gia streamer: ưu tiên realtime, dự phòng từ streamer_id của API ("Tên/Quốc gia/Mã").
   const fallback = parseStreamer(stream.streamerId);
-  // Tỷ lệ thắng / chuỗi thắng / độ tin cậy: dữ liệu thật từ GET /streams/:id/predictions/stats (null khi chưa tải xong).
+  // Tỷ lệ thắng (shoe hiện tại) / chuỗi thắng / biểu đồ tỷ lệ thắng theo shoe: dữ liệu thật từ GET /streams/:id/predictions/stats (null khi chưa tải xong).
   const stats = live.stats;
   const confidence = useMemo<ConfidencePoint[]>(
-    () => (stats?.recent ?? []).map((r) => ({ key: `${r.shoe}:${r.round}`, label: `#${r.round}`, value: Math.round(r.confidence * 1000) / 10 })),
+    () => (stats?.shoes ?? []).map((r) => ({ key: String(r.shoe), label: `#${r.shoe}`, value: Math.round(r.win_rate * 1000) / 10 })),
     [stats],
   );
   const evaluated = stats ? stats.wins + stats.losses : 0;
