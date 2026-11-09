@@ -5,7 +5,6 @@ import { useApi } from "@/src/hooks/use-api";
 import { useStreamSession } from "@/src/hooks/use-stream-session";
 import { useI18n } from "@/src/i18n/provider";
 import { getStream, type Stream } from "@/src/lib/api/catalog";
-import { getConfidenceSeries, getStreamStats } from "@/src/lib/mock-stats";
 import { parseStreamer } from "@/src/lib/streamer";
 import { stagger } from "@/src/lib/stagger";
 import { PageBanner } from "../catalog/PageBanner";
@@ -16,7 +15,7 @@ import { NotFoundView } from "../NotFoundView";
 import { AppShell } from "../shell/AppShell";
 import { HudCard } from "../ui/HudCard";
 import type { ConnectionState } from "../ui/StatusBadge";
-import { ConfidenceChart } from "./ConfidenceChart";
+import { ConfidenceChart, type ConfidencePoint } from "./ConfidenceChart";
 import { PredictionPanel } from "./PredictionPanel";
 import { SessionHistory } from "./SessionHistory";
 import { StreamDebugPanel } from "./StreamDebugPanel";
@@ -48,9 +47,14 @@ function StreamDetail({ stream }: { stream: Stream }) {
   const state: ConnectionState = live.connection === "live" ? "live" : live.connection === "reconnecting" ? "reconnecting" : "offline";
   // Tên + quốc gia streamer: ưu tiên realtime, dự phòng từ streamer_id của API ("Tên/Quốc gia/Mã").
   const fallback = parseStreamer(stream.streamerId);
-  // TODO: số liệu AI giả lập (src/lib/mock-stats.ts), chưa có API prediction.
-  const stats = useMemo(() => getStreamStats(id), [id]);
-  const confidence = useMemo(() => getConfidenceSeries(id, stats), [id, stats]);
+  // Tỷ lệ thắng / chuỗi thắng / độ tin cậy: dữ liệu thật từ GET /streams/:id/predictions/stats (null khi chưa tải xong).
+  const stats = live.stats;
+  const confidence = useMemo<ConfidencePoint[]>(
+    () => (stats?.recent ?? []).map((r) => ({ key: `${r.shoe}:${r.round}`, label: `#${r.round}`, value: Math.round(r.confidence * 1000) / 10 })),
+    [stats],
+  );
+  const evaluated = stats ? stats.wins + stats.losses : 0;
+  const streak = stats?.win_streak ?? 0;
 
   return (
     <>
@@ -70,14 +74,17 @@ function StreamDetail({ stream }: { stream: Stream }) {
                 <ChartIcon className="h-4 w-4 text-neon" />
                 {t("live.winRate")}
               </span>
-              <span className="mt-1 font-mono text-2xl font-black tracking-tight text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] md:text-3xl">{stats.aiWinRate.toFixed(1)}%</span>
+              <span className="mt-1 font-mono text-2xl font-black tracking-tight text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] md:text-3xl">
+                {stats?.win_rate == null ? "—" : `${(stats.win_rate * 100).toFixed(1)}%`}
+              </span>
+              <span className="font-mono text-[9px] text-gray-400">{t("live.winRateSample", { count: evaluated })}</span>
             </HudCard>
             <HudCard className="flex flex-col justify-between p-3 text-center">
               <span className="font-mono text-[10px] font-bold uppercase text-gray-300 md:text-[11px]">{t("live.winStreak")}</span>
               <span className="mt-1 flex items-center justify-center gap-2 font-mono text-2xl font-black text-white md:text-3xl">
-                <span className="animate-bounce text-xl">🔥</span>
-                {stats.winStreak}
-                <span className="animate-bounce text-xl">🔥</span>
+                {streak > 0 && <span className="animate-bounce text-xl">🔥</span>}
+                {stats ? streak : "—"}
+                {streak > 0 && <span className="animate-bounce text-xl">🔥</span>}
               </span>
             </HudCard>
           </div>

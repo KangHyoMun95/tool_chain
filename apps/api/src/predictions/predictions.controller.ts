@@ -19,4 +19,11 @@ export class PredictionsController {
     if (!prediction) throw new NotFoundException();
     return prediction;
   }
+
+  /** Tỷ lệ thắng, chuỗi thắng và các dự đoán gần nhất (biểu đồ độ tin cậy) của stream. Luôn 200 (rỗng khi chưa có dự đoán). */
+  @Get("stats")
+  async stats(@CurrentUser() actor: AuthUser, @Param() params: IdParamDto) {
+    await this.streams.getOne(actor.role, params.id);
+    return this.predictions.stats(params.id);
+  }
 }

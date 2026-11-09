@@ -1,18 +1,19 @@
 "use client";
 
 import { useI18n } from "@/src/i18n/provider";
-import type { ConfidencePoint } from "@/src/lib/mock-stats";
 import { ChartIcon } from "../icons";
 import { HudCard } from "../ui/HudCard";
 
 const W = 900;
 const H = 135;
 const X_PAD = 20;
-const Y_MIN = 60;
+const Y_MIN = 50;   // pick chỉ có khi một bên hơn bên kia, nên độ tin cậy luôn > 50%
 const Y_MAX = 100;
-const Y_TICKS = [100, 90, 80, 70, 60];
+const Y_TICKS = [100, 90, 80, 70, 60, 50];
 
-/** Biểu đồ độ tin cậy của các phiên gần nhất (dữ liệu giả lập). Đường neon đỏ + chấm trắng viền đỏ. */
+export type ConfidencePoint = { key: string; label: string; value: number };   // value: phần trăm 0–100
+
+/** Biểu đồ độ tin cậy của các dự đoán gần nhất. Đường neon đỏ + chấm trắng viền đỏ. */
 export function ConfidenceChart({ points }: { points: ConfidencePoint[] }) {
   const { t } = useI18n();
   const x = (i: number) => (points.length > 1 ? X_PAD + (i * (W - 2 * X_PAD)) / (points.length - 1) : W / 2);
@@ -36,6 +37,9 @@ export function ConfidenceChart({ points }: { points: ConfidencePoint[] }) {
           {Y_TICKS.map((v) => <span key={v}>{v}</span>)}
         </div>
         <div className="relative flex flex-1 flex-col justify-between pb-5">
+          {points.length === 0 && (
+            <p className="absolute inset-0 z-20 flex items-center justify-center pb-5 text-xs text-gray-400">{t("live.chartEmpty")}</p>
+          )}
           <div className="pointer-events-none absolute inset-0 flex flex-col justify-between pb-5">
             {Y_TICKS.map((v) => <div key={v} className="h-0 w-full border-b border-white/10" />)}
           </div>
@@ -47,13 +51,13 @@ export function ConfidenceChart({ points }: { points: ConfidencePoint[] }) {
             </defs>
             <polyline fill="none" stroke="#ff1e42" strokeWidth="3" filter="url(#confidenceGlow)" points={coords.map(([cx, cy]) => `${cx},${cy}`).join(" ")} />
             {coords.map(([cx, cy], i) => (
-              <circle key={points[i].sessionId} cx={cx} cy={cy} r="4.5" fill="#fff" stroke="#ff003b" strokeWidth="2.5">
-                <title>{`#${points[i].sessionId}: ${points[i].value}%`}</title>
+              <circle key={points[i].key} cx={cx} cy={cy} r="4.5" fill="#fff" stroke="#ff003b" strokeWidth="2.5">
+                <title>{`${points[i].label}: ${points[i].value}%`}</title>
               </circle>
             ))}
           </svg>
           <div className="absolute inset-x-0 -bottom-1 flex justify-between font-mono text-[10px] font-semibold text-gray-300 md:text-[11px]">
-            {points.map((p) => <span key={p.sessionId}>#{p.sessionId}</span>)}
+            {points.map((p) => <span key={p.key}>{p.label}</span>)}
           </div>
         </div>
       </div>
