@@ -43,7 +43,7 @@ export type StreamListStats = {
   draws: number;
   win_rate: number | null;         // wins / (wins + losses) của shoe hiện tại, 0–1; null khi chưa có ván nào
   win_streak: number;
-  recent: boolean[];               // STATS_RECENT_RESULTS dự đoán gần nhất (bỏ ván hòa), cũ → mới: true = thắng
+  recent: boolean[];               // tối đa STATS_RECENT_RESULTS dự đoán gần nhất của shoe hiện tại (bỏ ván hòa; ít hơn thì lấy đúng số đang có), cũ → mới: true = thắng
 };
 
 @Injectable()
@@ -181,16 +181,16 @@ export class PredictionsService {
        LEFT JOIN predictions p ON p.game_session_id = gs.game_session_id AND p.predict_result IS NOT NULL
        GROUP BY cur.stream_id, cur.shoe`, params);
 
-    const evaluated: { stream_id: string; pick: string; result: string }[] = await this.ds.query(
-      `SELECT stream_id, pick, result FROM (
-         SELECT p.stream_id, p.predict_result AS pick, gs.result,
+    const evaluated: { stream_id: string; shoe: string; pick: string; result: string }[] = await this.ds.query(
+      `SELECT stream_id, shoe, pick, result FROM (
+         SELECT p.stream_id, gs.road_shoe AS shoe, p.predict_result AS pick, gs.result,
                 row_number() OVER (PARTITION BY p.stream_id ORDER BY p.created_at DESC) AS rn
          FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
          WHERE p.stream_id IN (${vis}) AND p.predict_result IS NOT NULL AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
        ) x WHERE rn <= $${params.length + 1} ORDER BY stream_id, rn`,
       [...params, STATS_STREAK_WINDOW]);   // mỗi stream: mới → cũ
 
-    const byStream = new Map<string, { pick: string; result: string }[]>();
+    const byStream = new Map<string, { shoe: string; pick: string; result: string }[]>();
     for (const r of evaluated) {
       const list = byStream.get(r.stream_id) ?? [];
       list.push(r);
@@ -212,7 +212,7 @@ export class PredictionsService {
         wins, losses, draws: Number(c?.draws ?? 0),
         win_rate: wins + losses > 0 ? wins / (wins + losses) : null,
         win_streak: streak,
-        recent: rows.slice(0, STATS_RECENT_RESULTS).reverse().map((r) => r.pick === r.result),
+        recent: rows.filter((r) => Number(r.shoe) === (c ? Number(c.shoe) : null)).slice(0, STATS_RECENT_RESULTS).reverse().map((r) => r.pick === r.result),   // chỉ shoe hiện tại; ít hơn 10 thì lấy đúng số đang có
       };
     });
   }

@@ -51,7 +51,7 @@ export type StreamListStatsDto = {
   draws: number;
   win_rate: number | null;
   win_streak: number;
-  recent: boolean[];   // cũ → mới, true = thắng
+  recent: boolean[];   // shoe hiện tại, cũ → mới, true = thắng
 };
 
 export const fetchCategoryStreamStats = async (categoryId: string): Promise<StreamListStatsDto[]> =>
