@@ -17,11 +17,14 @@
     "tableCount": "{count} bàn"
   },
   "streams": {
-    "session": "Phiên #{id}",
+    "session": "Shoe #{shoe} · Ván #{round}",
+    "noSession": "Chưa có ván nào",
+    "offline": "OFFLINE",
     "live": "LIVE",
-    "winRate": "TỶ LỆ WIN AI",
+    "winRate": "WIN SHOE HIỆN TẠI",
     "winStreak": "CHUỖI THẮNG",
-    "recentResults": "{count} Lượt Gần Nhất",
+    "recentResults": "{count} Dự Đoán Gần Nhất",
+    "noRecent": "Chưa có dự đoán nào",
     "viewDetail": "Chi Tiết AI Dự Đoán",
     "empty": "Chưa có bàn nào trong loại trò chơi này.",
     "streamer": "Streamer: {name}"

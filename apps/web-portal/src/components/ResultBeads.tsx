@@ -1,4 +1,4 @@
-/** Chuỗi ✓ / ✕ của các lượt gần nhất (dữ liệu giả lập). */
+/** Chuỗi ✓ / ✕ của các dự đoán gần nhất. */
 export function ResultBeads({ results }: { results: boolean[] }) {
   return (
     <div className="flex items-center justify-between gap-1 font-mono">

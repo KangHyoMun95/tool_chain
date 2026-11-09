@@ -39,3 +39,20 @@ export type PredictionStatsDto = {
 
 export const fetchPredictionStats = (streamId: string): Promise<PredictionStatsDto> =>
   apiGet<PredictionStatsDto>(`/streams/${encodeURIComponent(streamId)}/predictions/stats`);
+
+/** GET /categories/:id/stream-stats — thống kê của từng bàn cho danh sách. win_rate chỉ của shoe hiện tại (0–1). */
+export type StreamListStatsDto = {
+  stream_id: string;
+  shoe: number | null;
+  round: number | null;
+  live: boolean;
+  wins: number;
+  losses: number;
+  draws: number;
+  win_rate: number | null;
+  win_streak: number;
+  recent: boolean[];   // cũ → mới, true = thắng
+};
+
+export const fetchCategoryStreamStats = async (categoryId: string): Promise<StreamListStatsDto[]> =>
+  (await apiGet<{ items: StreamListStatsDto[] }>(`/categories/${encodeURIComponent(categoryId)}/stream-stats`)).items;
