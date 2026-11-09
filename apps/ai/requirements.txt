@@ -5,3 +5,5 @@ pyarrow>=16.0              # đọc/ghi cache data/sessions.parquet
 SQLAlchemy>=2.0
 psycopg[binary]>=3.2       # driver Postgres (postgresql+psycopg://)
 python-dotenv>=1.0         # đọc DATABASE_URL từ .env
+redis>=5.0                 # service: Redis Stream, bảng đếm
+pydantic>=2.6              # contract predict:requests / ai:results / predict:results

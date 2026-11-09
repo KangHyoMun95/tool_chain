@@ -46,11 +46,16 @@ export class RealtimeHub implements OnApplicationBootstrap, OnModuleDestroy {
   async withStreamId(itemId: string, tickJson: string): Promise<string> {
     try {
       const [streamId] = await this.ids.getMany([RedisKeys.stream(itemId)]);
-      return JSON.stringify({ ...JSON.parse(tickJson), stream_id: streamId ?? null });
+      return JSON.stringify({ ...JSON.parse(tickJson), type: "tick", stream_id: streamId ?? null });
     } catch (e) {
       this.log.warn(`Không gắn được stream_id cho ${itemId}: ${e}`);
       return tickJson;
     }
+  }
+
+  /** Đẩy event dự đoán (JSON đã dựng sẵn) tới mọi client đang nghe key_id này. */
+  publishPrediction(itemId: string, eventJson: string): void {
+    this.listeners.get(itemId)?.forEach((fn) => fn(eventJson));
   }
 
   subscribe(itemId: string, fn: Listener): () => void {

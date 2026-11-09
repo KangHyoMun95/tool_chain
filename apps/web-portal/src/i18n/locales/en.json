@@ -97,6 +97,8 @@
     "scanning": "SCANNING TABLE DATA...",
     "prediction": "PREDICTION",
     "confidence": "Confidence",
+    "insufficientData": "Not enough data to predict",
+    "noPrediction": "No prediction for this round",
     "win": "WIN",
     "lose": "LOSE",
     "tie": "TIE",

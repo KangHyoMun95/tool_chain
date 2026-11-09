@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { buildKeyId, STREAM_STATUSES, type CrawlPayload, type StreamStatus } from "@toolhackchain/shared";
+import { buildKeyId, STREAM_STATUSES, type CrawlPayload, type RealtimePrediction, type StreamStatus } from "@toolhackchain/shared";
+import { toPrediction } from "@/src/lib/prediction-source";
+import { predictionStore } from "@/src/lib/prediction-store";
 import { useLiveItems } from "./use-live-items";
 import { useStreamHistory } from "./use-stream-history";
 
@@ -42,7 +44,11 @@ export function useStreamSession(stream: StreamRef) {
     historyApi.current?.scheduleRefetch();
   }, []);
 
-  const live = useLiveItems<CrawlPayload>([keyId], { streamId: stream.id, onTick });
+  const onPrediction = useCallback((p: RealtimePrediction) => {
+    predictionStore.put(p.data.stream_id, p.data.shoe, p.data.round, toPrediction(p.data));
+  }, []);
+
+  const live = useLiveItems<CrawlPayload>([keyId], { streamId: stream.id, onTick, onPrediction });
   const latest = live.ticks[keyId]?.data;
   const shoe = latest ? toInt(latest.stream_shoe) : null;
   const round = latest ? toInt(latest.stream_round) : null;

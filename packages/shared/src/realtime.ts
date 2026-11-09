@@ -1,4 +1,6 @@
 // packages/shared/src/realtime.ts
+import type { PredictionEvent } from "./ai";
+
 export const TICK_STREAM = "ticks";
 export const PERSIST_GROUP = "persist";
 export const TICK_DEAD_STREAM = "ticks:dead";   // tick gây lỗi dữ liệu khi ghi DB (đọc lại: ingestion/dead-letter.ts)
@@ -44,7 +46,12 @@ export type Tick<T = CrawlPayload> = {
 };
 
 // Event SSE xuống portal: tick gốc + stream_id của DB (streams.stream_id), null khi chưa có trong cache id.
-export type RealtimeTick<T = CrawlPayload> = Tick<T> & { stream_id: string | null };
+// `type` phân loại event; client coi event thiếu `type` là "tick" (tương thích bản cũ).
+export type RealtimeTick<T = CrawlPayload> = Tick<T> & { type: "tick"; stream_id: string | null };
+
+// Event SSE dự đoán (kênh public theo key_id — TẠM THỜI, phải chuyển sang kênh riêng theo user trước khi làm billing).
+// item_id = key_id, ts = epoch giây của created_at (để client dùng chung logic chống tick cũ).
+export type RealtimePrediction = { type: "prediction"; item_id: string; ts: number; stream_id: string; data: PredictionEvent };
 
 // Chuẩn hóa tên CHỈ để chống trùng, không lưu DB. Phải khớp normalize_name() ở contract.py và biểu thức unique index.
 export const normalizeName = (s: string): string => s.trim().replace(/\s+/g, " ").toLowerCase();
@@ -68,4 +75,10 @@ export const RedisKeys = {
   refresh: (sid: string) => `refresh:${sid}`,
   loginFail: (phone: string) => `login_fail:${phone}`,
   loginLock: (phone: string) => `login_lock:${phone}`,
+  // Luồng dự đoán — API sở hữu (ghi): round_status, predictReq, recent. AI sở hữu (ghi): aiCounts, aiCounted. Giá trị: xem ai.ts.
+  roundStatus: (gameSessionId: string) => `round_status:${gameSessionId}`,                       // status mới nhất của ván, TTL 1h
+  predictReq: (gameSessionId: string) => `predict_req:${gameSessionId}`,                         // cờ đã phát yêu cầu, TTL 1h
+  recent: (streamId: string, shoe: number) => `recent:${streamId}:${shoe}`,                      // HASH round → result, TTL 24h
+  aiCounts: (streamId: string) => `ai:counts:${streamId}`,                                       // HASH "<pattern>|<B/P>" → số lần
+  aiCounted: (streamId: string, shoe: number) => `ai:counted:${streamId}:${shoe}`,               // SET game_session_id đã đếm, TTL 48h
 } as const;

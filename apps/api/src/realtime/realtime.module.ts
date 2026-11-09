@@ -10,6 +10,7 @@ import { RealtimeController } from "./realtime.controller.js";
   // imports: [AuthModule],
   imports: [IngestionModule],
   providers: [RealtimeHub, /*StreamItemsGuard */],
-  controllers: [RealtimeController]
+  controllers: [RealtimeController],
+  exports: [RealtimeHub],
 })
 export class RealtimeModule {}
