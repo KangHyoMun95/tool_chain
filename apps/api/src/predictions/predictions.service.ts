@@ -5,7 +5,7 @@ import type { DataSource } from "typeorm";
 import type { ChosenPattern, PredictResult, PredictionDetail, PredictionReason } from "@toolhackchain/shared";
 import { GameSessionEntity, PredictionEntity } from "../database/entities/index.js";
 import { GameSessionsService } from "../game-sessions/game-sessions.service.js";
-import { STATS_RECENT, STATS_WINDOW } from "./predictions.constants.js";
+import { STATS_SHOES, STATS_STREAK_WINDOW } from "./predictions.constants.js";
 
 export type CurrentPrediction = {
   prediction_id: string;
@@ -22,15 +22,14 @@ export type CurrentPrediction = {
 };
 
 export type PredictionStats = {
-  window: number;                  // tối đa bao nhiêu dự đoán đã có kết quả được xét
-  evaluated: number;               // số dự đoán (có pick) của ván FINISHED trong cửa sổ
-  wins: number;
+  shoe: number | null;             // shoe hiện tại = shoe của dự đoán mới nhất của stream; null khi chưa có dự đoán nào
+  wins: number;                    // các số dưới đây chỉ tính trong shoe hiện tại
   losses: number;
   draws: number;                   // kết quả T: không tính thắng / thua
-  win_rate: number | null;         // wins / (wins + losses), 0–1; null khi chưa có ván nào để tính
-  win_streak: number;              // số dự đoán thắng liên tiếp tính từ ván mới nhất (bỏ qua ván hòa)
-  recent: {                        // các dự đoán gần nhất có confidence, cũ → mới (cho biểu đồ)
-    shoe: number; round: number; pick: "B" | "P"; confidence: number; result: string | null; created_at: Date;
+  win_rate: number | null;         // wins / (wins + losses), 0–1; null khi shoe hiện tại chưa có ván nào để tính
+  win_streak: number;              // số dự đoán thắng liên tiếp tính từ ván mới nhất (bỏ qua ván hòa), xét trong STATS_STREAK_WINDOW dự đoán
+  shoes: {                         // tỷ lệ thắng của từng shoe trong STATS_SHOES shoe gần nhất (gồm shoe hiện tại), cũ → mới
+    shoe: number; wins: number; losses: number; draws: number; win_rate: number;
   }[];
 };
 
@@ -85,37 +84,53 @@ export class PredictionsService {
   /**
    * Thống kê dự đoán của một stream. Thắng = pick trùng result; kết quả T là hòa (chưa tính đúng / sai, như UI);
    * ván không có pick (AI không dự đoán) hoặc chưa FINISHED không được tính.
+   * Tỷ lệ thắng hiện tại chỉ của shoe hiện tại; biểu đồ là tỷ lệ thắng của từng shoe gần nhất.
    */
   async stats(streamId: string): Promise<PredictionStats> {
-    const evaluated: { pick: string; result: string }[] = await this.ds.query(
+    const cur: { shoe: string }[] = await this.ds.query(
+      `SELECT gs.road_shoe AS shoe
+       FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
+       WHERE p.stream_id = $1
+       ORDER BY p.created_at DESC LIMIT 1`,
+      [streamId]);
+    const currentShoe = cur[0] ? Number(cur[0].shoe) : null;
+
+    // Mỗi dòng một shoe, sắp theo dự đoán đã chấm mới nhất của shoe đó (mới → cũ).
+    const rows: { shoe: string; wins: string; losses: string; draws: string }[] = await this.ds.query(
+      `SELECT gs.road_shoe AS shoe,
+              count(*) FILTER (WHERE gs.result <> 'T' AND p.predict_result = gs.result) AS wins,
+              count(*) FILTER (WHERE gs.result <> 'T' AND p.predict_result <> gs.result) AS losses,
+              count(*) FILTER (WHERE gs.result = 'T') AS draws
+       FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
+       WHERE p.stream_id = $1 AND p.predict_result IS NOT NULL AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
+       GROUP BY gs.road_shoe
+       ORDER BY max(p.created_at) DESC LIMIT $2`,
+      [streamId, STATS_SHOES]);   // mới → cũ
+    const perShoe = rows.map((r) => {
+      const wins = Number(r.wins), losses = Number(r.losses);
+      return { shoe: Number(r.shoe), wins, losses, draws: Number(r.draws), win_rate: wins + losses > 0 ? wins / (wins + losses) : null };
+    });
+    const now = perShoe.find((r) => r.shoe === currentShoe);
+
+    const recent: { pick: string; result: string }[] = await this.ds.query(
       `SELECT p.predict_result AS pick, gs.result
        FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
        WHERE p.stream_id = $1 AND p.predict_result IS NOT NULL AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
        ORDER BY p.created_at DESC LIMIT $2`,
-      [streamId, STATS_WINDOW]);   // mới → cũ
-
-    let wins = 0, losses = 0, draws = 0, streak = 0, streakOpen = true;
-    for (const r of evaluated) {
-      if (r.result === "T") { draws++; continue; }
-      if (r.pick === r.result) { wins++; if (streakOpen) streak++; }
-      else { losses++; streakOpen = false; }
+      [streamId, STATS_STREAK_WINDOW]);   // mới → cũ
+    let streak = 0;
+    for (const r of recent) {
+      if (r.result === "T") continue;
+      if (r.pick !== r.result) break;
+      streak++;
     }
 
-    const recent: { shoe: number; round: number; pick: "B" | "P"; confidence: string; result: string | null; created_at: Date }[] =
-      await this.ds.query(
-        `SELECT gs.road_shoe AS shoe, gs.road_count AS round, p.predict_result AS pick, p.confidence_score AS confidence,
-                gs.result, p.created_at
-         FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
-         WHERE p.stream_id = $1 AND p.confidence_score IS NOT NULL
-         ORDER BY p.created_at DESC LIMIT $2`,
-        [streamId, STATS_RECENT]);
-
     return {
-      window: STATS_WINDOW,
-      evaluated: evaluated.length, wins, losses, draws,
-      win_rate: wins + losses > 0 ? wins / (wins + losses) : null,
+      shoe: currentShoe,
+      wins: now?.wins ?? 0, losses: now?.losses ?? 0, draws: now?.draws ?? 0,
+      win_rate: now?.win_rate ?? null,
       win_streak: streak,
-      recent: recent.reverse().map((r) => ({ ...r, shoe: Number(r.shoe), round: Number(r.round), confidence: Number(r.confidence) })),
+      shoes: perShoe.filter((r) => r.win_rate !== null).reverse() as PredictionStats["shoes"],
     };
   }
 }

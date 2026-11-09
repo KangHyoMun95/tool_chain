@@ -26,16 +26,15 @@ export async function fetchCurrentPrediction(streamId: string): Promise<CurrentP
   }
 }
 
-/** GET /streams/:id/predictions/stats — win_rate và confidence là tỉ lệ 0–1. Hòa (T) không tính thắng / thua. */
+/** GET /streams/:id/predictions/stats — win_rate là tỉ lệ 0–1. Hòa (T) không tính thắng / thua. wins/losses/draws/win_rate chỉ của shoe hiện tại. */
 export type PredictionStatsDto = {
-  window: number;
-  evaluated: number;
+  shoe: number | null;
   wins: number;
   losses: number;
   draws: number;
   win_rate: number | null;
   win_streak: number;
-  recent: { shoe: number; round: number; pick: "B" | "P"; confidence: number; result: string | null; created_at: string }[];
+  shoes: { shoe: number; wins: number; losses: number; draws: number; win_rate: number }[];   // cũ → mới
 };
 
 export const fetchPredictionStats = (streamId: string): Promise<PredictionStatsDto> =>

@@ -7,13 +7,13 @@ import { HudCard } from "../ui/HudCard";
 const W = 900;
 const H = 135;
 const X_PAD = 20;
-const Y_MIN = 50;   // pick chỉ có khi một bên hơn bên kia, nên độ tin cậy luôn > 50%
+const Y_MIN = 0;
 const Y_MAX = 100;
-const Y_TICKS = [100, 90, 80, 70, 60, 50];
+const Y_TICKS = [100, 80, 60, 40, 20, 0];
 
 export type ConfidencePoint = { key: string; label: string; value: number };   // value: phần trăm 0–100
 
-/** Biểu đồ độ tin cậy của các dự đoán gần nhất. Đường neon đỏ + chấm trắng viền đỏ. */
+/** Biểu đồ tỷ lệ thắng của các shoe gần nhất (mỗi điểm một shoe). Đường neon đỏ + chấm trắng viền đỏ. */
 export function ConfidenceChart({ points }: { points: ConfidencePoint[] }) {
   const { t } = useI18n();
   const x = (i: number) => (points.length > 1 ? X_PAD + (i * (W - 2 * X_PAD)) / (points.length - 1) : W / 2);
