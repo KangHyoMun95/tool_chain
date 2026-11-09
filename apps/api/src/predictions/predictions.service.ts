@@ -2,10 +2,10 @@
 import { Injectable } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import type { DataSource } from "typeorm";
-import type { ChosenPattern, PredictResult, PredictionDetail, PredictionReason } from "@toolhackchain/shared";
+import { CatalogStatus, type ChosenPattern, type PredictResult, type PredictionDetail, type PredictionReason, type Role } from "@toolhackchain/shared";
 import { GameSessionEntity, PredictionEntity } from "../database/entities/index.js";
 import { GameSessionsService } from "../game-sessions/game-sessions.service.js";
-import { STATS_SHOES, STATS_STREAK_WINDOW } from "./predictions.constants.js";
+import { LIVE_WITHIN_MS, STATS_RECENT_RESULTS, STATS_SHOES, STATS_STREAK_WINDOW } from "./predictions.constants.js";
 
 export type CurrentPrediction = {
   prediction_id: string;
@@ -31,6 +31,19 @@ export type PredictionStats = {
   shoes: {                         // tỷ lệ thắng của từng shoe trong STATS_SHOES shoe gần nhất (gồm shoe hiện tại), cũ → mới
     shoe: number; wins: number; losses: number; draws: number; win_rate: number;
   }[];
+};
+
+export type StreamListStats = {
+  stream_id: string;
+  shoe: number | null;             // shoe hiện tại (shoe của dự đoán mới nhất)
+  round: number | null;            // ván mới nhất của stream (road_count của game_session mới nhất)
+  live: boolean;                   // có ván mới trong LIVE_WITHIN_MS gần đây
+  wins: number;                    // chỉ của shoe hiện tại
+  losses: number;
+  draws: number;
+  win_rate: number | null;         // wins / (wins + losses) của shoe hiện tại, 0–1; null khi chưa có ván nào
+  win_streak: number;
+  recent: boolean[];               // STATS_RECENT_RESULTS dự đoán gần nhất (bỏ ván hòa), cũ → mới: true = thắng
 };
 
 @Injectable()
@@ -132,5 +145,75 @@ export class PredictionsService {
       win_streak: streak,
       shoes: perShoe.filter((r) => r.win_rate !== null).reverse() as PredictionStats["shoes"],
     };
+  }
+
+  /**
+   * Thống kê của mọi stream trong một category cho danh sách bàn (vài truy vấn cho cả danh sách, không gọi từng bàn).
+   * Cùng định nghĩa với stats(): thắng = pick trùng result, T là hòa, win_rate chỉ của shoe hiện tại.
+   * Phạm vi nhìn thấy như GET /streams: USER chỉ thấy stream ACTIVE có category + lobby cha ACTIVE.
+   */
+  async listStats(role: Role, categoryId: string): Promise<StreamListStats[]> {
+    const visible = role === "USER" ? "AND s.status = $2 AND c.status = $2 AND l.status = $2" : "";
+    const params: unknown[] = role === "USER" ? [categoryId, CatalogStatus.ACTIVE] : [categoryId];
+    const vis = `SELECT s.stream_id FROM streams s
+                 JOIN categories c ON c.category_id = s.category_id JOIN lobbies l ON l.lobby_id = c.lobby_id
+                 WHERE s.category_id = $1 ${visible}`;
+
+    const latest: { stream_id: string; round: string; age_ms: string }[] = await this.ds.query(
+      `SELECT DISTINCT ON (gs.stream_id) gs.stream_id, gs.road_count AS round,
+              (extract(epoch FROM (now() - gs.created_at)) * 1000) AS age_ms
+       FROM game_sessions gs WHERE gs.stream_id IN (${vis})
+       ORDER BY gs.stream_id, gs.created_at DESC`, params);
+
+    const cur: { stream_id: string; shoe: string; wins: string; losses: string; draws: string }[] = await this.ds.query(
+      `WITH cur AS (
+         SELECT DISTINCT ON (p.stream_id) p.stream_id, gs.road_shoe AS shoe
+         FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
+         WHERE p.stream_id IN (${vis})
+         ORDER BY p.stream_id, p.created_at DESC)
+       SELECT cur.stream_id, cur.shoe,
+              count(*) FILTER (WHERE gs.result <> 'T' AND p.predict_result = gs.result) AS wins,
+              count(*) FILTER (WHERE gs.result <> 'T' AND p.predict_result <> gs.result) AS losses,
+              count(*) FILTER (WHERE gs.result = 'T') AS draws
+       FROM cur
+       LEFT JOIN game_sessions gs ON gs.stream_id = cur.stream_id AND gs.road_shoe = cur.shoe
+                                  AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
+       LEFT JOIN predictions p ON p.game_session_id = gs.game_session_id AND p.predict_result IS NOT NULL
+       GROUP BY cur.stream_id, cur.shoe`, params);
+
+    const evaluated: { stream_id: string; pick: string; result: string }[] = await this.ds.query(
+      `SELECT stream_id, pick, result FROM (
+         SELECT p.stream_id, p.predict_result AS pick, gs.result,
+                row_number() OVER (PARTITION BY p.stream_id ORDER BY p.created_at DESC) AS rn
+         FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
+         WHERE p.stream_id IN (${vis}) AND p.predict_result IS NOT NULL AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
+       ) x WHERE rn <= $${params.length + 1} ORDER BY stream_id, rn`,
+      [...params, STATS_STREAK_WINDOW]);   // mỗi stream: mới → cũ
+
+    const byStream = new Map<string, { pick: string; result: string }[]>();
+    for (const r of evaluated) {
+      const list = byStream.get(r.stream_id) ?? [];
+      list.push(r);
+      byStream.set(r.stream_id, list);
+    }
+    const ids = new Set([...latest.map((r) => r.stream_id), ...cur.map((r) => r.stream_id)]);
+    return [...ids].map((id) => {
+      const l = latest.find((r) => r.stream_id === id);
+      const c = cur.find((r) => r.stream_id === id);
+      const wins = Number(c?.wins ?? 0), losses = Number(c?.losses ?? 0);
+      const rows = (byStream.get(id) ?? []).filter((r) => r.result !== "T");   // mới → cũ, bỏ ván hòa
+      let streak = 0;
+      for (const r of rows) { if (r.pick !== r.result) break; streak++; }
+      return {
+        stream_id: id,
+        shoe: c ? Number(c.shoe) : null,
+        round: l ? Number(l.round) : null,
+        live: l ? Number(l.age_ms) <= LIVE_WITHIN_MS : false,
+        wins, losses, draws: Number(c?.draws ?? 0),
+        win_rate: wins + losses > 0 ? wins / (wins + losses) : null,
+        win_streak: streak,
+        recent: rows.slice(0, STATS_RECENT_RESULTS).reverse().map((r) => r.pick === r.result),
+      };
+    });
   }
 }

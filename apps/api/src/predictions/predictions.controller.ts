@@ -3,6 +3,7 @@ import { Controller, Get, NotFoundException, Param } from "@nestjs/common";
 import { CurrentUser } from "../auth/decorators.js";
 import type { AuthUser } from "../auth/auth.types.js";
 import { IdParamDto } from "../common/catalog-list.js";
+import { CategoriesService } from "../categories/categories.service.js";
 import { StreamsService } from "../streams/streams.service.js";
 import { PredictionsService } from "./predictions.service.js";
 
@@ -25,5 +26,17 @@ export class PredictionsController {
   async stats(@CurrentUser() actor: AuthUser, @Param() params: IdParamDto) {
     await this.streams.getOne(actor.role, params.id);
     return this.predictions.stats(params.id);
+  }
+}
+
+/** Thống kê cho danh sách bàn của một category. Đặt dưới /categories/:id để không đụng GET /streams/:id. */
+@Controller("categories/:id/stream-stats")
+export class CategoryStreamStatsController {
+  constructor(private predictions: PredictionsService, private categories: CategoriesService) {}
+
+  @Get()
+  async list(@CurrentUser() actor: AuthUser, @Param() params: IdParamDto) {
+    await this.categories.getOne(actor.role, params.id);   // 404 khi category không tồn tại / ngoài phạm vi
+    return { items: await this.predictions.listStats(actor.role, params.id) };
   }
 }

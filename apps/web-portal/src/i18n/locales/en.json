@@ -17,11 +17,14 @@
     "tableCount": "{count} tables"
   },
   "streams": {
-    "session": "Round #{id}",
+    "session": "Shoe #{shoe} · Round #{round}",
+    "noSession": "No rounds yet",
+    "offline": "OFFLINE",
     "live": "LIVE",
-    "winRate": "AI WIN RATE",
+    "winRate": "CURRENT SHOE WIN",
     "winStreak": "WIN STREAK",
-    "recentResults": "Last {count} shoes",
+    "recentResults": "Last {count} predictions",
+    "noRecent": "No predictions yet",
     "viewDetail": "AI Prediction Details",
     "empty": "No tables in this game yet.",
     "streamer": "Streamer: {name}"
