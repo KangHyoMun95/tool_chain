@@ -12,15 +12,11 @@ import { EmptyState, ErrorState } from "./DataStates";
 import { NotFoundView } from "./NotFoundView";
 import { AppShell } from "./shell/AppShell";
 
-// Danh sách bàn tự làm mới ngầm mỗi 10 giây (streamer, bàn mới / bàn bị ẩn...).
-const STREAMS_REFRESH_MS = 10_000;
-const STATS_REFRESH_MS = 10_000;   // tỷ lệ win / thứ tự bàn tự cập nhật theo kết quả mới
-
 export function CategoryStreamsView({ categoryId }: { categoryId: string }) {
   const { t } = useI18n();
   const category = useApi(() => getCategory(categoryId), [categoryId]);
-  const streams = useApi(() => listStreams(categoryId), [categoryId], { refreshMs: STREAMS_REFRESH_MS });
-  const stats = useApi(() => fetchCategoryStreamStats(categoryId), [categoryId], { refreshMs: STATS_REFRESH_MS });
+  const streams = useApi(() => listStreams(categoryId), [categoryId]);
+  const stats = useApi(() => fetchCategoryStreamStats(categoryId), [categoryId]);
 
   // Xếp theo tỷ lệ win của shoe hiện tại, cao → thấp; bàn chưa có tỷ lệ xuống cuối; hòa thì nhiều ván hơn trước, rồi theo tên.
   const sorted = useMemo(() => {
