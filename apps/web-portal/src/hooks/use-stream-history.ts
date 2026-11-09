@@ -4,9 +4,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/src/components/auth/AuthProvider";
 import { apiGet, ApiError } from "@/src/lib/api/client";
 
-export type HistoryRow = { shoe: number; round: number; result: string | null };
+export type HistoryRow = { shoe: number; round: number; result: string | null; pick?: "B" | "P" | null };   // pick: dự đoán lưu trong DB (undefined = chưa biết, vd ván vừa thêm optimistic)
 
-type ApiHistory = { shoe: number | null; items: { shoe: number; round: number; result: string | null }[] };
+type ApiHistory = { shoe: number | null; items: { shoe: number; round: number; result: string | null; pick: "B" | "P" | null }[] };
 
 const LIMIT = 60;   // đủ cho bảng kết quả 6 hàng x 10 cột
 const REFETCH_DELAY_MS = 4000;   // lớn hơn chu kỳ ghi batch của API (3s)
@@ -44,7 +44,7 @@ export function useStreamHistory(streamId: string, liveShoe: number | null, reco
       setError(false);
       setRows((prev) => {
         const next = new Map(prev);
-        for (const it of res.items) next.set(rowKey(it), { shoe: it.shoe, round: it.round, result: it.result });
+        for (const it of res.items) next.set(rowKey(it), { shoe: it.shoe, round: it.round, result: it.result, pick: it.pick });
         return next;
       });
     } catch (err) {

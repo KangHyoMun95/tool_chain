@@ -112,6 +112,9 @@
     "chartTitle": "Biểu Đồ Phần Trăm Độ Tin Cậy Mỗi Phiên",
     "chartRange": "{count} Phiên Gần Nhất",
     "chartSeries": "Độ tin cậy AI (%)",
+    "chartEmpty": "Chưa có dự đoán nào",
+    "winRateSample": "{count} ván đã có kết quả",
+    "chartEmpty": "Chưa có dự đoán nào",
     "debugTitle": "Debug thời gian",
     "debugConverted": "Giờ Việt Nam"
   },

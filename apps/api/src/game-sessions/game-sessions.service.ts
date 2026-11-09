@@ -15,7 +15,7 @@ export type ApplyResultsOutcome = {
 export class GameSessionsService {
   constructor(@InjectDataSource() private ds: DataSource) {}
 
-  /** Lịch sử ván FINISHED của một stream theo shoe (mặc định: shoe của ván mới nhất), round giảm dần. */
+  /** Lịch sử ván FINISHED của một stream theo shoe (mặc định: shoe của ván mới nhất), round giảm dần, kèm dự đoán của từng ván. */
   async history(streamId: string, shoe: number | undefined, page: number, limit: number) {
     if (shoe === undefined) {
       const latest: { road_shoe: number }[] = await this.ds.query(
@@ -26,13 +26,20 @@ export class GameSessionsService {
     const where = `stream_id = $1 AND road_shoe = $2 AND status = $3`;
     const args = [streamId, shoe, GameSessionStatus.FINISHED];
     const [{ count }]: { count: string }[] = await this.ds.query(`SELECT count(*) AS count FROM game_sessions WHERE ${where}`, args);
-    const rows: { game_session_id: string; shoe: number; round: number; result: string | null; status: string; created_at: Date }[] =
-      await this.ds.query(
-        `SELECT game_session_id, road_shoe AS shoe, road_count AS round, result, status, created_at
-         FROM game_sessions WHERE ${where}
-         ORDER BY road_count DESC, game_session_id LIMIT $4 OFFSET $5`,
-        [...args, limit, (page - 1) * limit]);
-    return { shoe, items: rows, total: Number(count), page, limit };
+    const rows: {
+      game_session_id: string; shoe: number; round: number; result: string | null; status: string; created_at: Date;
+      pick: "B" | "P" | null; confidence: string | null;
+    }[] = await this.ds.query(
+      `SELECT g.game_session_id, g.road_shoe AS shoe, g.road_count AS round, g.result, g.status, g.created_at,
+              p.predict_result AS pick, p.confidence_score AS confidence
+       FROM game_sessions g
+       LEFT JOIN predictions p ON p.game_session_id = g.game_session_id
+       WHERE g.stream_id = $1 AND g.road_shoe = $2 AND g.status = $3
+       ORDER BY g.road_count DESC, g.game_session_id LIMIT $4 OFFSET $5`,
+      [...args, limit, (page - 1) * limit]);
+    // pick / confidence: dự đoán của ván (null khi chưa có dự đoán hoặc AI không dự đoán); confidence là 0–1.
+    const items = rows.map((r) => ({ ...r, confidence: r.confidence === null ? null : Number(r.confidence) }));
+    return { shoe, items, total: Number(count), page, limit };
   }
 
   /** Chỉ insert ván chưa có; không set status (để mặc định của DB = RUNNING), không đụng ván đã tồn tại. */

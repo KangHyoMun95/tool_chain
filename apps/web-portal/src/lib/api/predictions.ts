@@ -25,3 +25,18 @@ export async function fetchCurrentPrediction(streamId: string): Promise<CurrentP
     throw err;
   }
 }
+
+/** GET /streams/:id/predictions/stats — win_rate và confidence là tỉ lệ 0–1. Hòa (T) không tính thắng / thua. */
+export type PredictionStatsDto = {
+  window: number;
+  evaluated: number;
+  wins: number;
+  losses: number;
+  draws: number;
+  win_rate: number | null;
+  win_streak: number;
+  recent: { shoe: number; round: number; pick: "B" | "P"; confidence: number; result: string | null; created_at: string }[];
+};
+
+export const fetchPredictionStats = (streamId: string): Promise<PredictionStatsDto> =>
+  apiGet<PredictionStatsDto>(`/streams/${encodeURIComponent(streamId)}/predictions/stats`);

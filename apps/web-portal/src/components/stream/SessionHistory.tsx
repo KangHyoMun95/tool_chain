@@ -25,8 +25,9 @@ export function SessionHistory({ streamId, rows, error }: Props) {
       {rows.length === 0 && !error && <p className="text-xs text-gray-400">{t("live.historyEmpty")}</p>}
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
         {rows.slice(0, SHOWN).map((r) => {
-          // Dự đoán đã biết trong phiên này (live: từ SSE / current; mock: giả lập). Chưa biết hoặc AI không dự đoán => "—", không đúng / sai.
-          const pick = predictionSource.peek(streamId, r.shoe, r.round)?.pick ?? null;
+          // Dự đoán lưu trong DB (từ API lịch sử); ván vừa kết thúc chưa kịp refetch thì lấy từ phiên (SSE / current).
+          // Chưa biết hoặc AI không dự đoán => "—", không đúng / sai.
+          const pick = r.pick !== undefined ? r.pick : (predictionSource.peek(streamId, r.shoe, r.round)?.pick ?? null);
           const tone = r.result === "T" ? "draw" : pick === null || r.result === null ? "none" : pick === r.result ? "win" : "loss";
           return (
             <div

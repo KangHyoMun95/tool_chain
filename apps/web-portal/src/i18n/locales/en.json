@@ -112,6 +112,9 @@
     "chartTitle": "Confidence Percentage per Round",
     "chartRange": "Last {count} rounds",
     "chartSeries": "AI confidence (%)",
+    "chartEmpty": "No predictions yet",
+    "winRateSample": "{count} settled rounds",
+    "chartEmpty": "No predictions yet",
     "debugTitle": "Time debug",
     "debugConverted": "Vietnam time"
   },

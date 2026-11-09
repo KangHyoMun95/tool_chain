@@ -1,6 +1,6 @@
-// TODO: dữ liệu AI GIẢ LẬP (tỉ lệ thắng, chuỗi thắng, lịch sử, độ tin cậy, mã phiên) — chưa có API prediction.
+// TODO: dữ liệu AI GIẢ LẬP chỉ còn cho thẻ bàn ở danh sách (StreamCard). Màn hình chi tiết bàn đã dùng API thật (GET /streams/:id/predictions/stats).
 // Số giả ổn định theo hash của id (UUID) để SSR/client khớp nhau. Sảnh / loại game / bàn là dữ liệu thật ở src/lib/api/catalog.ts.
-// Khi có API prediction thì thay các hàm get* bên dưới và xóa file này.
+// Khi có API thống kê cho danh sách bàn thì thay getStreamStats và xóa file này.
 
 export type StreamStats = {
   sessionId: number;
@@ -8,8 +8,6 @@ export type StreamStats = {
   winStreak: number;
   recentResults: boolean[];
 };
-
-export type ConfidencePoint = { sessionId: number; value: number };
 
 // Sinh số giả ngẫu nhiên ổn định theo seed để SSR và client cho cùng kết quả.
 function seeded(seed: number): () => number {
@@ -39,12 +37,4 @@ export function getStreamStats(streamId: string): StreamStats {
     winStreak,
     recentResults,
   };
-}
-
-export function getConfidenceSeries(streamId: string, stats: StreamStats, count = 10): ConfidencePoint[] {
-  const rand = seeded(hash(`confidence-${streamId}`));
-  return Array.from({ length: count }, (_, i) => ({
-    sessionId: stats.sessionId - count + i,
-    value: Math.round((78 + rand() * 18) * 10) / 10,
-  }));
 }
