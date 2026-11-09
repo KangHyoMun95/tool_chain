@@ -67,6 +67,9 @@ class SXLobby:
     def __init__(self):
         self.lobby_name = SX_LOBBY
         self.category_name = SX_CATEGORY_1
+        # Trạng thái theo TỪNG ván (shoe, round). Thuộc tính bắt đầu bằng "_" không đi vào payload (xem shot_message).
+        self._round_status: dict = {}
+        self._current_round = None
 
     def destructure_message(self, message: dict):
         parent_cls = BaseDetection(message=message)
@@ -78,7 +81,7 @@ class SXLobby:
         self.stream_id = parent_cls.get_key("tableID") or self.stream_id
         self.player_count = parent_cls.get_key("betCount") or self.player_count
         self.player_value = parent_cls.get_key("betCurrent") or self.player_value
-        self.status = self._get_status(parent_cls.get_key("eventType")) or self.status
+        self._update_status(self._get_status(parent_cls.get_key("eventType")))
         self.actual_result = self._get_actual_result(parent_cls.get_key("winCounts"))
         self.total_B, self.total_P, self.total_T = (self._get_win_counts(parent_cls.get_key("winCounts"))
                                                     or [self.total_B, self.total_P, self.total_T])
@@ -105,6 +108,23 @@ class SXLobby:
         self.stamp_time = parent_cls.ms_to_dt("stampTime") or self.stamp_time
         self.round_start_time = parent_cls.ms_to_dt("roundStartTime") or self.round_start_time
         self.repaint_time = parent_cls.ms_to_dt("repaintTime") or self.repaint_time
+
+    def _update_status(self, event_status):
+        """Trạng thái gắn với ván (shoe, round), không mang sang ván khác.
+
+        Message của ván mới (gameRound đổi) thường đến TRƯỚC GP_NEW_GAME_START của nó; nếu giữ status cũ thì tick đầu của ván
+        mới mang SUMMARY_RESULT / GET_RESULT của ván trước, và api (chỉ cho status tiến) không bao giờ nhận IN_PROGRESS của ván mới.
+        Message muộn của ván cũ (GP_WINNER, kết quả) đưa round lùi lại: khôi phục đúng status đã biết của ván đó.
+        """
+        key = (self.stream_shoe, self.stream_round)
+        if key != self._current_round:
+            self._current_round = key
+            self.status = self._round_status.get(key)
+        if event_status:
+            self.status = event_status
+            self._round_status[key] = event_status
+            while len(self._round_status) > 8:   # chỉ cần vài ván gần nhất
+                self._round_status.pop(next(iter(self._round_status)))
 
     def _get_streamer(self, dealer_id):
         if dealer_id is None:
@@ -187,4 +207,4 @@ class SXLobby:
     def shot_message(self):
         if self._is_missing_fields():
             return None
-        return self.to_dict(self.__dict__)
+        return self.to_dict({k: v for k, v in self.__dict__.items() if not k.startswith("_")})
