@@ -1,7 +1,5 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { usePrediction } from "@/src/hooks/use-prediction";
 import { useI18n } from "@/src/i18n/provider";
 import { cn } from "@/src/lib/cn";
@@ -21,27 +19,6 @@ type Props = {
 
 const TONE_CLASS = { loss: "hud-result-loss", draw: "hud-result-draw" } as const;
 
-const WINNER_GIF_MS = 4400;   // winner.gif dài ~4.25s (lặp vô hạn): hiển thị hết một vòng rồi gỡ
-
-/** winner.gif hiện giữa màn hình (portal ra body, không nằm trong khung dự đoán): đã hiện thì chạy hết một vòng, không phụ thuộc trạng thái khác (ván mới, đổi phase...). Tính giờ từ lúc ảnh tải xong. */
-function WinnerOverlay({ onDone }: { onDone: () => void }) {
-  const img = useRef<HTMLImageElement>(null);
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const start = () => { if (!timer.current) timer.current = setTimeout(onDone, WINNER_GIF_MS); };
-  useEffect(() => {
-    if (img.current?.complete && img.current.naturalWidth > 0) start();   // ảnh đã có trong cache
-    return () => { if (timer.current) clearTimeout(timer.current); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-  return createPortal(
-    <div className="pointer-events-none fixed inset-0 z-[100] flex items-center justify-center" aria-hidden="true">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img ref={img} src="/images/winner.gif" alt="" onLoad={start} onError={onDone} className="max-h-[80vh] max-w-[90vw] select-none object-contain" />
-    </div>,
-    document.body,
-  );
-}
-
 /** Thanh trạng thái ở đầu khung: ảnh predict_status.png, nhãn nằm giữa ảnh. */
 function StatusBar({ label, dim = false, pulse = false }: { label: string; dim?: boolean; pulse?: boolean }) {
   return (
@@ -57,7 +34,7 @@ function StatusBar({ label, dim = false, pulse = false }: { label: string; dim?:
 
 /**
  * Khung dự đoán: Offline → chờ IN_PROGRESS (radar) → đang lấy dự đoán (radar) → có dự đoán → có kết quả
- * (nền thua đỏ đậm / hòa xám; thắng chỉ hiện winner.gif giữa màn hình).
+ * (nền thua đỏ đậm / hòa xám).
  */
 export function PredictionPanel({ streamId, connection, shoe, round, status, statusLabel, result }: Props) {
   const { t } = useI18n();
@@ -67,16 +44,9 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
   const tone = online && prediction && result !== null
     ? (result === "T" ? "draw" : prediction.pick === null ? null : prediction.pick === result ? "win" : "loss")
     : null;
-  // Thắng: bật hiệu ứng đúng một lần cho mỗi ván; sau đó tự chạy hết, không phụ thuộc tone / phase hiện tại
-  const winKey = tone === "win" ? `${shoe}:${round}` : null;
-  const celebratedRef = useRef<string | null>(null);
-  const [celebration, setCelebration] = useState<string | null>(null);
-  useEffect(() => {
-    if (winKey && celebratedRef.current !== winKey) { celebratedRef.current = winKey; setCelebration(winKey); }
-  }, [winKey]);
 
   return (
-    <HudCard glow className={cn("relative flex h-[236px] flex-col items-center justify-start overflow-hidden p-3", tone && tone !== "win" && TONE_CLASS[tone], tone === "loss" && "predict-shake")} aria-live="polite">
+    <HudCard glow className={cn("relative flex h-[236px] flex-col items-center justify-start overflow-hidden p-3", tone && tone !== "win" && TONE_CLASS[tone])} aria-live="polite">
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <DecorImage src="/images/pedestal-bg.png" className="h-full w-full object-cover opacity-70 mix-blend-screen" />
         <div className="absolute inset-0 bg-gradient-to-b from-red-600/10 via-transparent to-red-900/20" />
@@ -115,9 +85,8 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
             >
               <DecorImage src="/images/predict_and_rate.gif" className="absolute inset-0 h-full w-full select-none object-contain" />
               <div className="absolute left-[50.2%] top-[42.8%] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
-                <span className={cn("relative font-display font-black leading-none", tone === "loss" ? "predict-glitch" : "predict-pulse", prediction.pick === "P" ? "text-blue-400 drop-shadow-[0_0_14px_rgba(59,130,246,0.95)]" : prediction.pick === "B" ? "text-red-500 drop-shadow-[0_0_14px_rgba(255,30,66,0.95)]" : "text-gray-300")} style={{ fontSize: prediction.pick === null ? "9cqw" : "13cqw" }}>
+                <span className={cn("font-display font-black leading-none", "predict-pulse", prediction.pick === "P" ? "text-blue-400 drop-shadow-[0_0_14px_rgba(59,130,246,0.95)]" : prediction.pick === "B" ? "text-red-500 drop-shadow-[0_0_14px_rgba(255,30,66,0.95)]" : "text-gray-300")} style={{ fontSize: prediction.pick === null ? "9cqw" : "13cqw" }}>
                   {prediction.pick ?? "—"}
-                  {tone === "loss" && <span className="predict-strike" aria-hidden="true" />}
                 </span>
               </div>
               <div className="absolute left-1/2 top-[82%] flex w-[52%] -translate-x-1/2 -translate-y-1/2 items-center justify-center gap-1.5 whitespace-nowrap">
@@ -134,9 +103,6 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
           </>
         )
       )}
-      {/* Dự đoán sai: đỏ chớp một lần, khung rung, chữ dự đoán nhiễu rồi mờ và bị gạch chéo (không dùng chữ / ảnh) */}
-      {tone === "loss" && <div key={`${shoe}:${round}`} className="predict-flash pointer-events-none absolute inset-0 z-20" aria-hidden="true" />}
-      {celebration && <WinnerOverlay key={celebration} onDone={() => setCelebration((c) => (c === celebration ? null : c))} />}
     </HudCard>
   );
 }
