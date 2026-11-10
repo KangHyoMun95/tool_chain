@@ -129,8 +129,8 @@
 
 /* Panel dự đoán: khối predict_and_rate hiện từ ô tròn (giữa) lan ra ngoài; ký tự dự đoán to / nhỏ nhẹ tuần hoàn */
 @keyframes predict-reveal {
-  from { clip-path: circle(0% at 50% 36%); opacity: 0.2; }
-  to { clip-path: circle(80% at 50% 36%); opacity: 1; }
+  from { clip-path: circle(0% at 50.2% 42.8%); opacity: 0.2; }
+  to { clip-path: circle(80% at 50.2% 42.8%); opacity: 1; }
 }
 @keyframes predict-pulse {
   0%, 100% { transform: scale(1); }

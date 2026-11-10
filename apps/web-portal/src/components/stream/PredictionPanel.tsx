@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { usePrediction } from "@/src/hooks/use-prediction";
 import { useI18n } from "@/src/i18n/provider";
 import { cn } from "@/src/lib/cn";
@@ -18,6 +19,22 @@ type Props = {
 };
 
 const TONE_CLASS = { win: "hud-result-win", loss: "hud-result-loss", draw: "hud-result-draw" } as const;
+
+const WINNER_GIF_MS = 4400;   // winner.gif dài ~4.25s (lặp vô hạn): hiển thị hết một vòng rồi gỡ
+
+/** winner.gif: đã hiện thì chạy hết một vòng, không phụ thuộc trạng thái khác (ván mới, đổi phase...). Tính giờ từ lúc ảnh tải xong. */
+function WinnerOverlay({ onDone }: { onDone: () => void }) {
+  const img = useRef<HTMLImageElement>(null);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const start = () => { if (!timer.current) timer.current = setTimeout(onDone, WINNER_GIF_MS); };
+  useEffect(() => {
+    if (img.current?.complete && img.current.naturalWidth > 0) start();   // ảnh đã có trong cache
+    return () => { if (timer.current) clearTimeout(timer.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img ref={img} src="/images/winner.gif" alt="" aria-hidden="true" onLoad={start} onError={onDone} className="pointer-events-none absolute inset-0 z-30 h-full w-full select-none object-contain" />;
+}
 
 /** Thanh trạng thái ở đầu khung: ảnh predict_status.png, nhãn nằm giữa ảnh. */
 function StatusBar({ label, dim = false, pulse = false }: { label: string; dim?: boolean; pulse?: boolean }) {
@@ -44,12 +61,20 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
   const tone = online && prediction && result !== null
     ? (result === "T" ? "draw" : prediction.pick === null ? null : prediction.pick === result ? "win" : "loss")
     : null;
+  // Thắng: bật hiệu ứng đúng một lần cho mỗi ván; sau đó tự chạy hết, không phụ thuộc tone / phase hiện tại
+  const winKey = tone === "win" ? `${shoe}:${round}` : null;
+  const celebratedRef = useRef<string | null>(null);
+  const [celebration, setCelebration] = useState<string | null>(null);
+  useEffect(() => {
+    if (winKey && celebratedRef.current !== winKey) { celebratedRef.current = winKey; setCelebration(winKey); }
+  }, [winKey]);
+  const celebrating = celebration !== null;
   const verdict = tone === "win" ? t("live.win") : tone === "loss" ? t("live.lose") : t("live.tie");
 
   return (
-    <HudCard glow className={cn("relative flex min-h-[300px] flex-col items-center justify-start overflow-hidden p-4", tone && TONE_CLASS[tone])} aria-live="polite">
+    <HudCard glow className={cn("relative flex min-h-[300px] flex-col items-center justify-start overflow-hidden p-4", celebrating ? TONE_CLASS.win : tone && TONE_CLASS[tone])} aria-live="polite">
       {/* Thắng: nền xanh #127CE2 (ẩn ảnh nền) để winner.gif trong suốt đè lên khối dự đoán */}
-      <div className={cn("pointer-events-none absolute inset-0 z-0 overflow-hidden", tone === "win" && "hidden")}>
+      <div className={cn("pointer-events-none absolute inset-0 z-0 overflow-hidden", celebrating && "hidden")}>
         <DecorImage src="/images/pedestal-bg.png" className="h-full w-full object-cover opacity-70 mix-blend-screen" />
         <div className="absolute inset-0 bg-gradient-to-b from-red-600/10 via-transparent to-red-900/20" />
       </div>
@@ -86,8 +111,8 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
               style={{ containerType: "inline-size" }}
             >
               <DecorImage src="/images/predict_and_rate.png" className="absolute inset-0 h-full w-full select-none object-contain" />
-              <div className="absolute left-1/2 top-[36%] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
-                <span className="predict-pulse font-display font-black leading-none text-white drop-shadow-[0_0_14px_rgba(255,255,255,0.9)]" style={{ fontSize: prediction.pick === null ? "9cqw" : "13cqw" }}>
+              <div className="absolute left-[50.2%] top-[42.8%] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
+                <span className={cn("predict-pulse font-display font-black leading-none", prediction.pick === "P" ? "text-blue-400 drop-shadow-[0_0_14px_rgba(59,130,246,0.95)]" : prediction.pick === "B" ? "text-red-500 drop-shadow-[0_0_14px_rgba(255,30,66,0.95)]" : "text-gray-300")} style={{ fontSize: prediction.pick === null ? "9cqw" : "13cqw" }}>
                   {prediction.pick ?? "—"}
                 </span>
               </div>
@@ -112,9 +137,7 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
           </>
         )
       )}
-      {tone === "win" && (
-        <DecorImage key={`win:${shoe}:${round}`} src="/images/winner.gif" className="pointer-events-none absolute inset-0 z-30 h-full w-full select-none object-contain" />
-      )}
+      {celebration && <WinnerOverlay key={celebration} onDone={() => setCelebration((c) => (c === celebration ? null : c))} />}
     </HudCard>
   );
 }
