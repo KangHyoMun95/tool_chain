@@ -76,7 +76,7 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
   }, [winKey]);
 
   return (
-    <HudCard glow className={cn("relative flex min-h-[300px] flex-col items-center justify-start overflow-hidden p-4", tone && tone !== "win" && TONE_CLASS[tone])} aria-live="polite">
+    <HudCard glow className={cn("relative flex min-h-[220px] flex-col items-center justify-start overflow-hidden p-3", tone && tone !== "win" && TONE_CLASS[tone])} aria-live="polite">
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <DecorImage src="/images/pedestal-bg.png" className="h-full w-full object-cover opacity-70 mix-blend-screen" />
         <div className="absolute inset-0 bg-gradient-to-b from-red-600/10 via-transparent to-red-900/20" />
@@ -90,7 +90,7 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
       ) : phase === "waiting" || phase === "analyzing" ? (
         <>
           <StatusBar pulse={phase === "analyzing"} label={phase === "analyzing" ? t("live.analyzing") : statusLabel} />
-          <div className="relative z-10 my-2"><Radar /></div>
+          <div className="relative z-10 my-2"><Radar size={130} /></div>
           <p className="relative z-10 flex items-center gap-2 font-mono text-xs font-black uppercase tracking-widest text-red-400 drop-shadow-[0_0_8px_#ff0038]">
             <span className="h-1.5 w-1.5 animate-ping rounded-full bg-neon" />
             <span className="animate-pulse">{t(phase === "analyzing" ? "live.scanning" : "live.loadingData")}</span>
@@ -110,7 +110,7 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
             {/* predict_and_rate.gif (sát đáy khung): ô tròn (giữa, phía trên) chứa dự đoán, ô dưới chứa phần trăm. Hiện từ trong ra ngoài khi có dự đoán. */}
             <div
               key={`${shoe}:${round}`}
-              className="predict-reveal relative z-10 -mb-4 mt-auto aspect-[828/304] w-full max-w-[400px]"
+              className="predict-reveal relative z-10 -mb-3 mt-auto aspect-[828/304] w-full max-w-[400px]"
               style={{ containerType: "inline-size" }}
             >
               <DecorImage src="/images/predict_and_rate.gif" className="absolute inset-0 h-full w-full select-none object-contain" />
