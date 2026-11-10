@@ -39,6 +39,15 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       entities,
       synchronize: false,
       migrationsRun: false,
+      // Không để một kết nối nửa chết làm treo vĩnh viễn (pg không có timeout mặc định).
+      extra: {
+        connectionTimeoutMillis: 10_000,
+        statement_timeout: 20_000,   // phía server
+        query_timeout: 25_000,       // phía client: vẫn báo lỗi khi socket chết (server không nhận được lệnh hủy)
+        idle_in_transaction_session_timeout: 30_000,
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10_000,
+      },
       installExtensions: false,   // id uuid dùng gen_random_uuid() của Postgres; không để TypeORM tự cài extension
     }),
     RedisModule,
