@@ -28,7 +28,7 @@ export type PredictionStats = {
   draws: number;                   // kết quả T: không tính thắng / thua
   win_rate: number | null;         // wins / (wins + losses), 0–1; null khi shoe hiện tại chưa có ván nào để tính
   win_streak: number;              // số dự đoán thắng liên tiếp tính từ ván mới nhất (bỏ qua ván hòa), xét trong STATS_STREAK_WINDOW dự đoán
-  shoes: {                         // tỷ lệ thắng của từng shoe trong STATS_SHOES shoe gần nhất (gồm shoe hiện tại), cũ → mới
+  shoes: {                         // tỷ lệ thắng của từng shoe QUÁ KHỨ (không gồm shoe hiện tại), tối đa STATS_SHOES shoe gần nhất, cũ → mới
     shoe: number; wins: number; losses: number; draws: number; win_rate: number;
   }[];
 };
@@ -118,7 +118,7 @@ export class PredictionsService {
        WHERE p.stream_id = $1 AND p.predict_result IS NOT NULL AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
        GROUP BY gs.road_shoe
        ORDER BY max(p.created_at) DESC LIMIT $2`,
-      [streamId, STATS_SHOES]);   // mới → cũ
+      [streamId, STATS_SHOES + 1]);   // mới → cũ
     const perShoe = rows.map((r) => {
       const wins = Number(r.wins), losses = Number(r.losses);
       return { shoe: Number(r.shoe), wins, losses, draws: Number(r.draws), win_rate: wins + losses > 0 ? wins / (wins + losses) : null };
@@ -143,7 +143,7 @@ export class PredictionsService {
       wins: now?.wins ?? 0, losses: now?.losses ?? 0, draws: now?.draws ?? 0,
       win_rate: now?.win_rate ?? null,
       win_streak: streak,
-      shoes: perShoe.filter((r) => r.win_rate !== null).reverse() as PredictionStats["shoes"],
+      shoes: perShoe.filter((r) => r.shoe !== currentShoe && r.win_rate !== null).slice(0, STATS_SHOES).reverse() as PredictionStats["shoes"],
     };
   }
 

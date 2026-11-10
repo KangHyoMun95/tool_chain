@@ -53,7 +53,6 @@ function StreamDetail({ stream }: { stream: Stream }) {
     () => (stats?.shoes ?? []).map((r) => ({ key: String(r.shoe), label: `#${r.shoe}`, value: Math.round(r.win_rate * 1000) / 10 })),
     [stats],
   );
-  const evaluated = stats ? stats.wins + stats.losses : 0;
   const streak = stats?.win_streak ?? 0;
 
   return (
@@ -77,7 +76,6 @@ function StreamDetail({ stream }: { stream: Stream }) {
               <span className="mt-1 font-mono text-2xl font-black tracking-tight text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.5)] md:text-3xl">
                 {stats?.win_rate == null ? "—" : `${(stats.win_rate * 100).toFixed(1)}%`}
               </span>
-              <span className="font-mono text-[9px] text-gray-400">{t("live.winRateSample", { count: evaluated })}</span>
             </HudCard>
             <HudCard className="flex flex-col justify-between p-3 text-center">
               <span className="font-mono text-[10px] font-bold uppercase text-gray-300 md:text-[11px]">{t("live.winStreak")}</span>
