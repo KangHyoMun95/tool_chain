@@ -14,14 +14,20 @@ import { RealtimeHub } from "../realtime/realtime.hub.js";
 import { predictionId } from "./prediction-id.js";
 import { parsePredictResult } from "./predict-result.schema.js";
 import { PredictionsService } from "./predictions.service.js";
-import { TRIGGER_BLOCK_MS, TRIGGER_READ_COUNT, TRIGGER_RETRY_DELAY_MS } from "./predictions.constants.js";
+import {
+  PERSIST_HANDLE_TIMEOUT_MS, PERSIST_SLOW_WARN_MS, REDIS_COMMAND_TIMEOUT_MS, REDIS_KEEPALIVE_MS,
+  TRIGGER_BLOCK_MS, TRIGGER_READ_COUNT, TRIGGER_RETRY_DELAY_MS,
+} from "./predictions.constants.js";
 
 const PG_FOREIGN_KEY_VIOLATION = "23503";   // stream_id không còn trong streams: retry vô ích
 
 @Injectable()
 export class PredictResultConsumer implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly log = new Logger(PredictResultConsumer.name);
-  private conn = new Redis(process.env.REDIS_URL!);      // kết nối riêng vì sẽ BLOCK
+  private conn = new Redis(process.env.REDIS_URL!, {   // kết nối riêng vì sẽ BLOCK
+    commandTimeout: REDIS_COMMAND_TIMEOUT_MS,    // lệnh treo (kết nối nửa chết) thì báo lỗi để loop thử lại thay vì kẹt vĩnh viễn
+    keepAlive: REDIS_KEEPALIVE_MS,
+  });
   private running = true;
   private consumer = process.env.CONSUMER_NAME ?? hostname();   // cố định qua các lần restart
 
@@ -58,7 +64,7 @@ export class PredictResultConsumer implements OnApplicationBootstrap, OnModuleDe
         if (entries.length === 0) continue;
 
         for (const [id, fields] of entries) {
-          await this.handle(fields);
+          await this.handleWithTimeout(id, fields);
           await this.conn.xack(PREDICT_RESULT_STREAM, PREDICT_PERSIST_GROUP, id);   // chỉ sau khi đã xử lý xong (và commit)
           if (replaying) cursor = id;
         }
@@ -70,6 +76,24 @@ export class PredictResultConsumer implements OnApplicationBootstrap, OnModuleDe
         cursor = "0";
       }
     }
+  }
+
+  /** Giới hạn thời gian cho một message: quá hạn ⇒ ném lỗi, loop thử lại từ PEL (insert idempotent). Query treo bị statement_timeout của pg cắt. */
+  private async handleWithTimeout(id: string, fields: string[]): Promise<void> {
+    const started = Date.now();
+    let timer: NodeJS.Timeout | undefined;
+    try {
+      await Promise.race([
+        this.handle(fields),
+        new Promise<never>((_, reject) => {
+          timer = setTimeout(() => reject(new Error(`predict:results ${id}: xử lý quá ${PERSIST_HANDLE_TIMEOUT_MS}ms`)), PERSIST_HANDLE_TIMEOUT_MS);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+    const took = Date.now() - started;
+    if (took >= PERSIST_SLOW_WARN_MS) this.log.warn(`predict:results ${id}: xử lý chậm ${took}ms`);
   }
 
   /** Lỗi tạm thời (DB / Redis sập) ném ra để loop thử lại; message hỏng hoặc quá hạn chỉ bị bỏ qua (caller vẫn XACK). */

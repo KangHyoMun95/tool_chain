@@ -154,6 +154,7 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 - Khi khởi động: đọc PEL của chính mình (`XREADGROUP ... STREAMS key 0`) cho hết, sau đó mới đọc `>`.
 - **Chỉ `XACK` sau khi DB đã commit.**
 - Mọi handler phải **idempotent**, vì message có thể được xử lý lại.
+- **Giới hạn thời gian:** consumer là vòng lặp tuần tự nên một `await` treo sẽ chặn mọi message. Vì vậy pool pg đặt `connectionTimeoutMillis`, `statement_timeout`, `query_timeout`, `idle_in_transaction_session_timeout`, keepalive (`app.module.ts`); `predict-persist` bọc mỗi message trong `PERSIST_HANDLE_TIMEOUT_MS` (quá hạn ⇒ ném lỗi, loop thử lại từ PEL) và log WARN khi chậm hơn `PERSIST_SLOW_WARN_MS`; kết nối Redis của consumer có `commandTimeout` (> `TRIGGER_BLOCK_MS`) và keepalive.
 - Danh sách consumer group hiện có: `persist` (ingestion, trên `ticks`), `predict-trigger`, `predict-persist` (api), `ai-counter`, `ai-predictor` (ai). Mỗi group một consumer cố định (`CONSUMER_NAME` cho api, `AI_CONSUMER_NAME` cho ai).
 
 ---

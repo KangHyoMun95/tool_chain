@@ -11,6 +11,10 @@ export const STATS_SHOES = 10;                        // số shoe gần nhất 
 export const TRIGGER_READ_COUNT = 200;
 export const TRIGGER_BLOCK_MS = 2_000;
 export const TRIGGER_RETRY_DELAY_MS = 1_000;
+export const PERSIST_HANDLE_TIMEOUT_MS = 15_000;      // một message predict:results xử lý quá lâu thì bỏ dở và thử lại (không để kẹt cả consumer)
+export const PERSIST_SLOW_WARN_MS = 3_000;            // log WARN khi một message xử lý lâu hơn mức này
+export const REDIS_COMMAND_TIMEOUT_MS = 15_000;       // phải lớn hơn TRIGGER_BLOCK_MS (XREADGROUP BLOCK)
+export const REDIS_KEEPALIVE_MS = 10_000;
 export const TRIGGER_LOG_INTERVAL_MS = 60_000;        // log INFO/WARN lặp lại tối đa 1 lần / phút cho mỗi khóa
 
 // Trạng thái chỉ tiến. Phải khớp bảng rank trong script advanceRoundStatus (predict-lua.ts).
