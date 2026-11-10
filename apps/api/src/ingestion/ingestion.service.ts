@@ -14,6 +14,7 @@ import { gameSessionId } from "../game-sessions/game-session-id.js";
 import { BoundedMap } from "./bounded-map.js";
 import { IdCache } from "./id-cache.service.js";
 import { ShoeObserver } from "./shoe-observer.js";
+import { SettleQueue } from "../billing/settle-queue.service.js";
 import { pgErrorCode } from "./dead-letter.js";
 import { INVALID_LOG_INTERVAL_MS, MAX_NAME_LENGTH, MAX_RESULT_LENGTH, MEMORY_CACHE_MAX } from "./ingestion.constants.js";
 
@@ -51,6 +52,7 @@ export class IngestionService {
     private streams: StreamsService,
     private streamInfo: StreamInformationService,
     private gameSessions: GameSessionsService,
+    private settle: SettleQueue,
   ) {}
 
   /** Ghi một batch tick trong một DB transaction. Ném lỗi nếu ghi thất bại (caller giữ buffer, không XACK). */
@@ -203,6 +205,7 @@ export class IngestionService {
     const newCache: [string, string][] = [];
     let infoWrites: { streamId: string; streamer: string }[] = [];
     let sessionState: [string, SessionState][] = [];
+    let finished: string[] = [];
 
     await this.ds.transaction(async (m) => {
       // lobbies → categories → streams
@@ -247,23 +250,31 @@ export class IngestionService {
       await this.streamInfo.upsertMany(m, infoWrites.map((w) => ({ streamId: w.streamId, streamerId: w.streamer })));
 
       // game_sessions
-      sessionState = await this.writeSessions(m, todo, streamIds);
+      ({ state: sessionState, finished } = await this.writeSessions(m, todo, streamIds));
     });
 
     // Commit xong mới cập nhật cache.
     await this.ids.setMany(newCache);
     for (const w of infoWrites) this.streamers.set(w.streamId, w.streamer);
     for (const [id, st] of sessionState) this.sessions.set(id, st);
+    // Ván vừa FINISHED → settlement (hoàn tiền nếu dự đoán sai). Không ném lỗi: batch đã commit, retry không gửi lại được
+    // (ván đã có result) — sweeper sẽ gửi bù sau vài phút.
+    if (finished.length > 0) {
+      await this.settle.enqueue(finished, "FINISHED")
+        .catch((e) => this.log.error(`Không gửi được settle:requests cho ${finished.length} ván FINISHED (sweeper sẽ gửi bù): ${e}`));
+    }
   }
 
-  private async writeSessions(m: EntityManager, todo: SessionGroup[], streamIds: Map<string, string>): Promise<[string, SessionState][]> {
-    if (todo.length === 0) return [];
+  private async writeSessions(
+    m: EntityManager, todo: SessionGroup[], streamIds: Map<string, string>,
+  ): Promise<{ state: [string, SessionState][]; finished: string[] }> {
+    if (todo.length === 0) return { state: [], finished: [] };
     await this.gameSessions.insertMany(m, todo.map((g) => ({ id: g.id, streamId: streamIds.get(g.keyId)!, shoe: g.shoe, round: g.round })));
 
     const withResult = todo.filter((g): g is SessionGroup & { result: string } => g.result !== null);
-    const { stored, cancelled } = await this.gameSessions.applyResults(m, withResult.map((g) => ({ id: g.id, result: g.result })));
+    const { stored, cancelled, finished } = await this.gameSessions.applyResults(m, withResult.map((g) => ({ id: g.id, result: g.result })));
 
-    return todo.map((g) => {
+    const state = todo.map((g) => {
       if (cancelled.has(g.id)) {
         this.log.warn(`Ván ${g.id} (stream "${g.stream}", shoe ${g.shoe}, round ${g.round}) đã CANCELLED nhưng nhận result "${g.result}", không cập nhật`);
         return [g.id, { result: null, cancelled: true }] as [string, SessionState];
@@ -275,6 +286,7 @@ export class IngestionService {
       }
       return [g.id, { result: existing ?? null }] as [string, SessionState];
     });
+    return { state, finished };
   }
 
   private warnConflict(id: string, stored: string, incoming: string) {

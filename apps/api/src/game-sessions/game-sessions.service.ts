@@ -9,6 +9,7 @@ export type SessionResult = { id: string; result: string };
 export type ApplyResultsOutcome = {
   stored: Map<string, string>;   // id → result đang lưu trong DB (ván có result)
   cancelled: Set<string>;        // id của ván đã CANCELLED, chưa có result: không cập nhật
+  finished: string[];            // id của ván VỪA được ghi result + FINISHED bởi câu UPDATE này (gửi settlement sau commit)
 };
 
 @Injectable()
@@ -58,17 +59,18 @@ export class GameSessionsService {
    * Không bao giờ ghi đè result đã có; ván CANCELLED không được cập nhật.
    */
   async applyResults(m: EntityManager, items: SessionResult[]): Promise<ApplyResultsOutcome> {
-    const out: ApplyResultsOutcome = { stored: new Map(), cancelled: new Set() };
+    const out: ApplyResultsOutcome = { stored: new Map(), cancelled: new Set(), finished: [] };
     if (items.length === 0) return out;
     const ids = items.map((i) => i.id);
     const updated: { id: string }[] = await m.query(
-      `UPDATE game_sessions g SET result = v.result, status = $3
+      `UPDATE game_sessions g SET result = v.result, status = $3, ended_at = now()
        FROM unnest($1::uuid[], $2::varchar[]) AS v(id, result)
        WHERE g.game_session_id = v.id AND g.result IS NULL AND g.status <> $4
        RETURNING g.game_session_id AS id`,
       [ids, items.map((i) => i.result), GameSessionStatus.FINISHED, GameSessionStatus.CANCELLED],
     );
     const written = new Set(updated.map((r) => r.id));
+    out.finished = [...written];
     for (const it of items) if (written.has(it.id)) out.stored.set(it.id, it.result);
 
     const rest = ids.filter((id) => !written.has(id));

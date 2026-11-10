@@ -47,6 +47,7 @@ tool_chain/
 │   │       ├── cli/                       # create-user / create-host
 │   │       ├── ingestion/                 # luồng ghi DB theo batch: tick-persister + IngestionService điều phối
 │   │       ├── lobbies/ categories/ streams/ stream-information/ game-sessions/   # mỗi bảng một service upsert
+│   │       ├── billing/                   # trừ tiền (charge trong transaction prediction), settlement (settle:requests), job hủy ván, sweeper
 │   │       ├── predictions/               # luồng dự đoán: trigger (ticks → predict:requests / ai:results), consumer predict:results → DB + SSE, GET current
 │   │       ├── ticks/                     # bản cũ, giữ để so sánh, KHÔNG đăng ký trong AppModule
 │   │       └── realtime/                  # luồng SSE đẩy xuống client
@@ -57,7 +58,8 @@ tool_chain/
 ├── db/migrations/           # Flyway SQL migration (nguồn sự thật của schema)
 ├── packages/shared/src/     # type/contract dùng chung TS
 │   ├── realtime.ts          # schema event realtime + RedisKeys
-│   └── ai.ts                # contract 3 stream dự đoán (predict:requests, ai:results, predict:results)
+│   ├── ai.ts                # contract 3 stream dự đoán (predict:requests, ai:results, predict:results)
+│   └── settle.ts            # contract stream settle:requests (api → api, hoàn tiền)
 ├── docker-compose.yml
 └── .env
 ```
@@ -94,15 +96,15 @@ crawler → Redis "ticks" → api (PredictTriggerService)
    └─ tick đầu tiên có actual_result    → recent:* + ai:results ─► AI (cập nhật bảng đếm)
                                                       api: kiểm tra hạn chót → lưu predictions (DB) → SSE public
 ```
-Chưa làm (phase 1 còn lại, theo mô hình trên):
+Billing (xem mục **Billing** bên dưới):
 ```
-dự đoán đã có
-   → billing: trừ điểm các participant đang hoạt động
-   → SSE: chỉ đẩy predict_result cho user đã trừ thành công (hiện đang đẩy kênh public)
-
-crawler có result → cập nhật game_session (FINISHED) → settlement: hoàn điểm nếu dự đoán sai
-stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn điểm toàn bộ
+prediction mới có pick → trừ tiền participant (cùng transaction với INSERT prediction)
+ingestion ghi result + FINISHED (commit) ─┐
+job hủy ván RUNNING quá X phút → CANCELLED ┼─► settle:requests ─► SettlementConsumer → hoàn tiền (refunded_at IS NULL)
+sweeper (mỗi phút, gửi bù tín hiệu bị mất) ┘
 ```
+Chưa làm: participant thật (kết nối SSE tham gia trong RAM của hub — hiện `PARTICIPANT_SOURCE` trả rỗng nên chưa ai bị trừ),
+giao pick riêng cho user đã trừ (hiện vẫn đẩy kênh public), portal.
 
 ### key_id, payload crawler & ingestion
 - `key_id` = `<lobby_name>|<category_name>|<stream_name>` đã chuẩn hóa. **Chỉ là khóa cache / phòng realtime (`item_id` của tick), KHÔNG lưu DB** (không có cột `streams.key_id`). Tên chứa `|` bị coi là tick lỗi.
@@ -117,7 +119,7 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 - **Ghi `result` và set `FINISHED` trong cùng một câu UPDATE** (atomic): `UPDATE game_sessions SET result = ?, status = 'FINISHED' WHERE game_session_id = ? AND result IS NULL AND status <> 'CANCELLED'`. **Không bao giờ ghi đè `result`**: tick báo result khác result đã lưu → log cảnh báo, giữ nguyên. Ván `CANCELLED` nhận result → không cập nhật, log WARN (kèm stream, shoe, round). Đây là chuyển trạng thái **duy nhất** ingestion được làm (RUNNING → FINISHED); `FINISHED` là trạng thái cuối, không được đổi lại; các chuyển trạng thái khác (vd `CANCELLED`) do job kiểm tra status quản lý.
 - `stream_information`: một dòng cho mỗi stream (unique `stream_id`), chỉ ghi khi `streamer_id` đổi.
 - Batch: gộp tick theo `(stream, stream_round)` giữ bản mới nhất (giữ result nếu có), ghi theo thứ tự lobbies → categories → streams → stream_information → game_sessions trong **một DB transaction**, chỉ `XACK` sau khi commit. Tick lỗi validate: log, bỏ qua (vẫn XACK). Lỗi DB: giữ buffer, thử lại.
-- Tự kiểm tra: `apps/api/scripts/publish-sample-tick.mjs` (bắn tick mẫu) và `apps/api/scripts/ingestion-check.sql` (đếm dòng).
+- Tự kiểm tra: `apps/api/scripts/billing-sim.mjs` (bắn tick mẫu IN_PROGRESS → result có chờ, giả lập trừ tiền — chỉ local).
 
 ### Luồng dự đoán AI (pattern-v1)
 - **3 Redis Stream** (contract ở `packages/shared/src/ai.ts` ↔ `apps/ai/src/patterns/contract.py`, `MAXLEN ~ 10000`):
@@ -135,6 +137,13 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 - **Lưu DB:** bảng `predictions` (V9): `predict_result` cho phép NULL (CHECK B/P), `detail jsonb` = `{chosen, rows, history_used, missing_previous}`, `model_version`, `reason`; CHECK: có `predict_result` khi và chỉ khi `reason = 'OK'`, `confidence_score` trong 0..1. Trước khi insert, api `INSERT game_sessions ... ON CONFLICT DO NOTHING` trong cùng transaction (khóa ngoại; ván có thể còn trong batch của ingestion), rồi `INSERT predictions ... ON CONFLICT (game_session_id) DO NOTHING RETURNING`; chỉ khi thêm dòng mới mới đẩy SSE.
 - **SSE prediction:** event `type: "prediction"` (`RealtimePrediction` ở `packages/shared`) đẩy tới phòng `key_id`, không chứa `detail`; tick giờ có `type: "tick"` (client coi event thiếu `type` là tick). ⚠️ **Prediction đang đi kênh public — PHẢI chuyển sang kênh riêng theo user trước khi làm billing** (xem mục SSE bên dưới).
 - **API đọc:** `GET /api/streams/:id/predictions/current` — prediction mới nhất của stream (theo thời điểm tạo) kèm `shoe`, `round`, `confidence` 0–1, không có `detail`; phạm vi nhìn thấy như `GET /streams/:id`; 404 khi chưa có prediction. Portal phải so `(shoe, round)` với ván đang xem.
+
+### Billing (trừ tiền / hoàn tiền) — `apps/api/src/billing/`
+- **Phí:** env `PREDICTION_FEE` (số nguyên > 0, bắt buộc; thiếu / sai thì API dừng). `fee_amount` lưu giá lúc trừ. Chỉ role **USER** bị trừ.
+- **Trừ tiền** (`BillingService.charge`, gọi trong transaction của `PredictionsService.insertFromResult`): chỉ khi INSERT prediction thêm dòng MỚI và `pick != null`. Snapshot user_id DISTINCT của participant (`PARTICIPANT_SOURCE`) lấy ngay trước transaction. Thứ tự: `SELECT ... FROM game_sessions ... FOR SHARE` (ván phải còn `RUNNING`, nếu không thì không trừ — để settlement không thể chạy xong trước khi subscription commit) → khóa users `ORDER BY user_id FOR UPDATE` → `UPDATE users ... WHERE balance >= fee AND status = 'ACTIVE' AND role USER RETURNING` → `prediction_subscriptions` (`ON CONFLICT DO NOTHING`, số dòng phải bằng số user bị trừ, lệch ⇒ ném lỗi rollback) → `transactions CHARGE`. Participant không trừ được trả về `rejected` (`INSUFFICIENT_BALANCE` / `NOT_ALLOWED`).
+- **Settlement:** stream `settle:requests` (`packages/shared/src/settle.ts`, `{game_session_id, reason: FINISHED|CANCELLED}`, `MAXLEN ~ 10000`), group `settle`, `SettlementConsumer` (PEL trước rồi `>`, timeout mỗi tin, XACK sau commit). `BillingService.refund`: một transaction — chọn subscription `refunded_at IS NULL` của ván `CANCELLED` hoặc `FINISHED` có `result <> predict_result` (kết quả `T` luôn được hoàn) `FOR UPDATE OF ps` → khóa users theo `user_id` tăng dần → một câu CTE: set `refunded_at`, cộng `fee_amount`, ghi `transactions REFUND` (balance_before / after từ RETURNING). Hoàn cho cả user đã DEACTIVE / DELETED. Idempotent: chạy lại không hoàn trùng.
+- **Nguồn tín hiệu:** ingestion gửi sau khi batch COMMIT cho các ván vừa được set result + FINISHED (RETURNING của câu UPDATE; lỗi Redis chỉ log, sweeper gửi bù); câu UPDATE đó cũng set `game_sessions.ended_at`. **Job hủy ván** (`GameSessionCancelJob`, mỗi phút, **chỉ chạy khi `GAME_SESSION_CANCEL_ENABLED=true`**, mặc định tắt): `UPDATE ... SET status = 'CANCELLED', ended_at = now()` cho ván `RUNNING`, `result IS NULL`, `created_at` cũ hơn `GAME_SESSION_CANCEL_AFTER_MINUTES` (mặc định 5), tối đa 1000 ván / lần, `FOR UPDATE SKIP LOCKED`; chỉ gửi settlement cho ván có subscription chưa hoàn. **Sweeper** (`SettleSweeperJob`, mỗi phút): ván FINISHED / CANCELLED hơn 2 phút (`COALESCE(ended_at, created_at)`) còn subscription đủ điều kiện hoàn, subscription tạo trong 7 ngày; `SET settle_req:{gsid} NX EX 300` trước khi XADD (SET thất bại thì bỏ qua). Có log WARN của sweeper nghĩa là có tín hiệu bị mất.
+- Job dùng `setInterval` (không thêm `@nestjs/schedule`: bản hiện tại đòi Node >= 20.19 và kéo theo thay đổi lockfile của web-admin).
 
 ### Stream detail realtime (web-portal `/streams/[streamId]`)
 - **`stream_id` gắn vào event SSE:** `RealtimeHub.withStreamId()` thêm `stream_id` (UUID DB) vào tick từ cache `stream:{key_id}` (`RealtimeTick` ở `packages/shared`); cache miss ⇒ `null`, **không upsert** (ingestion tạo stream và ghi cache sau khi commit). `CacheWarmup` nạp sẵn cache này từ DB lúc API khởi động. Portal subscribe theo `key_id` (`buildKeyId` ở `packages/shared`, api re-export) và chấp nhận tick nếu `stream_id` khớp HOẶC `null`.
@@ -155,7 +164,7 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 - **Chỉ `XACK` sau khi DB đã commit.**
 - Mọi handler phải **idempotent**, vì message có thể được xử lý lại.
 - **Giới hạn thời gian:** consumer là vòng lặp tuần tự nên một `await` treo sẽ chặn mọi message. Vì vậy pool pg đặt `connectionTimeoutMillis`, `statement_timeout`, `query_timeout`, `idle_in_transaction_session_timeout`, keepalive (`app.module.ts`); `predict-persist` bọc mỗi message trong `PERSIST_HANDLE_TIMEOUT_MS` (quá hạn ⇒ ném lỗi, loop thử lại từ PEL) và log WARN khi chậm hơn `PERSIST_SLOW_WARN_MS`; kết nối Redis của consumer có `commandTimeout` (> `TRIGGER_BLOCK_MS`) và keepalive.
-- Danh sách consumer group hiện có: `persist` (ingestion, trên `ticks`), `predict-trigger`, `predict-persist` (api), `ai-counter`, `ai-predictor` (ai). Mỗi group một consumer cố định (`CONSUMER_NAME` cho api, `AI_CONSUMER_NAME` cho ai).
+- Danh sách consumer group hiện có: `persist` (ingestion, trên `ticks`), `predict-trigger`, `predict-persist`, `settle` (api, trên `settle:requests`), `ai-counter`, `ai-predictor` (ai). Mỗi group một consumer cố định (`CONSUMER_NAME` cho api, `AI_CONSUMER_NAME` cho ai).
 
 ---
 
@@ -183,10 +192,10 @@ stream tắt / crawler lỗi giữa ván → game_session (CANCELLED) → hoàn 
 | `categories` | category_id, category_name, lobby_id, created_at (default now), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `streams` | stream_id, stream_name, category_id, status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `stream_information` | stream_information_id, stream_id, streamer_id | `streamer_id` là **tên** người live (text), không phải FK |
-| `game_sessions` | game_session_id, stream_id, road_shoe (= stream_shoe), road_count (= stream_round), result, status, created_at | status: `RUNNING` → `FINISHED` \| `CANCELLED` |
+| `game_sessions` | game_session_id, stream_id, road_shoe (= stream_shoe), road_count (= stream_round), result, status, ended_at, created_at | status: `RUNNING` → `FINISHED` \| `CANCELLED`; `ended_at` = lúc sang FINISHED / CANCELLED (V10, dòng cũ NULL) |
 | `predictions` | prediction_id, stream_id, game_session_id (**unique**), predict_result (NULL khi AI không dự đoán), confidence_score, detail (jsonb), model_version, reason, created_at | mỗi ván của mỗi stream chỉ có 1 prediction; ghi bởi api (không phải AI) |
-| `stream_participants` | stream_participant_id, user_id, stream_id, last_seen_at, created_at | unique (user_id, stream_id) |
-| `prediction_subscriptions` | prediction_subscription_id, user_id, prediction_id, fee_amount, refunded_at, created_at | unique (user_id, prediction_id) |
+| `stream_connections` | stream_connection_id, user_id, stream_id, opened_at, last_ping_at, closed_at, close_reason | nhật ký kết nối SSE tham gia stream (V10); close_reason: `CLIENT_CLOSED` \| `PING_FAILED` \| `INSUFFICIENT_BALANCE` \| `SESSION_REVOKED` \| `SERVER_SHUTDOWN` \| `SERVER_RESTART`. Bảng `stream_participants` đã xóa (V11) |
+| `prediction_subscriptions` | prediction_subscription_id, user_id, prediction_id, fee_amount, delivered_at, refunded_at, created_at | unique (user_id, prediction_id); `delivered_at` = đẩy pick thành công (best effort) |
 | `transactions` | transaction_id, user_id, predictions_subscriptions_id (nullable), transaction_type, amount, balance_before, balance_after, created_by, created_at | |
 
 **Kiểu id:** mọi id là `UUID DEFAULT gen_random_uuid()` (V7), kể cả khóa ngoại; riêng `roles.role_id` giữ `SMALLINT`. Trong TS là `string`; DTO kiểm tra bằng `@IsUUID()`. `AppModule` đặt `installExtensions: false` cho TypeORM (không tự cài extension). Cache id trong Redis chứa giá trị không phải UUID (id số cũ) bị coi là cache miss.
@@ -225,9 +234,7 @@ Các quy tắc dưới đây **không được phá vỡ**. Nếu một yêu c�
 
 ## Participants & SSE
 
-- User tham gia stream thì upsert `stream_participants`. Rời stream, đóng kết nối hoặc mất heartbeat thì xóa.
-- Server gửi heartbeat SSE mỗi 10–15 giây và cập nhật `last_seen_at`.
-- Khi fan-out chỉ lấy participant có `last_seen_at > now() - 30s`, để không trừ tiền user đã rời đi mà server không nhận được tín hiệu.
+- Participant = kết nối SSE mở từ trang chi tiết stream, giữ trong RAM của hub (API chạy một instance); mỗi kết nối ghi một dòng `stream_connections` (đang làm, xem mục Billing). Bảng `stream_participants` cũ đã bỏ.
 - Được tham gia nhiều stream cùng lúc, mỗi stream trừ tiền riêng. Nhiều tab cùng một stream chỉ tính một lần.
 - `balance < fee` thì API chủ động đóng kết nối SSE của user và gửi event báo hết điểm trước khi đóng.
 

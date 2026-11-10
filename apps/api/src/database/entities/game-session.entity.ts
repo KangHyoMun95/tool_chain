@@ -11,5 +11,6 @@ export class GameSessionEntity {
   @Column({ name: "road_count", type: "integer", nullable: true }) roadCount!: number | null;
   @Column({ type: "varchar", length: 50, nullable: true }) result!: string | null;
   @Column({ length: 20, default: GameSessionStatus.RUNNING }) status!: GameSessionStatus;
+  @Column({ name: "ended_at", type: "timestamptz", nullable: true }) endedAt!: Date | null; // lúc sang FINISHED / CANCELLED
   @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
 }
