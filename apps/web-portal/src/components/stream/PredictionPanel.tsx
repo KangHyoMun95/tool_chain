@@ -51,7 +51,7 @@ function StatusBar({ label, dim = false, pulse = false }: { label: string; dim?:
 
 /**
  * Khung dự đoán: Offline → chờ IN_PROGRESS (radar) → đang lấy dự đoán (radar) → có dự đoán → có kết quả
- * (nền thắng xanh / thua đỏ đậm / hòa xám + nhãn THẮNG / THUA / HÒA).
+ * (nền thắng xanh / thua đỏ đậm / hòa xám, không hiện chữ kết quả trong khung).
  */
 export function PredictionPanel({ streamId, connection, shoe, round, status, statusLabel, result }: Props) {
   const { t } = useI18n();
@@ -69,7 +69,6 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
     if (winKey && celebratedRef.current !== winKey) { celebratedRef.current = winKey; setCelebration(winKey); }
   }, [winKey]);
   const celebrating = celebration !== null;
-  const verdict = tone === "win" ? t("live.win") : tone === "loss" ? t("live.lose") : t("live.tie");
 
   return (
     <HudCard glow className={cn("relative flex min-h-[300px] flex-col items-center justify-start overflow-hidden p-4", celebrating ? TONE_CLASS.win : tone && TONE_CLASS[tone])} aria-live="polite">
@@ -104,10 +103,10 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
           <>
             <StatusBar label={statusLabel} />
 
-            {/* predict_and_rate.png: ô tròn (giữa, phía trên) chứa dự đoán, ô dưới chứa phần trăm. Hiện từ trong ra ngoài khi có dự đoán. */}
+            {/* predict_and_rate.png (sát đáy khung): ô tròn (giữa, phía trên) chứa dự đoán, ô dưới chứa phần trăm. Hiện từ trong ra ngoài khi có dự đoán. */}
             <div
               key={`${shoe}:${round}`}
-              className="predict-reveal relative z-10 mt-1 aspect-[828/304] w-full max-w-[400px]"
+              className="predict-reveal relative z-10 -mb-4 mt-auto aspect-[828/304] w-full max-w-[400px]"
               style={{ containerType: "inline-size" }}
             >
               <DecorImage src="/images/predict_and_rate.png" className="absolute inset-0 h-full w-full select-none object-contain" />
@@ -127,13 +126,6 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
                 )}
               </div>
             </div>
-
-            {result !== null && tone && (
-              <div className="relative z-10 mt-1 flex items-center gap-3">
-                <span className="font-display text-4xl font-black text-white">{result}</span>
-                <span className="rounded-full border border-white/40 bg-black/50 px-4 py-1 font-display text-sm font-extrabold tracking-wider text-white">{verdict}</span>
-              </div>
-            )}
           </>
         )
       )}
