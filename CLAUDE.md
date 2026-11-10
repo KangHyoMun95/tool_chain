@@ -119,7 +119,6 @@ giao pick riêng cho user đã trừ (hiện vẫn đẩy kênh public), portal.
 - **Ghi `result` và set `FINISHED` trong cùng một câu UPDATE** (atomic): `UPDATE game_sessions SET result = ?, status = 'FINISHED' WHERE game_session_id = ? AND result IS NULL AND status <> 'CANCELLED'`. **Không bao giờ ghi đè `result`**: tick báo result khác result đã lưu → log cảnh báo, giữ nguyên. Ván `CANCELLED` nhận result → không cập nhật, log WARN (kèm stream, shoe, round). Đây là chuyển trạng thái **duy nhất** ingestion được làm (RUNNING → FINISHED); `FINISHED` là trạng thái cuối, không được đổi lại; các chuyển trạng thái khác (vd `CANCELLED`) do job kiểm tra status quản lý.
 - `stream_information`: một dòng cho mỗi stream (unique `stream_id`), chỉ ghi khi `streamer_id` đổi.
 - Batch: gộp tick theo `(stream, stream_round)` giữ bản mới nhất (giữ result nếu có), ghi theo thứ tự lobbies → categories → streams → stream_information → game_sessions trong **một DB transaction**, chỉ `XACK` sau khi commit. Tick lỗi validate: log, bỏ qua (vẫn XACK). Lỗi DB: giữ buffer, thử lại.
-- Tự kiểm tra: `apps/api/scripts/billing-sim.mjs` (bắn tick mẫu IN_PROGRESS → result có chờ, giả lập trừ tiền — chỉ local).
 
 ### Luồng dự đoán AI (pattern-v1)
 - **3 Redis Stream** (contract ở `packages/shared/src/ai.ts` ↔ `apps/ai/src/patterns/contract.py`, `MAXLEN ~ 10000`):
