@@ -26,7 +26,7 @@ function toTotals(d: CrawlPayload | undefined): Totals | null {
   return [B, P, T].every((x) => typeof x === "number" && Number.isFinite(x)) ? { B, P, T } : null;
 }
 
-/** Realtime + lịch sử của một stream. Tick đi qua useLiveItems (lọc theo stream_id), lịch sử qua useStreamHistory. */
+/** Realtime + lịch sử của một stream. Tick + pick đi qua useLiveItems (kết nối tham gia, lọc theo stream_id), lịch sử qua useStreamHistory. */
 export function useStreamSession(stream: StreamRef) {
   const keyId = buildKeyId(stream.lobbyName, stream.categoryName, stream.name);
   const [result, setResult] = useState<{ shoe: number; round: number; value: string } | null>(null);
@@ -55,7 +55,8 @@ export function useStreamSession(stream: StreamRef) {
     statsApi.current?.scheduleRefresh(STATS_AFTER_PREDICTION_MS);   // điểm mới cho biểu đồ độ tin cậy
   }, []);
 
-  const live = useLiveItems<CrawlPayload>([keyId], { streamId: stream.id, onTick, onPrediction });
+  // Trang chi tiết = tham gia stream (bị trừ tiền mỗi dự đoán có pick); hết điểm ⇒ connection = "insufficient".
+  const live = useLiveItems<CrawlPayload>([keyId], { streamId: stream.id, participate: true, onTick, onPrediction });
   const latest = live.ticks[keyId]?.data;
   const shoe = latest ? toInt(latest.stream_shoe) : null;
   const round = latest ? toInt(latest.stream_round) : null;

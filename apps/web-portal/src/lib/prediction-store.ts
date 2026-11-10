@@ -12,6 +12,8 @@ export const predictionStore = {
 
   put(streamId: string, shoe: number, round: number, prediction: Prediction): void {
     const key = keyOf(streamId, shoe, round);
+    // Không để "locked" (current trả về) đè dự đoán thật đã nhận qua SSE.
+    if (prediction.locked && entries.get(key)?.locked === false) return;
     if (!entries.has(key) && entries.size >= MAX_ENTRIES) {
       const oldest = entries.keys().next();
       if (!oldest.done) entries.delete(oldest.value);

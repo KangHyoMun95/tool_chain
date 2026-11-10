@@ -1,25 +1,40 @@
 // apps/web-portal/src/hooks/use-live-items.ts
 "use client";
 import { useEffect, useRef, useState } from "react";
-import type { RealtimePrediction, RealtimeTick } from "@toolhackchain/shared";
+import type { RealtimeInsufficientBalance, RealtimePrediction, RealtimeTick } from "@toolhackchain/shared";
+import { useAuth } from "@/src/components/auth/AuthProvider";
+import { ApiError, isInsufficientBalance } from "@/src/lib/api/client";
+import { requestSseTicket } from "@/src/lib/api/realtime";
 import { apiUrl } from "@/src/lib/auth";
 
 // Trang demo /live nhận tick kiểu bất kỳ (BTC/ETH...); trang stream dùng CrawlPayload (mặc định của RealtimeTick).
 type LiveTick<D> = Omit<RealtimeTick<D>, "stream_id" | "type"> & { type?: "tick"; stream_id?: string | null };
-type Status = "connecting" | "live" | "reconnecting" | "revoked";
+/** insufficient: hết điểm (402 khi xin ticket hoặc event insufficient_balance) — dừng hẳn, không tự kết nối lại. */
+export type LiveStatus = "connecting" | "live" | "reconnecting" | "revoked" | "insufficient";
+
+const RETRY_BASE_MS = 1_000;
+const RETRY_MAX_MS = 15_000;
 
 type Options<D> = {
   /** Chỉ nhận tick có stream_id khớp HOẶC null (đã lọc theo key_id lúc subscribe; null = chưa có trong cache id của API). */
   streamId?: string;
+  /** Trang chi tiết: kết nối tham gia stream này (bị trừ tiền cho mỗi dự đoán có pick, nhận pick riêng). */
+  participate?: boolean;
   /** Gọi cho mọi tick hợp lệ mới hơn tick đã có (kể cả khi nội dung không đổi). Dùng bản mới nhất của hàm, không cần useCallback. */
   onTick?: (t: LiveTick<D>) => void;
-  /** Gọi cho event SSE `type: "prediction"` của đúng stream (kênh public theo key_id). */
+  /** Event `prediction` của đúng stream (chỉ tới trên kết nối tham gia, khi đã bị trừ tiền hoặc pick = null). */
   onPrediction?: (p: RealtimePrediction) => void;
 };
 
-export function useLiveItems<D = Record<string, unknown>>(items: string[], { streamId, onTick, onPrediction }: Options<D> = {}) {
+/**
+ * SSE theo ticket một lần: xin ticket (POST /realtime/ticket) → EventSource /stream?ticket=. Ticket chỉ dùng được một lần nên
+ * không để EventSource tự kết nối lại: lỗi / server đóng ⇒ đóng hẳn rồi xin ticket mới với backoff (1s, 2s, 4s... tối đa 15s).
+ * 401 không làm mới được token ⇒ chưa đăng nhập; 403 / 404 ⇒ revoked; 402 / insufficient_balance ⇒ insufficient (dừng).
+ */
+export function useLiveItems<D = Record<string, unknown>>(items: string[], { streamId, participate = false, onTick, onPrediction }: Options<D> = {}) {
+  const { status: authStatus, markUnauthenticated } = useAuth();
   const [ticks, setTicks] = useState<Record<string, LiveTick<D>>>({});
-  const [status, setStatus] = useState<Status>("connecting");
+  const [status, setStatus] = useState<LiveStatus>("connecting");
   const [reconnectCount, setReconnectCount] = useState(0);   // tăng mỗi lần kết nối lại thành công sau khi mất kết nối
   const key = items.join(",");
   const onTickRef = useRef(onTick);
@@ -28,21 +43,39 @@ export function useLiveItems<D = Record<string, unknown>>(items: string[], { str
   onPredictionRef.current = onPrediction;
 
   useEffect(() => {
-    if (!key) return;
+    if ((!key && !participate) || authStatus !== "authenticated") return;
+    if (participate && !streamId) return;
+    let stopped = false;
     let dropped = false;
+    let attempt = 0;
+    let es: EventSource | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const latestTs = new Map<string, number>();
-    const es = new EventSource(
-      apiUrl(`/stream?items=${encodeURIComponent(key)}`),
-      { withCredentials: true },
-    );
-    es.onopen = () => {
-      setStatus("live");
-      if (dropped) { dropped = false; setReconnectCount((n) => n + 1); }
+
+    const stop = (next: LiveStatus) => {
+      stopped = true;
+      es?.close();
+      clearTimeout(timer);
+      setStatus(next);
     };
-    es.onmessage = (e) => {
-      let msg: LiveTick<D> | RealtimePrediction;
+
+    const retry = () => {
+      if (stopped) return;
+      es?.close();
+      es = null;
+      dropped = true;
+      setStatus("reconnecting");
+      const delay = Math.min(RETRY_MAX_MS, RETRY_BASE_MS * 2 ** attempt);
+      attempt++;
+      clearTimeout(timer);
+      timer = setTimeout(() => void connect(), delay);
+    };
+
+    const onMessage = (e: MessageEvent<string>) => {
+      let msg: LiveTick<D> | RealtimePrediction | RealtimeInsufficientBalance;
       try { msg = JSON.parse(e.data); } catch { return; }
-      // Event thiếu `type` (API bản cũ) coi là tick. Prediction không đi qua logic chống tick cũ / state của tick.
+      if (msg.type === "insufficient_balance") { stop("insufficient"); return; }
+      // Event thiếu `type` coi là tick. Prediction không đi qua logic chống tick cũ / state của tick.
       if (msg.type === "prediction") {
         if (!streamId || msg.stream_id === streamId) onPredictionRef.current?.(msg);
         return;
@@ -58,10 +91,41 @@ export function useLiveItems<D = Record<string, unknown>>(items: string[], { str
         return old && JSON.stringify(old.data) === JSON.stringify(t.data) ? p : { ...p, [t.item_id]: t };
       });
     };
-    es.addEventListener("revoked", () => { setStatus("revoked"); es.close(); });
-    es.onerror = () => { dropped = true; setStatus("reconnecting"); };
-    return () => es.close();
-  }, [key, streamId]);
+
+    async function connect() {
+      let ticket: string;
+      try {
+        ticket = await requestSseTicket({
+          items: key ? key.split(",") : [],
+          participateStreamId: participate ? streamId : undefined,
+        });
+      } catch (err) {
+        if (stopped) return;
+        if (isInsufficientBalance(err)) return stop("insufficient");
+        if (err instanceof ApiError && err.status === 401) { stop("revoked"); markUnauthenticated(); return; }
+        if (err instanceof ApiError && (err.status === 403 || err.status === 404 || err.status === 400)) return stop("revoked");
+        return retry();   // mạng / 5xx / 429
+      }
+      if (stopped) return;
+      const source = new EventSource(apiUrl(`/stream?ticket=${encodeURIComponent(ticket)}`));
+      es = source;
+      source.onopen = () => {
+        attempt = 0;
+        setStatus("live");
+        if (dropped) { dropped = false; setReconnectCount((n) => n + 1); }
+      };
+      source.onmessage = onMessage;
+      source.onerror = () => { if (es === source) retry(); };   // không để EventSource tự mở lại với ticket đã dùng
+    }
+
+    setStatus("connecting");
+    void connect();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      es?.close();
+    };
+  }, [key, streamId, participate, authStatus, markUnauthenticated]);
 
   return { ticks, status, reconnectCount };
 }

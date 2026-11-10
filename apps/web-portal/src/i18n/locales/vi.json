@@ -27,7 +27,8 @@
     "noRecent": "Chưa có dự đoán nào",
     "viewDetail": "Chi Tiết AI Dự Đoán",
     "empty": "Chưa có bàn nào trong loại trò chơi này.",
-    "streamer": "Streamer: {name}"
+    "streamer": "Streamer: {name}",
+    "insufficientBalance": "Không đủ điểm"
   },
   "notFound": {
     "title": "Không tìm thấy trang",
@@ -78,14 +79,16 @@
     "error": "Không tải được dữ liệu. Vui lòng thử lại.",
     "errorNetwork": "Không kết nối được máy chủ. Vui lòng thử lại.",
     "retry": "Thử lại",
-    "comingSoon": "Tính năng sắp ra mắt (Coming soon)"
+    "comingSoon": "Tính năng sắp ra mắt (Coming soon)",
+    "close": "Đóng"
   },
   "live": {
     "connection": {
       "connecting": "Đang kết nối...",
       "live": "Đang trực tiếp",
       "reconnecting": "Mất kết nối, đang thử lại...",
-      "revoked": "Phiên đã bị thu hồi"
+      "revoked": "Phiên đã bị thu hồi",
+      "insufficient": "Hết điểm"
     },
     "status": {
       "IN_PROGRESS": "Đang tiến hành",
@@ -117,7 +120,8 @@
     "chartSeries": "Tỷ lệ win AI mỗi phiên (%)",
     "chartEmpty": "Chưa có phiên nào trong quá khứ",
     "debugTitle": "Debug thời gian",
-    "debugConverted": "Giờ Việt Nam"
+    "debugConverted": "Giờ Việt Nam",
+    "nextRound": "DỰ ĐOÁN TỪ VÁN SAU"
   },
   "status": {
     "live": "LIVE",
@@ -151,5 +155,10 @@
     "before": "Chào mừng bạn đến với",
     "after": "- Hệ thống phân tích thuật toán chuyên nghiệp!",
     "more": "Xem chi tiết"
+  },
+  "billing": {
+    "insufficientTitle": "Không đủ điểm",
+    "insufficientDescription": "Số dư của bạn không đủ để xem dự đoán của bàn này. Vui lòng nạp thêm điểm.",
+    "kickedOut": "Bạn đã hết điểm nên không thể tiếp tục nhận dự đoán. Vui lòng nạp thêm điểm."
   }
 }

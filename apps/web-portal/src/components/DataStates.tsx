@@ -3,7 +3,7 @@
 import { useI18n } from "@/src/i18n/provider";
 import type { ApiError } from "@/src/lib/api/client";
 import { HudCard } from "./ui/HudCard";
-import { NeonButton } from "./ui/NeonButton";
+import { NeonButton, NeonLink } from "./ui/NeonButton";
 import { Spinner } from "./ui/Spinner";
 
 export function LoadingState() {
@@ -30,6 +30,29 @@ export function EmptyState({ message }: { message: string }) {
   return (
     <HudCard panel className="px-4 py-10 text-center">
       <p className="text-sm text-gray-300">{message}</p>
+    </HudCard>
+  );
+}
+
+/** 402 INSUFFICIENT_BALANCE: không đủ điểm để xem dự đoán của bàn. */
+export function InsufficientBalanceState() {
+  const { t } = useI18n();
+  return (
+    <HudCard panel className="flex flex-col items-start gap-3 p-6" role="alert">
+      <h2 className="font-display text-2xl font-bold uppercase tracking-wide text-white">{t("billing.insufficientTitle")}</h2>
+      <p className="text-sm text-gray-300">{t("billing.insufficientDescription")}</p>
+      <NeonLink href="/" className="px-5 py-2 text-sm">{t("notFound.action")}</NeonLink>
+    </HudCard>
+  );
+}
+
+/** Thông báo một dòng ở đầu trang (vd vừa bị đưa về danh sách vì hết điểm). */
+export function NoticeBanner({ message, onClose }: { message: string; onClose: () => void }) {
+  const { t } = useI18n();
+  return (
+    <HudCard panel className="mb-4 flex items-center justify-between gap-3 border border-neon/60 px-4 py-3" role="alert">
+      <p className="text-sm font-semibold text-red-200">{message}</p>
+      <button type="button" onClick={onClose} className="shrink-0 font-mono text-xs uppercase tracking-wider text-gray-400 hover:text-white" aria-label={t("common.close")}>✕</button>
     </HudCard>
   );
 }
