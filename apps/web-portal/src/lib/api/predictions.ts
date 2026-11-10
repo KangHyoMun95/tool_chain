@@ -34,7 +34,7 @@ export type PredictionStatsDto = {
   draws: number;
   win_rate: number | null;
   win_streak: number;
-  shoes: { shoe: number; wins: number; losses: number; draws: number; win_rate: number }[];   // cũ → mới
+  shoes: { shoe: number; wins: number; losses: number; draws: number; win_rate: number }[];   // các shoe quá khứ (không gồm hiện tại), cũ → mới
 };
 
 export const fetchPredictionStats = (streamId: string): Promise<PredictionStatsDto> =>
