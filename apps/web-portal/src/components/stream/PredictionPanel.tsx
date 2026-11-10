@@ -48,7 +48,8 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
 
   return (
     <HudCard glow className={cn("relative flex min-h-[300px] flex-col items-center justify-start overflow-hidden p-4", tone && TONE_CLASS[tone])} aria-live="polite">
-      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+      {/* Thắng: nền xanh #127CE2 (ẩn ảnh nền) để winner.gif trong suốt đè lên khối dự đoán */}
+      <div className={cn("pointer-events-none absolute inset-0 z-0 overflow-hidden", tone === "win" && "hidden")}>
         <DecorImage src="/images/pedestal-bg.png" className="h-full w-full object-cover opacity-70 mix-blend-screen" />
         <div className="absolute inset-0 bg-gradient-to-b from-red-600/10 via-transparent to-red-900/20" />
       </div>
@@ -110,6 +111,9 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
             )}
           </>
         )
+      )}
+      {tone === "win" && (
+        <DecorImage key={`win:${shoe}:${round}`} src="/images/winner.gif" className="pointer-events-none absolute inset-0 z-30 h-full w-full select-none object-contain" />
       )}
     </HudCard>
   );
