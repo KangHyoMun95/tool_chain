@@ -4,16 +4,16 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
 import { Redis } from "ioredis";
 import { hostname } from "os";
-import { SETTLE_GROUP, SETTLE_REQUEST_STREAM, type SettleRequest } from "@toolhackchain/shared";
-import { fieldsToObject, sleep, StreamEntry } from "../common/stream.util.js";
+import {
+  parseSettleMessage, SETTLE_DEAD_MAXLEN, SETTLE_DEAD_STREAM, SETTLE_GROUP, SETTLE_REQUEST_STREAM,
+} from "@toolhackchain/shared";
+import { sleep, StreamEntry } from "../common/stream.util.js";
 import { withTimeout } from "../common/with-timeout.js";
 import { REDIS_COMMAND_TIMEOUT_MS, REDIS_KEEPALIVE_MS } from "../predictions/predictions.constants.js";
 import { BillingService } from "./billing.service.js";
 import {
   SETTLE_BLOCK_MS, SETTLE_HANDLE_TIMEOUT_MS, SETTLE_READ_COUNT, SETTLE_RETRY_DELAY_MS, SETTLE_SLOW_WARN_MS,
 } from "./billing.constants.js";
-
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 @Injectable()
 export class SettlementConsumer implements OnApplicationBootstrap, OnModuleDestroy {
@@ -67,14 +67,22 @@ export class SettlementConsumer implements OnApplicationBootstrap, OnModuleDestr
     }
   }
 
-  /** Message hỏng: log và bỏ qua (caller vẫn XACK). Lỗi DB: ném để loop thử lại từ PEL. */
+  /**
+   * Message sai contract: log ERROR kèm toàn bộ nội dung, chép sang settle:dead rồi mới để caller XACK
+   * (XADD settle:dead lỗi ⇒ ném, không XACK, loop thử lại). Lỗi DB: ném để loop thử lại từ PEL.
+   */
   private async handle(id: string, fields: string[]): Promise<void> {
-    let msg: SettleRequest | null = null;
-    try { msg = JSON.parse(fieldsToObject(fields).payload) as SettleRequest; } catch { /* msg = null */ }
-    if (!msg || typeof msg.game_session_id !== "string" || !UUID_RE.test(msg.game_session_id)) {
-      this.log.error(`settle:requests ${id}: bỏ qua message không đúng contract`);
+    const parsed = parseSettleMessage(fields);
+    if (!parsed.ok) {
+      const content = JSON.stringify(fields);
+      this.log.error(`settle:requests ${id}: message không đúng contract (${parsed.error}), chuyển sang ${SETTLE_DEAD_STREAM}: ${content}`);
+      await this.conn.xadd(
+        SETTLE_DEAD_STREAM, "MAXLEN", "~", SETTLE_DEAD_MAXLEN, "*",
+        "source_id", id, "error", parsed.error, "fields", content, "dead_at", new Date().toISOString(),
+      );
       return;
     }
+    const msg = parsed.value;
     const n = await this.billing.refund(msg.game_session_id);
     if (n > 0) this.log.log(`Hoàn tiền ván ${msg.game_session_id} (${msg.reason}): ${n} subscription`);
   }

@@ -8,6 +8,7 @@ import { ConfigService } from "@nestjs/config";
 import { InjectDataSource } from "@nestjs/typeorm";
 import type { DataSource, EntityManager } from "typeorm";
 import { GameSessionStatus, type Role } from "@toolhackchain/shared";
+import { updateReturning } from "../common/update-returning.js";
 import type { EnvVars } from "../config/env.validation.js";
 
 const USER_ROLE: Role = "USER";   // chỉ USER bị trừ tiền
@@ -45,7 +46,8 @@ export class BillingService {
     // Khóa user theo thứ tự user_id tăng dần (cùng thứ tự với refund) để tránh deadlock.
     await m.query(`SELECT user_id FROM users WHERE user_id = ANY($1::uuid[]) ORDER BY user_id FOR UPDATE`, [ids]);
 
-    const charged: { user_id: string; balance_before: string; balance_after: string }[] = await m.query(
+    const charged = await updateReturning<{ user_id: string; balance_before: string; balance_after: string }>(
+      m,
       `UPDATE users SET balance = balance - $2::bigint
        WHERE user_id = ANY($1::uuid[]) AND balance >= $2::bigint AND status = 'ACTIVE'
          AND role_id = (SELECT role_id FROM roles WHERE role_name = $3)
@@ -112,7 +114,8 @@ export class BillingService {
 
       // Một ván có đúng một prediction và UNIQUE (user_id, prediction_id) ⇒ mỗi user tối đa một dòng: không cần gộp theo user.
       const rows: unknown[] = await m.query(
-        `WITH marked AS (
+        `-- top-level: INSERT (rows trả về bình thường, không dùng updateReturning)
+         WITH marked AS (
            UPDATE prediction_subscriptions ps SET refunded_at = now()
            WHERE ps.prediction_subscription_id = ANY($1::uuid[]) AND ps.refunded_at IS NULL
            RETURNING ps.prediction_subscription_id AS sid, ps.user_id, ps.fee_amount AS fee

@@ -7,6 +7,7 @@ import { ConfigService } from "@nestjs/config";
 import { InjectDataSource } from "@nestjs/typeorm";
 import type { DataSource } from "typeorm";
 import { GameSessionStatus } from "@toolhackchain/shared";
+import { updateReturning } from "../common/update-returning.js";
 import type { EnvVars } from "../config/env.validation.js";
 import { CANCEL_BATCH_LIMIT, CANCEL_JOB_INTERVAL_MS } from "./billing.constants.js";
 import { SettleQueue } from "./settle-queue.service.js";
@@ -40,7 +41,8 @@ export class GameSessionCancelJob implements OnApplicationBootstrap, OnModuleDes
       const minutes = this.config.get("GAME_SESSION_CANCEL_AFTER_MINUTES", { infer: true });
       // SKIP LOCKED: bỏ qua ván đang bị khóa (charge FOR SHARE / ingestion đang ghi result); lượt sau xét lại.
       // Một câu lệnh (auto-commit): chỉ gửi settle:requests sau khi đã commit.
-      const rows: { id: string; has_subs: boolean }[] = await this.ds.query(
+      const rows = await updateReturning<{ id: string; has_subs: boolean }>(
+        this.ds,
         `WITH c AS (
            SELECT game_session_id FROM game_sessions
            WHERE status = $1 AND result IS NULL AND created_at < now() - make_interval(mins => $2)
@@ -56,7 +58,8 @@ export class GameSessionCancelJob implements OnApplicationBootstrap, OnModuleDes
       const toSettle = rows.filter((r) => r.has_subs).map((r) => r.id);
       this.log.log(`CANCELLED ${rows.length} ván không có result quá ${minutes} phút (${toSettle.length} ván cần hoàn tiền)`);
       // Lỗi Redis ở đây: sweeper sẽ gửi lại sau SWEEP_MIN_AGE_MS.
-      await this.queue.enqueue(toSettle, "CANCELLED");
+      const sent = await this.queue.enqueue(toSettle, "CANCELLED");
+      if (sent !== toSettle.length) this.log.error(`Chỉ gửi được ${sent}/${toSettle.length} settle:requests CANCELLED (sweeper sẽ gửi bù)`);
     } catch (e) {
       this.log.error(e);
     } finally {
