@@ -33,12 +33,7 @@
   }
   .hud-card-glow { box-shadow: 0 0 25px rgba(255, 10, 40, 0.35), inset 0 0 20px rgba(255, 10, 40, 0.2); }
 
-  /* Khung dự đoán khi đã có kết quả: thắng xanh lá, thua đỏ đậm, hòa xám (đặt sau .hud-card để thắng về thứ tự) */
-  .hud-result-win {
-    border-color: #127ce2;
-    background: #127ce2;   /* nền xanh để winner.gif (trong suốt) nổi lên */
-    box-shadow: 0 0 28px rgba(18, 124, 226, 0.55), inset 0 0 20px rgba(18, 124, 226, 0.25);
-  }
+  /* Khung dự đoán khi đã có kết quả: thua đỏ đậm, hòa xám (đặt sau .hud-card để thắng về thứ tự) */
   .hud-result-loss {
     border-color: #ff1e42;
     background: linear-gradient(135deg, rgba(153, 20, 35, 0.9), rgba(60, 5, 12, 0.95));
