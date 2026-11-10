@@ -3,6 +3,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import type { DataSource, EntityManager } from "typeorm";
 import { GameSessionStatus } from "@toolhackchain/shared";
+import { updateReturning } from "../common/update-returning.js";
 
 export type NewSession = { id: string; streamId: string; shoe: number; round: number };
 export type SessionResult = { id: string; result: string };
@@ -62,7 +63,8 @@ export class GameSessionsService {
     const out: ApplyResultsOutcome = { stored: new Map(), cancelled: new Set(), finished: [] };
     if (items.length === 0) return out;
     const ids = items.map((i) => i.id);
-    const updated: { id: string }[] = await m.query(
+    const updated = await updateReturning<{ id: string }>(
+      m,
       `UPDATE game_sessions g SET result = v.result, status = $3, ended_at = now()
        FROM unnest($1::uuid[], $2::varchar[]) AS v(id, result)
        WHERE g.game_session_id = v.id AND g.result IS NULL AND g.status <> $4

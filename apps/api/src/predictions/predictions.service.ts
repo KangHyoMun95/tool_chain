@@ -134,7 +134,8 @@ export class PredictionsService {
   /** true nếu user đã bị trừ tiền cho prediction này; đồng thời set delivered_at nếu chưa có (pick được giao qua API). */
   private async claimSubscription(predictionId: string, userId: string): Promise<boolean> {
     const rows: { subscribed: boolean }[] = await this.ds.query(
-      `WITH s AS (
+      `-- top-level: SELECT (rows trả về bình thường, không dùng updateReturning)
+       WITH s AS (
          SELECT prediction_subscription_id FROM prediction_subscriptions WHERE prediction_id = $1 AND user_id = $2),
        d AS (
          UPDATE prediction_subscriptions ps SET delivered_at = now()
