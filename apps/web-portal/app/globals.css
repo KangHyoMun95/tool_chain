@@ -35,9 +35,9 @@
 
   /* Khung dự đoán khi đã có kết quả: thắng xanh lá, thua đỏ đậm, hòa xám (đặt sau .hud-card để thắng về thứ tự) */
   .hud-result-win {
-    border-color: rgba(16, 185, 129, 0.8);
-    background: linear-gradient(135deg, rgba(6, 78, 59, 0.85), rgba(2, 24, 16, 0.95));
-    box-shadow: 0 0 28px rgba(16, 185, 129, 0.45), inset 0 0 20px rgba(16, 185, 129, 0.2);
+    border-color: #127ce2;
+    background: #127ce2;   /* nền xanh để winner.gif (trong suốt) nổi lên */
+    box-shadow: 0 0 28px rgba(18, 124, 226, 0.55), inset 0 0 20px rgba(18, 124, 226, 0.25);
   }
   .hud-result-loss {
     border-color: #ff1e42;
@@ -126,3 +126,15 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Panel dự đoán: khối predict_and_rate hiện từ ô tròn (giữa) lan ra ngoài; ký tự dự đoán to / nhỏ nhẹ tuần hoàn */
+@keyframes predict-reveal {
+  from { clip-path: circle(0% at 50% 36%); opacity: 0.2; }
+  to { clip-path: circle(80% at 50% 36%); opacity: 1; }
+}
+@keyframes predict-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}
+.predict-reveal { animation: predict-reveal 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.predict-pulse { display: inline-block; animation: predict-pulse 1.8s ease-in-out infinite; }
