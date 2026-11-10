@@ -9,6 +9,7 @@ import { InjectDataSource } from "@nestjs/typeorm";
 import type { DataSource, EntityManager } from "typeorm";
 import { GameSessionStatus, type Role } from "@toolhackchain/shared";
 import type { EnvVars } from "../config/env.validation.js";
+import { InsufficientBalanceException } from "./insufficient-balance.exception.js";
 
 const USER_ROLE: Role = "USER";   // chỉ USER bị trừ tiền
 
@@ -26,6 +27,23 @@ export class BillingService {
   /** Phí hiện tại dưới dạng chuỗi số nguyên (truyền thẳng vào SQL ::bigint). */
   get fee(): string {
     return String(this.config.get("PREDICTION_FEE", { infer: true }));
+  }
+
+  /**
+   * USER, ACTIVE và balance >= phí hiện tại (so sánh trong SQL, không đưa bigint qua TS). Dùng để cho vào trang chi tiết / cấp ticket tham gia.
+   * Chỉ là cổng chặn sớm: việc trừ tiền vẫn kiểm tra lại điều kiện trong câu UPDATE của charge().
+   */
+  async canParticipate(userId: string): Promise<boolean> {
+    const rows: { ok: boolean }[] = await this.ds.query(
+      `SELECT (u.status = 'ACTIVE' AND r.role_name = $3 AND u.balance >= $2::bigint) AS ok
+       FROM users u JOIN roles r ON r.role_id = u.role_id WHERE u.user_id = $1`,
+      [userId, this.fee, USER_ROLE]);
+    return rows[0]?.ok === true;
+  }
+
+  /** 402 INSUFFICIENT_BALANCE khi canParticipate() = false. */
+  async assertCanParticipate(userId: string): Promise<void> {
+    if (!(await this.canParticipate(userId))) throw new InsufficientBalanceException();
   }
 
   /**

@@ -1,15 +1,16 @@
-// apps/api/scripts/billing-sim.mjs — CHỈ DÙNG LOCAL để tự kiểm tra billing / settlement.
-// Bắn tick mẫu vào Redis "ticks" (như crawler), có chờ giữa các trạng thái, và (tùy chọn) giả lập một lần trừ tiền
-// bằng đúng các câu SQL của BillingService.charge — dùng khi chưa có kết nối SSE tham gia (PR billing 1).
+// apps/api/scripts/billing-sim.mjs — CHỈ DÙNG LOCAL để tự kiểm tra billing / settlement / giao pick.
+// Bắn tick mẫu vào Redis "ticks" (như crawler) và giả làm AI bằng một message predict:results, có chờ giữa các bước.
+// Trừ tiền do API làm thật cho các kết nối SSE đang tham gia stream (mở bằng scripts/sse-client.mjs --stream <uuid>).
+// Tắt AI trước (docker compose stop ai) để AI không ghi prediction của ván trước script.
 //
-//   cd apps/api && REDIS_URL=... DATABASE_URL=... node scripts/billing-sim.mjs round  --stream s1 --shoe 1 --round 1 --pick B --result P --phone 0900000001
-//   node scripts/billing-sim.mjs result --stream s1 --shoe 1 --round 1 --result P        # chỉ bắn lại tick có result
-//   node scripts/billing-sim.mjs show   --stream s1 --shoe 1 --round 1 --phone 0900000001  # in trạng thái ván / tiền
+//   cd apps/api && node --env-file=.env scripts/billing-sim.mjs round --stream s1 --shoe 1 --round 1 --pick B --result P --phone 0900000001
+//   node --env-file=.env scripts/billing-sim.mjs result --stream s1 --shoe 1 --round 1 --result P   # chỉ bắn lại tick có result
+//   node --env-file=.env scripts/billing-sim.mjs show   --stream s1 --shoe 1 --round 1 --phone 0900000001   # in trạng thái ván / tiền
 //
 // Tham số: --lobby (mặc định "Sim Lobby"), --category ("Sim Cat"), --stream, --shoe, --round,
-//   --pick B|P (prediction giả nếu ván chưa có prediction; bỏ trống = không tạo, không trừ),
-//   --result B|P|T|- ("-" = không bắn result), --phone (user bị trừ), --wait (ms chờ batch ingestion, mặc định 4000).
-// PREDICTION_FEE lấy từ env (bắt buộc với lệnh round có --phone), phải trùng giá trị API đang dùng.
+//   --pick B|P|- (message predict:results giả; "-" = AI không dự đoán; bỏ trống = không gửi),
+//   --result B|P|T|- ("-" = không bắn result), --phone (chỉ để in tiền / subscription của user này),
+//   --wait (ms chờ sau tick IN_PROGRESS / result, mặc định 4000), --hold (ms chờ sau prediction trước khi bắn result, mặc định 3000).
 import { createHash } from "node:crypto";
 import { Redis } from "ioredis";
 import pg from "pg";
@@ -30,7 +31,7 @@ const [cmd, ...rest] = process.argv.slice(2);
 const args = {};
 for (let i = 0; i < rest.length; i += 2) args[rest[i].replace(/^--/, "")] = rest[i + 1];
 const lobby = args.lobby ?? "Sim Lobby", category = args.category ?? "Sim Cat", stream = args.stream;
-const shoe = Number(args.shoe), round = Number(args.round), wait = Number(args.wait ?? 4000);
+const shoe = Number(args.shoe), round = Number(args.round), wait = Number(args.wait ?? 4000), hold = Number(args.hold ?? 3000);
 if (!["round", "result", "show"].includes(cmd) || !stream || !Number.isInteger(shoe) || !Number.isInteger(round)) {
   console.error("Cách dùng: node scripts/billing-sim.mjs round|result|show --stream <tên> --shoe <n> --round <n> [...]");
   process.exit(2);
@@ -57,43 +58,22 @@ async function publish(status, result) {
   console.log(`→ tick ${status}${result ? ` result=${result}` : ""} (${keyId} shoe ${shoe} round ${round})`);
 }
 
-/** Giả lập BillingService.charge cho một user (cùng câu SQL, cùng transaction). */
-async function simulateCharge(phone) {
-  const fee = process.env.PREDICTION_FEE;
-  if (!/^[1-9]\d*$/.test(fee ?? "")) throw new Error("Thiếu PREDICTION_FEE (số nguyên > 0, trùng với API)");
-  await db.query("BEGIN");
-  try {
-    const p = await db.query(`SELECT predict_result FROM predictions WHERE prediction_id = $1`, [pid]);
-    if (!p.rows[0]?.predict_result) { await db.query("ROLLBACK"); return console.log("× ván không có prediction có pick: không trừ"); }
-    const s = await db.query(`SELECT status FROM game_sessions WHERE game_session_id = $1 FOR SHARE`, [gsid]);
-    if (s.rows[0]?.status !== "RUNNING") { await db.query("ROLLBACK"); return console.log(`× ván ${s.rows[0]?.status}: không trừ`); }
-    const u = await db.query(`SELECT user_id FROM users WHERE phone_number = $1`, [phone]);
-    if (!u.rows[0]) throw new Error(`Không có user ${phone}`);
-    const ids = [u.rows[0].user_id];
-    await db.query(`SELECT user_id FROM users WHERE user_id = ANY($1::uuid[]) ORDER BY user_id FOR UPDATE`, [ids]);
-    const c = await db.query(
-      `UPDATE users SET balance = balance - $2::bigint
-       WHERE user_id = ANY($1::uuid[]) AND balance >= $2::bigint AND status = 'ACTIVE'
-         AND role_id = (SELECT role_id FROM roles WHERE role_name = 'USER')
-       RETURNING user_id, balance + $2::bigint AS balance_before, balance AS balance_after`, [ids, fee]);
-    if (c.rows.length === 0) { await db.query("ROLLBACK"); return console.log("× không trừ được (thiếu tiền / không ACTIVE / không phải USER)"); }
-    const sub = await db.query(
-      `INSERT INTO prediction_subscriptions (user_id, prediction_id, fee_amount)
-       SELECT u, $2, $3::bigint FROM unnest($1::uuid[]) AS u
-       ON CONFLICT (user_id, prediction_id) DO NOTHING RETURNING prediction_subscription_id`, [ids, pid, fee]);
-    if (sub.rows.length !== c.rows.length) throw new Error("đã trừ nhưng subscription đã tồn tại → rollback (đúng như API)");
-    await db.query(
-      `INSERT INTO transactions (user_id, predictions_subscriptions_id, transaction_type, amount, balance_before, balance_after)
-       SELECT c.user_id, s.prediction_subscription_id, 'CHARGE', $4::bigint, c.balance_before, c.balance_after
-       FROM unnest($1::uuid[], $2::bigint[], $3::bigint[]) AS c(user_id, balance_before, balance_after)
-       JOIN prediction_subscriptions s ON s.user_id = c.user_id AND s.prediction_id = $5`,
-      [c.rows.map((r) => r.user_id), c.rows.map((r) => r.balance_before), c.rows.map((r) => r.balance_after), fee, pid]);
-    await db.query("COMMIT");
-    console.log(`✓ trừ ${fee}: ${c.rows[0].balance_before} → ${c.rows[0].balance_after}`);
-  } catch (e) {
-    await db.query("ROLLBACK");
-    throw e;
-  }
+/** Giả làm AI: XADD predict:results (đi qua PredictResultConsumer thật: hạn chót → insert + trừ participant → giao pick). */
+async function publishPrediction(pick) {
+  const streamId = (await db.query(
+    `SELECT stream_id FROM game_sessions WHERE game_session_id = $1`, [gsid])).rows[0]?.stream_id
+    ?? await redis.get(`stream:${keyId}`);
+  if (!streamId) throw new Error("Chưa có stream trong DB / cache (tăng --wait để ingestion kịp ghi)");
+  const ok = pick === "B" || pick === "P";
+  const msg = {
+    schema_version: 1, prediction_id: pid, game_session_id: gsid, stream_id: streamId, key_id: keyId, shoe, round,
+    pick: ok ? pick : null, confidence: ok ? 0.6 : null,
+    chosen: ok ? { k: 3, pattern: "BPB", occurrences: 5, pct_B: pick === "B" ? 0.6 : 0.4, pct_P: pick === "B" ? 0.4 : 0.6 } : null,
+    detail: [], history_used: "", missing_previous: false, reason: ok ? "OK" : "NOT_ENOUGH_HISTORY",
+    model_version: "sim", created_at: new Date().toISOString(),
+  };
+  await redis.xadd("predict:results", "MAXLEN", "~", 10000, "*", "payload", JSON.stringify(msg));
+  console.log(`→ predict:results pick=${msg.pick ?? "null"} (${msg.reason})`);
 }
 
 async function show() {
@@ -116,15 +96,10 @@ try {
     await publish("IN_PROGRESS", null);
     console.log(`… chờ ${wait}ms (batch ingestion)`); await sleep(wait);
     if (args.pick) {
-      if (!["B", "P"].includes(args.pick)) throw new Error("--pick phải là B hoặc P");
-      const ins = await db.query(
-        `INSERT INTO predictions (prediction_id, stream_id, game_session_id, predict_result, confidence_score, detail, model_version, reason)
-         SELECT $1, g.stream_id, g.game_session_id, $3, 0.5, '{"chosen":null,"rows":[],"history_used":0,"missing_previous":false}'::jsonb, 'sim', 'OK'
-         FROM game_sessions g WHERE g.game_session_id = $2
-         ON CONFLICT (game_session_id) DO NOTHING RETURNING prediction_id`, [pid, gsid, args.pick]);
-      console.log(ins.rows.length ? `✓ tạo prediction giả pick=${args.pick}` : "• ván đã có prediction (giữ nguyên pick hiện có)");
+      if (!["B", "P", "-"].includes(args.pick)) throw new Error("--pick phải là B, P hoặc - (AI không dự đoán)");
+      await publishPrediction(args.pick);
+      console.log(`… chờ ${hold}ms (consumer trừ tiền + giao pick; xem cửa sổ sse-client)`); await sleep(hold);
     }
-    if (args.phone) await simulateCharge(args.phone);
     if (args.result && args.result !== "-") {
       await publish("GET_RESULT", args.result);
       console.log(`… chờ ${wait}ms (ingestion + settlement)`); await sleep(wait);

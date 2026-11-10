@@ -1,4 +1,6 @@
 // src/realtime/realtime.hub.ts
+// Kênh public: chỉ TICK (đọc stream "ticks") theo key_id. Không bao giờ đẩy pick ở đây —
+// prediction đi qua ConnectionRegistry, chỉ tới kết nối tham gia của user đã trừ tiền.
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
 import { Redis } from "ioredis";
 import { RedisKeys, TICK_STREAM } from "@toolhackchain/shared";
@@ -51,11 +53,6 @@ export class RealtimeHub implements OnApplicationBootstrap, OnModuleDestroy {
       this.log.warn(`Không gắn được stream_id cho ${itemId}: ${e}`);
       return tickJson;
     }
-  }
-
-  /** Đẩy event dự đoán (JSON đã dựng sẵn) tới mọi client đang nghe key_id này. */
-  publishPrediction(itemId: string, eventJson: string): void {
-    this.listeners.get(itemId)?.forEach((fn) => fn(eventJson));
   }
 
   subscribe(itemId: string, fn: Listener): () => void {

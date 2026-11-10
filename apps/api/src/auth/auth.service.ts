@@ -26,6 +26,7 @@ export type MeResponse = {
   status: UserStatus;
   balance: string; // bigint → string
   refer_user_id: string | null;
+  can_participate: boolean; // USER, ACTIVE và balance >= PREDICTION_FEE (tính trong SQL); portal dùng để khóa thẻ bàn, không tự so balance
 };
 
 @Injectable()
@@ -133,9 +134,11 @@ export class AuthService implements OnModuleInit {
       .addSelect("u.status", "status")
       .addSelect("u.balance", "balance")
       .addSelect("u.refer_user_id", "refer_user_id")
+      .addSelect("(r.role_name = :userRole AND u.status = :active AND u.balance >= CAST(:fee AS bigint))", "can_participate")
       .from(UserEntity, "u")
       .innerJoin(RoleEntity, "r", "r.role_id = u.role_id")
       .where("u.user_id = :userId", { userId })
+      .setParameters({ userRole: "USER", active: UserStatus.ACTIVE, fee: String(this.config.get("PREDICTION_FEE", { infer: true })) })
       .getRawOne<MeResponse>();
   }
 }
