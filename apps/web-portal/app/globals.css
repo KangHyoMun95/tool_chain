@@ -126,3 +126,15 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
+
+/* Panel dự đoán: khối predict_and_rate hiện từ ô tròn (giữa) lan ra ngoài; ký tự dự đoán to / nhỏ nhẹ tuần hoàn */
+@keyframes predict-reveal {
+  from { clip-path: circle(0% at 50% 36%); opacity: 0.2; }
+  to { clip-path: circle(80% at 50% 36%); opacity: 1; }
+}
+@keyframes predict-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}
+.predict-reveal { animation: predict-reveal 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.predict-pulse { display: inline-block; animation: predict-pulse 1.8s ease-in-out infinite; }
