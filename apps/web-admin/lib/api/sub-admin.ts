@@ -8,6 +8,7 @@ import {
 import { AccountStatus } from '@/lib/legacy-types';
 import type { Role } from '@/lib/auth/roles';
 import { apiFetch } from './client';
+import { setUserStatus } from './user';
 
 /** Query key for every Admin(Con) list/detail query. */
 export const SUB_ADMINS_KEY = ['sub-admins'] as const;
@@ -78,9 +79,7 @@ export function useDeactivateSubAdmin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiFetch<SubAdminRow>(`/sub-admins/${id}/deactivate`, {
-        method: 'PATCH',
-      }),
+      setUserStatus(id, 'DEACTIVE'),
     onSuccess: () => qc.invalidateQueries({ queryKey: SUB_ADMINS_KEY }),
   });
 }

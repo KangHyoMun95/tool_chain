@@ -61,7 +61,7 @@ export function UserTable() {
   const confirmDelete = (record: ManagedUserRow) => {
     modal.confirm({
       title: 'Xoá người dùng',
-      content: `Xoá vĩnh viễn "${record.username}"? Hành động không thể hoàn tác.`,
+      content: `Xoá "${record.username}"? User sẽ không đăng nhập được nữa và không thể khôi phục.`,
       okText: 'Xoá',
       okButtonProps: { danger: true },
       cancelText: 'Huỷ',

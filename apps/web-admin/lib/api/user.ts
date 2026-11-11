@@ -75,12 +75,20 @@ export function useUpdateUser() {
   });
 }
 
-/** Hard delete — Admin(Con) may delete its own Users (see CLAUDE.md). */
+/** Xóa mềm (status DELETED): chỉ ADMIN, chỉ User con trực tiếp. */
+/** PATCH /users/:id/status — API chỉ cho cha đổi status của con trực tiếp. */
+export function setUserStatus(id: string, status: 'ACTIVE' | 'DEACTIVE' | 'DELETED') {
+  return apiFetch<{ user_id: string; status: string }>(`/users/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
 export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiFetch<void>(`/users/${id}`, { method: 'DELETE' }),
+      setUserStatus(id, 'DELETED'),
     onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   });
 }
@@ -89,7 +97,7 @@ export function useDeactivateUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiFetch<UserRow>(`/users/${id}/deactivate`, { method: 'PATCH' }),
+      setUserStatus(id, 'DEACTIVE'),
     onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   });
 }
