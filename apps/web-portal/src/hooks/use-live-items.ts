@@ -11,7 +11,7 @@ import { requestSseTicket } from "@/src/lib/api/realtime";
 import { apiUrl } from "@/src/lib/auth";
 import { streamDebug } from "@/src/lib/stream-debug";
 
-// Trang demo /live nhận tick kiểu bất kỳ (BTC/ETH...); trang stream dùng CrawlPayload (mặc định của RealtimeTick).
+// Kiểu payload của tick mặc định là CrawlPayload (RealtimeTick).
 type LiveTick<D> = Omit<RealtimeTick<D>, "stream_id" | "type"> & { type?: "tick"; stream_id?: string | null };
 /** insufficient: hết điểm (402 khi xin ticket hoặc event insufficient_balance) — dừng hẳn, không tự kết nối lại. */
 export type LiveStatus = "connecting" | "live" | "reconnecting" | "revoked" | "insufficient";
