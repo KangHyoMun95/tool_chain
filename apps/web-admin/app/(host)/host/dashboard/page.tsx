@@ -1,12 +1,7 @@
 'use client';
 
-import { PageContainer } from '@ant-design/pro-components';
-import { DashboardView } from '@/components/shared/dashboard-view';
+import { Unsupported } from '@/components/shared/Unsupported';
 
-export default function DashboardPage() {
-  return (
-    <PageContainer title="Dashboard">
-      <DashboardView />
-    </PageContainer>
-  );
+export default function Page() {
+  return <Unsupported title="Dashboard" backHref="/host/accounts" />;
 }

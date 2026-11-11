@@ -1,12 +1,7 @@
 'use client';
 
-import { PageContainer } from '@ant-design/pro-components';
-import { SubAdminTable } from '@/components/host/sub-admin-table';
+import { Unsupported } from '@/components/shared/Unsupported';
 
-export default function HostAdminsPage() {
-  return (
-    <PageContainer title="Quản lý người dùng">
-      <SubAdminTable />
-    </PageContainer>
-  );
+export default function Page() {
+  return <Unsupported title="Quản lý người dùng" backHref="/host/accounts" />;
 }

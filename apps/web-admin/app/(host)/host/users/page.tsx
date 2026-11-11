@@ -1,12 +1,7 @@
 'use client';
 
-import { PageContainer } from '@ant-design/pro-components';
-import { UserHierarchyTable } from '@/components/host/user-hierarchy-table';
+import { Unsupported } from '@/components/shared/Unsupported';
 
-export default function HostUsersPage() {
-  return (
-    <PageContainer title="Quản lý User">
-      <UserHierarchyTable />
-    </PageContainer>
-  );
+export default function Page() {
+  return <Unsupported title="Quản lý User" backHref="/host/accounts" />;
 }

@@ -23,9 +23,9 @@ export const ROLE_LABEL: Record<Role, string> = {
 export function homeForRole(role: Role): string {
   switch (role) {
     case ROLE.HOST:
-      return '/host/admins';
+      return '/host/accounts';
     case ROLE.ADMIN:
-      return '/admin/users';
+      return '/admin/accounts';
     default:
       return '/login';
   }
