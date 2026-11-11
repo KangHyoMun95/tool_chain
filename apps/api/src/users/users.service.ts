@@ -1,10 +1,11 @@
 // src/users/users.service.ts
-import { ConflictException, ForbiddenException, Injectable, Logger } from "@nestjs/common";
+import { BadRequestException, ConflictException, ForbiddenException, Injectable, Logger } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import argon2 from "argon2";
 import { DataSource, QueryFailedError } from "typeorm";
 import { UserStatus } from "@toolhackchain/shared";
 import type { AuthUser } from "../auth/auth.types.js";
+import { updateReturning } from "../common/update-returning.js";
 import { ARGON2_OPTIONS } from "../auth/password.js";
 import { PermissionService } from "../auth/permission.service.js";
 import { SessionService } from "../auth/session.service.js";
@@ -73,5 +74,64 @@ export class UsersService {
     if (status !== UserStatus.ACTIVE) await this.sessions.revokeAllSessions(target.userId);
     this.log.log(`status changed actor=${actor.userId} target=${target.userId} ${target.status}->${status}`);
     return { user_id: target.userId, status };
+  }
+
+  /**
+   * Cấp điểm (chỉ cộng) cho cấp dưới TRỰC TIẾP: HOST sinh mới cho ADMIN (MINT); ADMIN chuyển từ balance của mình cho USER
+   * (TRANSFER_OUT + TRANSFER_IN). Cháu, cha, chính mình, user không ACTIVE ⇒ 403. Một DB transaction, khóa users theo user_id tăng dần.
+   */
+  async grantPoints(actor: AuthUser, targetUserId: string, amount: number) {
+    try {
+      await this.permissions.assertCanGrantPoints(actor, targetUserId);
+    } catch (e) {
+      if (e instanceof ForbiddenException) throw new ForbiddenException("Chỉ được cấp điểm cho cấp dưới trực tiếp đang hoạt động");
+      throw e;
+    }
+
+    const fee = String(amount);
+    const result = await this.dataSource.transaction(async (m) => {
+      const ids = actor.role === "ADMIN" ? [actor.userId, targetUserId] : [targetUserId];
+      const locked = await m.query(
+        `SELECT user_id, status, refer_user_id FROM users WHERE user_id = ANY($1::uuid[]) ORDER BY user_id FOR UPDATE`,
+        [ids],
+      ) as { user_id: string; status: string; refer_user_id: string | null }[];
+      const target = locked.find((r) => r.user_id === targetUserId);
+      if (!target || target.status !== UserStatus.ACTIVE || target.refer_user_id !== actor.userId) {
+        throw new ForbiddenException("Chỉ được cấp điểm cho cấp dưới trực tiếp đang hoạt động");
+      }
+
+      let actorAfter: string | null = null;
+      if (actor.role === "ADMIN") {
+        const [out] = await updateReturning<{ balance_before: string; balance_after: string }>(
+          m,
+          `UPDATE users SET balance = balance - $2::bigint WHERE user_id = $1 AND balance >= $2::bigint
+           RETURNING (balance + $2::bigint)::text AS balance_before, balance::text AS balance_after`,
+          [actor.userId, fee],
+        );
+        if (!out) throw new BadRequestException({ code: "INSUFFICIENT_BALANCE", message: "Không đủ điểm để cấp" });
+        actorAfter = out.balance_after;
+        await m.query(
+          `INSERT INTO transactions (user_id, transaction_type, amount, balance_before, balance_after, created_by)
+           VALUES ($1, 'TRANSFER_OUT', $2::bigint, $3::bigint, $4::bigint, $1)`,
+          [actor.userId, fee, out.balance_before, out.balance_after],
+        );
+      }
+
+      const [inc] = await updateReturning<{ balance_before: string; balance_after: string }>(
+        m,
+        `UPDATE users SET balance = balance + $2::bigint WHERE user_id = $1
+         RETURNING (balance - $2::bigint)::text AS balance_before, balance::text AS balance_after`,
+        [targetUserId, fee],
+      );
+      await m.query(
+        `INSERT INTO transactions (user_id, transaction_type, amount, balance_before, balance_after, created_by)
+         VALUES ($1, $5, $2::bigint, $3::bigint, $4::bigint, $6)`,
+        [targetUserId, fee, inc.balance_before, inc.balance_after, actor.role === "ADMIN" ? "TRANSFER_IN" : "MINT", actor.userId],
+      );
+      return { user_id: targetUserId, amount: fee, balance: inc.balance_after, actor_balance: actorAfter };
+    });
+
+    this.log.log(`points granted actor=${actor.userId} target=${targetUserId} amount=${fee}`);
+    return result;
   }
 }

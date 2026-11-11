@@ -103,15 +103,19 @@ export function SubAdminTable() {
               onClick={() => setEditing(record)}
             />
           </Tooltip>,
-          <Tooltip key="grant" title="Cấp điểm">
-            <Button
-              type="text"
-              size="small"
-              icon={<DollarOutlined />}
-              onClick={() => setGranting(record)}
-            />
-          </Tooltip>,
         ];
+        if (record.depth === 1 && record.status === AccountStatus.ACTIVE) {
+          actions.push(
+        <Tooltip key="grant" title="Cấp điểm">
+          <Button
+            type="text"
+            size="small"
+            icon={<DollarOutlined />}
+            onClick={() => setGranting(record)}
+          />
+        </Tooltip>,
+          );
+        }
         if (record.status === AccountStatus.ACTIVE) {
           actions.push(
             <Tooltip key="deactivate" title="Deactive">

@@ -3,18 +3,15 @@
 import {
   ModalForm,
   ProFormDigit,
-  ProFormSelect,
-  ProFormTextArea,
 } from '@ant-design/pro-components';
 import { App } from 'antd';
-import { PointDirection } from '@/lib/legacy-types';
 import {
   useGrantUserPoints,
   type GrantUserPointsInput,
   type UserRow,
 } from '@/lib/api/user';
 
-/** Controlled "Cấp điểm" modal for a User: amount + direction + reason. */
+/** Controlled "Cấp điểm" modal for a User: chỉ cộng điểm cho cấp dưới trực tiếp. */
 export function GrantUserPointsModal({
   record,
   open,
@@ -35,12 +32,11 @@ export function GrantUserPointsModal({
       open={open}
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
-      initialValues={{ direction: PointDirection.CREDIT }}
       onFinish={async (values) => {
         if (!record) return false;
         try {
           await grant.mutateAsync({ id: record.id, ...values });
-          message.success('Đã cập nhật điểm');
+          message.success('Đã cấp điểm');
           onSuccess?.();
           return true;
         } catch (err) {
@@ -49,15 +45,6 @@ export function GrantUserPointsModal({
         }
       }}
     >
-      <ProFormSelect
-        name="direction"
-        label="Loại"
-        rules={[{ required: true }]}
-        options={[
-          { label: 'Cộng điểm', value: PointDirection.CREDIT },
-          { label: 'Trừ điểm', value: PointDirection.DEBIT },
-        ]}
-      />
       <ProFormDigit
         name="amount"
         label="Số điểm"
@@ -65,7 +52,6 @@ export function GrantUserPointsModal({
         fieldProps={{ precision: 0 }}
         rules={[{ required: true, message: 'Nhập số điểm' }]}
       />
-      <ProFormTextArea name="reason" label="Lý do" placeholder="Ghi chú lý do (tuỳ chọn)" />
     </ModalForm>
   );
 }

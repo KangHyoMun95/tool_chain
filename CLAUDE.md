@@ -281,6 +281,9 @@ Mọi route đều yêu cầu đăng nhập, trừ route gắn `@Public()`. Rout
 ### API danh sách user cấp dưới
 `GET /api/sub-admins` (HOST / ADMIN; `users/sub-admins.*`): cây user dưới người gọi — con trực tiếp (`refer_user_id` = người gọi, `depth` 1) và toàn bộ con cháu (recursive CTE trên `refer_user_id`, tối đa 10 cấp, có chống vòng), không gồm chính người gọi. Phạm vi chỉ lấy từ token, không nhận id từ client. Query: `page`, `limit` (1–100), `status` (`ACTIVE|DEACTIVE|DELETED`), `role` (`ADMIN|USER`), `q` (số điện thoại chứa chuỗi, chỉ chữ số); sai kiểu / tham số lạ ⇒ 400. Response `{ items, total, page, limit }` dạng **cây**: `items` là con trực tiếp, mỗi item `{ user_id, phone_number, role, status, balance (chuỗi), refer_user_id, depth, created_at, children[] }` với `children` là con trực tiếp của user đó (đệ quy). `total` / `page` / `limit` tính trên con trực tiếp. Lọc `status` / `role` / `q`: giữ user khớp và mọi tổ tiên của nó (nhánh không có user khớp bị bỏ).
 
+### Cấp điểm
+`POST /api/users/:userId/points` `{ amount }` (HOST / ADMIN, `UsersService.grantPoints`): **chỉ cộng**, **chỉ cho cấp dưới trực tiếp** đang `ACTIVE` (HOST → ADMIN con, ADMIN → USER con). Cháu, cha, chính mình, user không ACTIVE hoặc không tồn tại ⇒ 403 (cùng thông báo). HOST sinh mới (`MINT`); ADMIN chuyển từ balance của mình (`TRANSFER_OUT` + `TRANSFER_IN`, không đủ ⇒ 400 `INSUFFICIENT_BALANCE`). Một DB transaction, khóa users theo `user_id` tăng dần, tính trong SQL. Web-admin chỉ hiện nút cấp điểm ở dòng `depth === 1`.
+
 ### API danh mục (chỉ đọc)
 `GET /api/lobbies`, `GET /api/categories`, `GET /api/streams` (tạo/sửa nằm ở luồng ingestion, không có API ghi). Mọi role đã đăng nhập đều gọi được.
 - Query chung: `page` (>= 1, mặc định 1), `limit` (1–100, mặc định 20), `status` (`ACTIVE|DEACTIVE|ARCHIVE`), `q` (tên chứa chuỗi, không phân biệt hoa thường). Thêm: categories `lobby_id`; streams `lobby_id`, `category_id`. Tham số lạ hoặc sai kiểu ⇒ 400.
