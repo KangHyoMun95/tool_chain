@@ -31,13 +31,11 @@ export interface UserRow {
 }
 
 export interface CreateUserInput {
-  username: string;
+  phone_number: string;
   password: string;
-  phoneNumber?: string;
 }
 
 export interface UpdateUserInput {
-  username?: string;
   password?: string;
   phoneNumber?: string;
 }
@@ -57,8 +55,10 @@ export function loadUsers(qc: QueryClient): Promise<UserRow[]> {
 export function useCreateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateUserInput) =>
-      apiFetch<UserRow>('/users', { method: 'POST', body: JSON.stringify(input) }),
+    mutationFn: async (input: CreateUserInput) => {
+      const created = await apiFetch<{ user_id: string }>('/users', { method: 'POST', body: JSON.stringify(input) });
+      return { id: created.user_id };
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   });
 }

@@ -29,14 +29,11 @@ export function EditSubAdminModal({
       open={open}
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
-      initialValues={{ username: record?.username, phoneNumber: record?.phoneNumber ?? undefined }}
+      initialValues={{ phoneNumber: record?.phoneNumber ?? undefined }}
       onFinish={async (values) => {
         if (!record) return false;
         // Only send fields that were actually filled in.
         const payload: UpdateSubAdminInput = {};
-        if (values.username && values.username !== record.username) {
-          payload.username = values.username;
-        }
         if (values.password) payload.password = values.password;
         if ((values.phoneNumber ?? '') !== (record.phoneNumber ?? '')) {
           payload.phoneNumber = values.phoneNumber ?? '';
@@ -53,20 +50,15 @@ export function EditSubAdminModal({
       }}
     >
       <ProFormText
-        name="username"
-        label="Tên đăng nhập"
-        rules={[{ min: 3 }]}
+        name="phoneNumber"
+        label="Số điện thoại"
+        rules={[{ pattern: /^\d{6,20}$/, message: 'Chỉ chữ số, 6–20 ký tự' }]}
       />
       <ProFormText.Password
         name="password"
         label="Mật khẩu mới"
         placeholder="Để trống nếu không đổi"
         rules={[{ min: 6 }]}
-      />
-      <ProFormText
-        name="phoneNumber"
-        label="Số điện thoại"
-        rules={[{ max: 20, message: 'Tối đa 20 ký tự' }]}
       />
     </ModalForm>
   );

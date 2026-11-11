@@ -32,19 +32,17 @@ export function CreateSubAdminModal({ onSuccess }: { onSuccess?: () => void }) {
       }}
     >
       <ProFormText
-        name="username"
-        label="Tên đăng nhập"
-        rules={[{ required: true, message: 'Nhập tên đăng nhập' }, { min: 3 }]}
+        name="phone_number"
+        label="Số điện thoại"
+        rules={[
+          { required: true, message: 'Nhập số điện thoại' },
+          { pattern: /^\d{6,20}$/, message: 'Chỉ chữ số, 6–20 ký tự' },
+        ]}
       />
       <ProFormText.Password
         name="password"
         label="Mật khẩu"
-        rules={[{ required: true, message: 'Nhập mật khẩu' }, { min: 6 }]}
-      />
-      <ProFormText
-        name="phoneNumber"
-        label="Số điện thoại"
-        rules={[{ max: 20, message: 'Tối đa 20 ký tự' }]}
+        rules={[{ required: true, message: 'Nhập mật khẩu' }, { min: 12, message: 'Tối thiểu 12 ký tự' }]}
       />
     </ModalForm>
   );

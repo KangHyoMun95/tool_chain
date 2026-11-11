@@ -27,13 +27,11 @@ export interface SubAdminRow {
 }
 
 export interface CreateSubAdminInput {
-  username: string;
+  phone_number: string;
   password: string;
-  phoneNumber?: string;
 }
 
 export interface UpdateSubAdminInput {
-  username?: string;
   password?: string;
   phoneNumber?: string;
 }
@@ -56,7 +54,7 @@ export function useCreateSubAdmin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateSubAdminInput) =>
-      apiFetch<SubAdminRow>('/sub-admins', {
+      apiFetch<{ user_id: string }>('/users', {
         method: 'POST',
         body: JSON.stringify(input),
       }),
