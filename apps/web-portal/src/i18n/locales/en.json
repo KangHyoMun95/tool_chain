@@ -23,8 +23,6 @@
     "live": "LIVE",
     "winRate": "CURRENT SHOE WIN",
     "winStreak": "WIN STREAK",
-    "recentResults": "Last {count} predictions",
-    "noRecent": "No predictions yet",
     "viewDetail": "AI Prediction Details",
     "empty": "No tables in this game yet.",
     "streamer": "Streamer: {name}",

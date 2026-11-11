@@ -23,8 +23,6 @@
     "live": "LIVE",
     "winRate": "WIN SHOE HIỆN TẠI",
     "winStreak": "CHUỖI THẮNG",
-    "recentResults": "{count} Dự Đoán Gần Nhất",
-    "noRecent": "Chưa có dự đoán nào",
     "viewDetail": "Chi Tiết AI Dự Đoán",
     "empty": "Chưa có bàn nào trong loại trò chơi này.",
     "streamer": "Streamer: {name}",

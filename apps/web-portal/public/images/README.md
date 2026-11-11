@@ -6,6 +6,7 @@
 | `banner-home.webp` | banner trang chủ / lobby | WebP 1800px (~60KB); bản PNG gốc 1.4MB gây giật khi chạy hiệu ứng |
 | `hud-frame.png` | nền đăng nhập mobile | khung HUD neon đỏ |
 | `pedestal-bg.png` | nền các khối của chi tiết bàn | `mix-blend-screen` |
+| `win.png`, `loss.png`, `draw.png` | `ResultOverlay` (giữa màn hình khi có kết quả so với dự đoán) | PNG nền trong suốt; `draw.png` ~1MB, được nạp sẵn khi mở trang chi tiết |
 | `lobbies/<slug>.png` | thẻ lobby, sidebar | ảnh 112×112 (hiển thị 56×56), PNG/WebP nền trong suốt |
 | `categories/<slug>.png` | thẻ category | như trên |
 

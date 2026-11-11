@@ -66,12 +66,8 @@ export type StreamListStatsDto = {
   losses: number;
   draws: number;
   win_rate: number | null;
-  win_streak: number;
-  recent: RecentResultDto[];   // shoe hiện tại, cũ → mới, chỉ ván FINISHED, bỏ ván hòa
+  win_streak: number;   // chuỗi thắng dài nhất của shoe hiện tại, hoặc của shoe trước khi shoe hiện tại còn ít dữ liệu (API quyết định)
 };
-
-/** Một dự đoán đã chấm (công khai): pick, kết quả của ván, thắng = pick trùng kết quả. */
-export type RecentResultDto = { pick: "B" | "P"; result: "B" | "P"; win: boolean };
 
 export const fetchCategoryStreamStats = async (categoryId: string): Promise<StreamListStatsDto[]> =>
   (await apiGet<{ items: StreamListStatsDto[] }>(`/categories/${encodeURIComponent(categoryId)}/stream-stats`)).items;
