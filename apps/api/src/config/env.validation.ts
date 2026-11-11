@@ -14,6 +14,10 @@ export class EnvVars {
   // Ván RUNNING không có result quá số phút này thì bị CANCELLED (và hoàn tiền). Job chỉ chạy khi GAME_SESSION_CANCEL_ENABLED=true.
   @IsOptional() @IsInt() @Min(1) @Max(1440) GAME_SESSION_CANCEL_AFTER_MINUTES: number = 5;
   @IsOptional() @IsIn(["true", "false"]) GAME_SESSION_CANCEL_ENABLED: "true" | "false" = "false";
+  // Hub (SSE): stream chỉ nhận tick cũ hơn phiên đang giữ liên tục quá khoảng này ⇒ xóa state, tick kế tiếp khởi tạo lại.
+  @IsOptional() @IsInt() @Min(5_000) @Max(3_600_000) HUB_STALE_RESET_MS: number = 60_000;
+  // true ⇒ Nest logger in thêm mức DEBUG (mặc định chỉ log / warn / error / fatal). Đọc trong main.ts trước khi tạo app.
+  @IsOptional() @IsIn(["true", "false"]) API_LOG_DEBUG: "true" | "false" = "false";
 
   @IsOptional() @IsInt() @Min(60) @Max(3600) ACCESS_TOKEN_TTL_SECONDS: number = 900;
   @IsOptional() @IsInt() @Min(300) SESSION_TTL_SECONDS: number = 7 * 24 * 3600;

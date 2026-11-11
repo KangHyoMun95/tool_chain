@@ -1,3 +1,5 @@
+import os
+
 import pandas as pd
 
 # Pattern matching
@@ -15,6 +17,9 @@ COUNTED_TTL_SECONDS = 48 * 60 * 60   # ai:counted:{stream_id}:{shoe}
 REBUILD_COUNTED_WINDOW_SECONDS = COUNTED_TTL_SECONDS   # dựng lại: chỉ tạo tập counted cho shoe có ván trong khoảng này
 MISSING_PREVIOUS_RETRIES = 3         # đọc lại recent khi thiếu round - 1
 MISSING_PREVIOUS_DELAY_S = 0.3
+# recent:{stream_id}:{shoe} thiếu round ⇒ đọc bù từ DB các ván có result của shoe đó trong số giờ gần nhất này
+# (số shoe có thể lặp lại giữa các ngày: không đọc quá xa để không trộn shoe cùng số của ngày khác).
+HISTORY_DB_WINDOW_HOURS = int(os.environ.get("AI_HISTORY_DB_WINDOW_HOURS", "6"))
 READ_COUNT = 50                      # XREADGROUP COUNT
 BLOCK_MS = 2_000
 MAX_CONCURRENT_PREDICTIONS = 32

@@ -152,14 +152,17 @@ export class PredictResultConsumer implements OnApplicationBootstrap, OnModuleDe
     if (msg.pick === null) {
       // AI không dự đoán: không ai bị trừ, báo cho mọi participant.
       const n = this.delivery.deliverUnpaid(event);
-      this.log.log(`Prediction ${msg.key_id} shoe ${msg.shoe}, round ${msg.round}: ${msg.reason} (${n} kết nối)`);
+      // pick = null: không ai bị trừ tiền ⇒ DEBUG (API_LOG_DEBUG=true mới in).
+      this.log.debug(`Prediction ${msg.key_id} shoe ${msg.shoe}, round ${msg.round}: ${msg.reason} (${n} kết nối)`);
       return;
     }
 
     // Có pick: chỉ user đã trừ tiền nhận pick (lọc ở server). Participant không trừ được thì bị đóng kết nối.
     if (charge) this.delivery.closeRejected(msg.stream_id, charge.rejected);
     const r = await this.delivery.deliverPaid(msg.prediction_id, event);
-    this.log.log(
+    // Không có participant (không ai bị trừ, không ai được giao) ⇒ DEBUG.
+    const quiet = charge?.skipped === "NO_PARTICIPANTS" || (r.due === 0 && (charge?.charged.length ?? 0) === 0 && (charge?.rejected.length ?? 0) === 0);
+    (quiet ? this.log.debug.bind(this.log) : this.log.log.bind(this.log))(
       `Prediction ${msg.key_id} shoe ${msg.shoe}, round ${msg.round}: ${msg.pick}; ` +
       `trừ ${charge?.charged.length ?? 0} user, không trừ được ${charge?.rejected.length ?? 0}` +
       `${charge?.skipped ? ` (${charge.skipped})` : ""}, giao ${r.delivered}/${r.due}`);
