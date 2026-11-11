@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ValidationPipe, type LogLevel } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
@@ -18,7 +18,12 @@ function parseTrustProxy(value?: string): boolean | number | string {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  // API_LOG_DEBUG=true ⇒ thêm mức debug (mặc định Nest in cả debug / verbose). Đọc trực tiếp vì logger cần trước khi có ConfigService;
+  // giá trị vẫn được validate trong env.validation.ts.
+  const logger: LogLevel[] = process.env.API_LOG_DEBUG === 'true'
+    ? ['log', 'warn', 'error', 'fatal', 'debug']
+    : ['log', 'warn', 'error', 'fatal'];
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger });
   const config = app.get<ConfigService<EnvVars, true>>(ConfigService);
 
   app.setGlobalPrefix("api");

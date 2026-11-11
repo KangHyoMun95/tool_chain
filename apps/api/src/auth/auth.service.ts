@@ -26,6 +26,7 @@ export type MeResponse = {
   status: UserStatus;
   balance: string; // bigint → string
   refer_user_id: string | null;
+  can_participate: boolean; // USER, ACTIVE và balance >= PREDICTION_FEE (tính trong SQL); portal dùng để khóa thẻ bàn, không tự so balance
 };
 
 @Injectable()
@@ -65,7 +66,7 @@ export class AuthService implements OnModuleInit {
     };
   }
 
-  async login(phone: string, password: string, ip: string): Promise<TokenPair> {
+  async login(phone: string, password: string, ip: string, audience?: "portal"): Promise<TokenPair> {
     await this.attempts.assertNotLocked(phone);
 
     const row = await this.dataSource
@@ -83,6 +84,12 @@ export class AuthService implements OnModuleInit {
     if (!row || !passwordOk || row.status !== UserStatus.ACTIVE) {
       await this.attempts.recordFailure(phone);
       this.log.warn(`login failed phone=${this.mask(phone)} ip=${ip}`);
+      throw new UnauthorizedException(INVALID_CREDENTIALS);
+    }
+
+    // Portal chỉ dành cho USER. Cùng lỗi với sai mật khẩu để không lộ role; không tính vào số lần sai (mật khẩu đúng).
+    if (audience === "portal" && row.role !== "USER") {
+      this.log.warn(`portal login rejected: role=${row.role} user_id=${row.user_id} ip=${ip}`);
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
 
@@ -133,9 +140,11 @@ export class AuthService implements OnModuleInit {
       .addSelect("u.status", "status")
       .addSelect("u.balance", "balance")
       .addSelect("u.refer_user_id", "refer_user_id")
+      .addSelect("(r.role_name = :userRole AND u.status = :active AND u.balance >= CAST(:fee AS bigint))", "can_participate")
       .from(UserEntity, "u")
       .innerJoin(RoleEntity, "r", "r.role_id = u.role_id")
       .where("u.user_id = :userId", { userId })
+      .setParameters({ userRole: "USER", active: UserStatus.ACTIVE, fee: String(this.config.get("PREDICTION_FEE", { infer: true })) })
       .getRawOne<MeResponse>();
   }
 }

@@ -1,15 +1,17 @@
 "use client";
 
+import type { LiveStatus } from "@/src/hooks/use-live-items";
 import { usePrediction } from "@/src/hooks/use-prediction";
 import { useI18n } from "@/src/i18n/provider";
 import { cn } from "@/src/lib/cn";
 import { HudCard } from "../ui/HudCard";
 import { Radar } from "../ui/Radar";
 import { DecorImage } from "./DecorImage";
+import { ResultOverlay } from "./ResultOverlay";
 
 type Props = {
   streamId: string;
-  connection: "connecting" | "live" | "reconnecting" | "revoked";
+  connection: LiveStatus;
   shoe: number | null;
   round: number | null;
   status: string | null;   // status thô của message mới nhất
@@ -40,12 +42,16 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
   const { t } = useI18n();
   const { phase, prediction } = usePrediction(streamId, shoe, round, status);
   const online = connection === "live";
-  // pick = null (AI chưa đủ dữ liệu): không có đúng / sai, chỉ hiện hòa khi kết quả là T
-  const tone = online && prediction && result !== null
+  // pick = null (AI chưa đủ dữ liệu): không có đúng / sai, chỉ hiện hòa khi kết quả là T. Bị khóa (vào giữa ván): không tô màu.
+  const tone = online && prediction && !prediction.locked && result !== null
     ? (result === "T" ? "draw" : prediction.pick === null ? null : prediction.pick === result ? "win" : "loss")
     : null;
+  // Ảnh kết quả giữa màn hình: win / loss cần có pick để so; draw (kết quả T) hiện cả khi AI không có pick, như màu nền hòa của khung.
+  const overlayTone = tone === "draw" ? tone : tone && prediction?.pick ? tone : null;
 
   return (
+    <>
+    <ResultOverlay tone={overlayTone} roundKey={`${streamId}:${shoe}:${round}`} />
     <HudCard glow className={cn("relative flex h-[236px] flex-col items-center justify-start overflow-hidden p-3", tone && tone !== "win" && TONE_CLASS[tone])} aria-live="polite">
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <DecorImage src="/images/pedestal-bg.png" className="h-full w-full object-cover opacity-70 mix-blend-screen" />
@@ -66,6 +72,12 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
             <span className="animate-pulse">{t(phase === "analyzing" ? "live.scanning" : "live.loadingData")}</span>
             <span className="h-1.5 w-1.5 animate-ping rounded-full bg-neon" />
           </p>
+        </>
+      ) : phase === "ready" && prediction?.locked ? (
+        <>
+          <StatusBar label={statusLabel} />
+          <div className="relative z-10 my-2 opacity-60"><Radar size={105} /></div>
+          <p className="relative z-10 font-mono text-xs font-black uppercase tracking-widest text-gray-200">{t("live.nextRound")}</p>
         </>
       ) : phase === "missing" ? (
         <>
@@ -104,5 +116,6 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
         )
       )}
     </HudCard>
+    </>
   );
 }

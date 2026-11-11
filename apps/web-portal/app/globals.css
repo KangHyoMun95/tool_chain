@@ -132,4 +132,36 @@
   50% { transform: scale(1.14); }
 }
 .predict-reveal { animation: predict-reveal 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+/* Ảnh kết quả giữa màn hình (ResultOverlay, 2.6s = SHOW_MS): hiện vào → giữ → mờ dần cuối. */
+@keyframes result-overlay-win {          /* từ trong ra ngoài, nhanh (~350ms), bật quá rồi dừng dứt khoát */
+  0% { clip-path: circle(0% at 50% 50%); transform: scale(0.3); opacity: 0; }
+  13% { clip-path: circle(80% at 50% 50%); transform: scale(1.18); opacity: 1; }
+  19% { clip-path: circle(80% at 50% 50%); transform: scale(1); }
+  88% { clip-path: circle(80% at 50% 50%); transform: scale(1); opacity: 1; }
+  100% { clip-path: circle(80% at 50% 50%); transform: scale(1.06); opacity: 0; }
+}
+@keyframes result-overlay-loss {         /* từ trên xuống dưới (~600ms) */
+  0% { clip-path: inset(0 0 100% 0); transform: translateY(-60px); opacity: 0.3; }
+  23% { clip-path: inset(0 0 0 0); transform: translateY(0); opacity: 1; }
+  88% { clip-path: inset(0 0 0 0); transform: translateY(0); opacity: 1; }
+  100% { clip-path: inset(0 0 0 0); transform: translateY(16px); opacity: 0; }
+}
+@keyframes result-overlay-draw {         /* từ trong ra ngoài, nhẹ nhàng (~900ms, không bật) */
+  0% { clip-path: circle(0% at 50% 50%); transform: scale(0.85); opacity: 0; }
+  35% { clip-path: circle(80% at 50% 50%); transform: scale(1); opacity: 1; }
+  88% { clip-path: circle(80% at 50% 50%); transform: scale(1); opacity: 1; }
+  100% { clip-path: circle(80% at 50% 50%); transform: scale(1); opacity: 0; }
+}
+@keyframes result-overlay-dim { 0% { opacity: 0; } 12% { opacity: 1; } 88% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes result-overlay-fade { 0% { opacity: 0; } 10% { opacity: 1; } 88% { opacity: 1; } 100% { opacity: 0; } }
+.result-overlay-win { animation: result-overlay-win 2.6s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.result-overlay-loss { animation: result-overlay-loss 2.6s cubic-bezier(0.33, 1, 0.68, 1) both; }
+.result-overlay-draw { animation: result-overlay-draw 2.6s ease-out both; }
+.result-overlay-dim { animation: result-overlay-dim 2.6s linear both; }
+/* Máy bật "giảm chuyển động": không bỏ hẳn hiệu ứng (ảnh phải vẫn hiện), chỉ mờ vào / ra. */
+@media (prefers-reduced-motion: reduce) {
+  .result-overlay-win, .result-overlay-loss, .result-overlay-draw { animation: result-overlay-fade 2.6s linear both !important; }
+  .result-overlay-dim { animation: result-overlay-dim 2.6s linear both !important; }
+}
 .predict-pulse { display: inline-block; animation: predict-pulse 1.8s ease-in-out infinite; }

@@ -94,24 +94,44 @@ export class PredictTriggerService implements OnApplicationBootstrap, OnModuleDe
 
   /** Lỗi Redis ném ra ngoài (để loop thử lại); tick hỏng chỉ bị bỏ qua. */
   private async handle(entryId: string, fields: string[]): Promise<void> {
+    // Mọi nhánh bỏ qua đều log (logOnce: tối đa 1 dòng / phút / khóa). Nhánh trùng lặp bình thường (đã gửi kết quả / request,
+    // status không tiến) thì không log vì mỗi ván có hàng chục tick.
+    const { item_id: itemId, tick: rawTick } = fieldsToObject(fields);
     let tick: Tick;
-    try { tick = JSON.parse(fieldsToObject(fields).tick) as Tick; } catch { return; }
+    try { tick = JSON.parse(rawTick) as Tick; } catch {
+      this.logOnce(`badjson:${itemId}`, "info", `Bỏ qua tick ${entryId} của ${itemId}: không parse được JSON`);
+      return;
+    }
     const d = tick?.data as Record<string, unknown> | undefined;
-    if (!d || typeof d !== "object") return;
+    if (!d || typeof d !== "object" || Array.isArray(d)) {
+      this.logOnce(`nodata:${itemId}`, "info", `Bỏ qua tick ${entryId} của ${itemId}: data không phải object`);
+      return;
+    }
 
     // Cùng cách ingestion sinh key_id / game_session_id, để ID khớp với bản ghi game_sessions.
     const names = [d.lobby_name, d.category_name, d.stream_name];
-    if (!names.every((n): n is string => typeof n === "string" && n.trim() !== "" && !n.includes("|"))) return;
+    if (!names.every((n): n is string => typeof n === "string" && n.trim() !== "" && !n.includes("|"))) {
+      this.logOnce(`badname:${itemId}`, "info", `Bỏ qua tick ${entryId} của ${itemId}: lobby/category/stream_name thiếu, rỗng hoặc chứa "|"`);
+      return;
+    }
     const keyId = buildKeyId(names[0], names[1], names[2]);
     const shoe = toInt(d.stream_shoe);
     const round = toInt(d.stream_round);
-    if (shoe === null || round === null) return;
+    if (shoe === null || round === null) {
+      this.logOnce(`badpos:${keyId}`, "info",
+        `Bỏ qua tick ${entryId} của ${keyId}: stream_shoe "${String(d.stream_shoe)}" / stream_round "${String(d.stream_round)}" không phải số nguyên`);
+      return;
+    }
     const gsid = gameSessionId(keyId, shoe, round);
 
     const firstSeen = !this.sessions.has(gsid);
     const st = this.sessions.get(gsid) ?? { status: null, resultSent: false, requestDone: false };
     this.sessions.set(gsid, st);
     const status = isStatus(d.status) ? d.status : null;
+    if (!status) {
+      this.logOnce(`badstatus:${keyId}`, "info",
+        `Tick ${keyId} shoe ${shoe}, round ${round} có status lạ "${String(d.status)}": không cập nhật round_status, không gửi yêu cầu dự đoán`);
+    }
 
     // 1) Trạng thái mới nhất của ván (chỉ tiến). Ghi TRƯỚC khi XADD để AI đọc thấy dữ liệu mới nhất.
     if (status && rank(status) > rank(st.status)) {
@@ -165,6 +185,7 @@ export class PredictTriggerService implements OnApplicationBootstrap, OnModuleDe
           );
           st.requestDone = true;
           if (sent) this.log.log(`Yêu cầu dự đoán: ${keyId} shoe ${shoe}, round ${round}`);
+          else this.logOnce(`reqdup:${gsid}`, "info", `Không gửi lại yêu cầu dự đoán ${keyId} shoe ${shoe}, round ${round}: đã có cờ predict_req (đã gửi trước đó, vd trước khi restart)`);
         }
       }
     } else if (firstSeen && status && status !== "IN_PROGRESS") {

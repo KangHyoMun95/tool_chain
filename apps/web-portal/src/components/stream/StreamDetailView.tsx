@@ -1,15 +1,18 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { useApi } from "@/src/hooks/use-api";
 import { useStreamSession } from "@/src/hooks/use-stream-session";
 import { useI18n } from "@/src/i18n/provider";
+import { isInsufficientBalance } from "@/src/lib/api/client";
 import { getStream, type Stream } from "@/src/lib/api/catalog";
+import { INSUFFICIENT_NOTICE } from "@/src/lib/notice";
 import { parseStreamer } from "@/src/lib/streamer";
 import { stagger } from "@/src/lib/stagger";
 import { PageBanner } from "../catalog/PageBanner";
 import { PageBannerSkeleton, StreamDetailSkeleton } from "../catalog/Skeletons";
-import { ErrorState } from "../DataStates";
+import { ErrorState, InsufficientBalanceState } from "../DataStates";
 import { ChartIcon } from "../icons";
 import { NotFoundView } from "../NotFoundView";
 import { AppShell } from "../shell/AppShell";
@@ -30,9 +33,12 @@ export function StreamDetailView({ streamId }: { streamId: string }) {
   let body;
   if (stream.status === "loading") body = <><PageBannerSkeleton /><StreamDetailSkeleton /></>;
   else if (stream.status === "error") {
-    body = stream.error.status === 404 || stream.error.status === 400
-      ? <NotFoundView />
-      : <ErrorState error={stream.error} onRetry={stream.reload} />;
+    // 402: USER không đủ điểm (vào bằng link trực tiếp; thẻ bàn ở danh sách đã bị khóa).
+    body = isInsufficientBalance(stream.error)
+      ? <InsufficientBalanceState />
+      : stream.error.status === 404 || stream.error.status === 400
+        ? <NotFoundView />
+        : <ErrorState error={stream.error} onRetry={stream.reload} />;
   } else body = <StreamDetail stream={stream.data} />;
 
   return <AppShell>{body}</AppShell>;
@@ -41,7 +47,12 @@ export function StreamDetailView({ streamId }: { streamId: string }) {
 function StreamDetail({ stream }: { stream: Stream }) {
   const { id } = stream;
   const { t } = useI18n();
+  const router = useRouter();
   const live = useStreamSession(stream);
+  // Hết điểm giữa chừng (event insufficient_balance / 402 khi xin ticket): quay về danh sách bàn kèm thông báo.
+  useEffect(() => {
+    if (live.connection === "insufficient") router.replace(`/categories/${stream.categoryId}?notice=${INSUFFICIENT_NOTICE}`);
+  }, [live.connection, router, stream.categoryId]);
   const statusLabel = t(`live.status.${live.status ?? "none"}`);
   // Huy hiệu ở banner: xanh = SSE đang kết nối, đỏ = mất kết nối đang thử lại, xám = chưa/không có kết nối.
   const state: ConnectionState = live.connection === "live" ? "live" : live.connection === "reconnecting" ? "reconnecting" : "offline";
@@ -53,7 +64,7 @@ function StreamDetail({ stream }: { stream: Stream }) {
     () => (stats?.shoes ?? []).map((r) => ({ key: String(r.shoe), label: `#${r.shoe}`, value: Math.round(r.win_rate * 1000) / 10 })),
     [stats],
   );
-  const streak = stats?.win_streak ?? 0;
+  const streak = stats?.best_streak ?? 0;   // chuỗi thắng tốt nhất của shoe hiện tại (GET /predictions/best-streak)
 
   return (
     <>

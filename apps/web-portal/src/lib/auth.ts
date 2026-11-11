@@ -48,6 +48,16 @@ async function readAccessToken(res: Response): Promise<string | null> {
   return typeof token === "string" ? token : null;
 }
 
+/** Role trong claim của access token (chỉ để chặn phía UI; API vẫn kiểm tra role ở từng route). */
+function isUserToken(token: string): boolean {
+  try {
+    const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return (JSON.parse(atob(payload)) as { role?: unknown }).role === "USER";
+  } catch {
+    return false;
+  }
+}
+
 async function isTokenValid(token: string): Promise<boolean> {
   try {
     const res = await fetch(`${API_BASE}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
@@ -68,7 +78,8 @@ function refreshAccessToken(): Promise<boolean> {
       const res = await fetch(`${API_BASE}/auth/refresh`, { method: "POST", credentials: "include" });
       if (!res.ok) return false;
       const token = await readAccessToken(res);
-      if (token === null) return false;
+      // Cookie refresh dùng chung với web-admin (cùng site): phiên HOST / ADMIN không được vào portal.
+      if (token === null || !isUserToken(token)) return false;
       accessToken = token;
       return true;
     } catch {
@@ -123,7 +134,7 @@ export async function login(phone: string, password: string): Promise<void> {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone_number: phone, password }),
+      body: JSON.stringify({ phone_number: phone, password, audience: "portal" }),
     });
   } catch {
     throw new AuthError("network");
@@ -136,5 +147,21 @@ export async function login(phone: string, password: string): Promise<void> {
 
   const token = await readAccessToken(res);
   if (token === null) throw new AuthError("unknown");
+  if (!isUserToken(token)) throw new AuthError("invalid_credentials");
   accessToken = token;
+}
+
+/**
+ * Đăng xuất: POST /auth/logout (server xóa session + refresh token trong Redis, đóng các kết nối SSE, xóa cookie refresh).
+ * 401 nghĩa là phiên đã không còn (hết hạn / bị thu hồi) nên coi như đã đăng xuất. Lỗi mạng / 5xx ⇒ ném AuthError, token giữ nguyên.
+ */
+export async function logout(): Promise<void> {
+  let res: Response;
+  try {
+    res = await authFetch("/auth/logout", { method: "POST", credentials: "include" });
+  } catch {
+    throw new AuthError("network");
+  }
+  if (!res.ok && res.status !== 401) throw new AuthError("unknown");
+  accessToken = null;
 }

@@ -5,13 +5,14 @@ import { useI18n } from "@/src/i18n/provider";
 import type { Stream } from "@/src/lib/api/catalog";
 import type { StreamListStatsDto } from "@/src/lib/api/predictions";
 import { stagger } from "@/src/lib/stagger";
-import { ResultBeads } from "../ResultBeads";
 
-/** Thẻ bàn ở danh sách. Số liệu AI lấy từ GET /categories/:id/stream-stats; tỷ lệ win là của shoe hiện tại. */
-export function StreamCard({ stream, stats, index }: { stream: Stream; stats?: StreamListStatsDto; index: number }) {
+/**
+ * Thẻ bàn ở danh sách. Số liệu AI lấy từ GET /categories/:id/stream-stats; tỷ lệ win là của shoe hiện tại.
+ * canParticipate = false (me.can_participate do API tính) ⇒ khóa nút vào trang chi tiết (vào trang = bị trừ tiền).
+ */
+export function StreamCard({ stream, stats, index, canParticipate = true }: { stream: Stream; stats?: StreamListStatsDto; index: number; canParticipate?: boolean }) {
   const { t } = useI18n();
   const live = stats?.live ?? false;
-  const recent = stats?.recent ?? [];
   const title = `${stream.categoryName} ${stream.name}`;   // giống tiêu đề trang chi tiết
 
   return (
@@ -57,13 +58,9 @@ export function StreamCard({ stream, stats, index }: { stream: Stream; stats?: S
             </span>
           </div>
         </div>
-
-        <div className="mt-3">
-          <span className="mb-1.5 block font-mono text-[11px] font-semibold text-gray-300">{t("streams.recentResults", { count: recent.length })}</span>
-          {recent.length > 0 ? <ResultBeads results={recent} /> : <p className="font-mono text-[11px] text-gray-500">{t("streams.noRecent")}</p>}
-        </div>
       </div>
 
+      {canParticipate ? (
       <Link
         href={`/streams/${stream.id}`}
         className="btn-fx mt-4 flex w-full select-none items-center justify-center gap-1 rounded-xl py-2.5 text-center text-xs font-bold text-white shadow-[0_0_14px_rgba(255,30,66,0.6)] md:text-sm"
@@ -71,6 +68,14 @@ export function StreamCard({ stream, stats, index }: { stream: Stream; stats?: S
       >
         <span className="relative z-10">{t("streams.viewDetail")}</span> <span className="fx-arrow-right relative z-10 text-base leading-none">→</span>
       </Link>
+      ) : (
+        <span
+          aria-disabled="true"
+          className="mt-4 flex w-full cursor-not-allowed select-none items-center justify-center rounded-xl border border-gray-700 bg-[#1a1a22] py-2.5 text-center text-xs font-bold text-gray-400 md:text-sm"
+        >
+          {t("streams.insufficientBalance")}
+        </span>
+      )}
     </article>
   );
 }

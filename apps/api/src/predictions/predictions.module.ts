@@ -9,10 +9,12 @@ import { PredictTriggerService } from "./predict-trigger.service.js";
 import { CategoriesModule } from "../categories/categories.module.js";
 import { CategoryStreamStatsController, PredictionsController } from "./predictions.controller.js";
 import { PredictionsService } from "./predictions.service.js";
+import { BillingModule } from "../billing/billing.module.js";
+import { PredictionDeliveryService } from "./prediction-delivery.service.js";
 
 @Module({
-  imports: [IngestionModule, GameSessionsModule, StreamsModule, CategoriesModule, RealtimeModule],   // IdCache, insertMany, quyền xem stream, RealtimeHub
+  imports: [IngestionModule, GameSessionsModule, StreamsModule, CategoriesModule, RealtimeModule, BillingModule],   // BillingService (trừ tiền); IdCache, insertMany, quyền xem stream, ConnectionRegistry (participant + giao pick)
   controllers: [PredictionsController, CategoryStreamStatsController],
-  providers: [PredictTriggerService, PredictResultConsumer, PredictionsService],
+  providers: [PredictTriggerService, PredictResultConsumer, PredictionsService, PredictionDeliveryService],
 })
 export class PredictionsModule {}
