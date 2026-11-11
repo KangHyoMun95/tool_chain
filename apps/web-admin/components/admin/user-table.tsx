@@ -166,6 +166,7 @@ export function UserTable() {
           const { rows, total } = await fetchManagedUsers(toManagedUserQuery(params));
           return { data: rows, total, success: true };
         }}
+        expandable={{ childrenColumnName: 'children' }}
         search={{ labelWidth: 'auto' }}
         pagination={{ pageSize: 10, showSizeChanger: true }}
         headerTitle="Danh sách người dùng"

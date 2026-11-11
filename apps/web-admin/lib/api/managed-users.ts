@@ -12,6 +12,7 @@ interface ManagedUserDto {
   refer_user_id: string;
   depth: number;
   created_at: string;
+  children: ManagedUserDto[];
 }
 
 interface ManagedUserPage {
@@ -22,7 +23,7 @@ interface ManagedUserPage {
 }
 
 /** Một dòng của GET /sub-admins, đủ trường để các modal sửa / cấp điểm cũ dùng được. */
-export type ManagedUserRow = UserRow & SubAdminRow & { depth: number };
+export type ManagedUserRow = UserRow & SubAdminRow & { depth: number; children?: ManagedUserRow[] };
 
 export interface ManagedUserQuery {
   page: number;
@@ -45,9 +46,10 @@ const toRow = (u: ManagedUserDto): ManagedUserRow => ({
   depth: u.depth,
   createdAt: u.created_at,
   updatedAt: u.created_at,
+  ...(u.children.length ? { children: u.children.map(toRow) } : {}),
 });
 
-/** Mọi user dưới người đăng nhập (con trực tiếp và con cháu), phân trang ở server. */
+/** Cây user dưới người đăng nhập: con trực tiếp ở gốc (phân trang ở server), con cháu nằm trong `children`. */
 export async function fetchManagedUsers(query: ManagedUserQuery): Promise<{ rows: ManagedUserRow[]; total: number }> {
   const params = new URLSearchParams({ page: String(query.page), limit: String(query.limit) });
   if (query.q) params.set('q', query.q);
