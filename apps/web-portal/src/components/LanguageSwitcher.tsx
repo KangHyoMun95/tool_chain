@@ -4,7 +4,7 @@ import { LOCALES, LOCALE_LABELS, isLocale } from "@/src/i18n/config";
 import { useI18n } from "@/src/i18n/provider";
 import { GlobeIcon } from "./icons";
 
-/** Chọn ngôn ngữ. Hiện chưa gắn vào đâu (sẽ nằm trong menu hamburger khi có thiết kế); giữ lại để dùng sau. */
+/** Chọn ngôn ngữ (select); nằm trong LanguageDialog của menu hamburger. */
 export function LanguageSwitcher() {
   const { locale, setLocale, t } = useI18n();
 

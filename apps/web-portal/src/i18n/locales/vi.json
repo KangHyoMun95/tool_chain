@@ -134,6 +134,11 @@
     "menu": "Mở menu",
     "closeMenu": "Đóng menu",
     "menuLanguage": "Chọn ngôn ngữ",
+    "logoutTitle": "Đăng xuất",
+    "logoutConfirm": "Bạn có chắc muốn đăng xuất không?",
+    "logoutYes": "Có",
+    "logoutNo": "Không",
+    "logoutFailed": "Không đăng xuất được. Vui lòng thử lại.",
     "menuLogout": "Đăng xuất"
   },
   "sidebar": {
