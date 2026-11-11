@@ -1,8 +1,24 @@
 import type { ChosenPattern, PredictionReason } from "@toolhackchain/shared";
 import { ApiError, apiGet } from "./client";
 
-/** GET /streams/:id/predictions/current — confidence là tỉ lệ 0–1. */
-export type CurrentPredictionDto = {
+/**
+ * GET /streams/:id/predictions/current — confidence là tỉ lệ 0–1.
+ * Ván còn chạy mà user chưa bị trừ tiền cho ván đó (vào giữa ván) ⇒ locked: true, không có pick ("Dự đoán từ ván sau").
+ */
+export type CurrentPredictionDto = UnlockedPredictionDto | LockedPredictionDto;
+
+export type LockedPredictionDto = {
+  locked: true;
+  prediction_id: string;
+  game_session_id: string;
+  stream_id: string;
+  shoe: number;
+  round: number;
+  created_at: string;
+};
+
+export type UnlockedPredictionDto = {
+  locked: false;
   prediction_id: string;
   game_session_id: string;
   stream_id: string;
@@ -51,8 +67,11 @@ export type StreamListStatsDto = {
   draws: number;
   win_rate: number | null;
   win_streak: number;
-  recent: boolean[];   // shoe hiện tại, cũ → mới, true = thắng
+  recent: RecentResultDto[];   // shoe hiện tại, cũ → mới, chỉ ván FINISHED, bỏ ván hòa
 };
+
+/** Một dự đoán đã chấm (công khai): pick, kết quả của ván, thắng = pick trùng kết quả. */
+export type RecentResultDto = { pick: "B" | "P"; result: "B" | "P"; win: boolean };
 
 export const fetchCategoryStreamStats = async (categoryId: string): Promise<StreamListStatsDto[]> =>
   (await apiGet<{ items: StreamListStatsDto[] }>(`/categories/${encodeURIComponent(categoryId)}/stream-stats`)).items;
