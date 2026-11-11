@@ -131,7 +131,10 @@
     "balance": "Balance",
     "deposit": "DEPOSIT",
     "notifications": "Notifications",
-    "menu": "Open menu"
+    "menu": "Open menu",
+    "closeMenu": "Close menu",
+    "menuLanguage": "Language",
+    "menuLogout": "Log out"
   },
   "sidebar": {
     "label": "Navigation",

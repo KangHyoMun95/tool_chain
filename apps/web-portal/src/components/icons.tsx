@@ -248,3 +248,17 @@ export const ChartIcon = (props: IconProps) => (
     <path d="m7 15 4-4 3 3 5-6" />
   </Icon>
 );
+
+export const XIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M6 6l12 12M18 6 6 18" />
+  </Icon>
+);
+
+export const LogOutIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+    <path d="m16 17 5-5-5-5" />
+    <path d="M21 12H9" />
+  </Icon>
+);
