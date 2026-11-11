@@ -5,7 +5,7 @@ import {
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query';
-import { AccountStatus, PointDirection } from '@/lib/legacy-types';
+import { AccountStatus } from '@/lib/legacy-types';
 import type { Role } from '@/lib/auth/roles';
 import { apiFetch } from './client';
 import { ME_KEY } from './profile';
@@ -44,8 +44,6 @@ export interface UpdateUserInput {
 
 export interface GrantUserPointsInput {
   amount: number;
-  direction: PointDirection;
-  reason?: string;
 }
 
 export function fetchUsers(): Promise<UserRow[]> {

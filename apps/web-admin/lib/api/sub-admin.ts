@@ -5,7 +5,7 @@ import {
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query';
-import { AccountStatus, PointDirection } from '@/lib/legacy-types';
+import { AccountStatus } from '@/lib/legacy-types';
 import type { Role } from '@/lib/auth/roles';
 import { apiFetch } from './client';
 
@@ -40,8 +40,6 @@ export interface UpdateSubAdminInput {
 
 export interface GrantPointsInput {
   amount: number;
-  direction: PointDirection;
-  reason?: string;
 }
 
 /** Raw fetch of all Admin(Con)s owned by the current Host (used by ProTable). */
@@ -90,15 +88,13 @@ export function useDeactivateSubAdmin() {
 }
 
 /**
- * Grant/deduct points for an Admin(Con) via POST /sub-admins/:id/points.
- * The backend routes this through PointsService, which updates the balance and
- * writes a PointTransaction audit record in one transaction (per CLAUDE.md).
+ * Cấp điểm cho cấp dưới trực tiếp: POST /users/:id/points `{ amount }` (API từ chối cháu / cha).
  */
 export function useGrantPoints() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...input }: GrantPointsInput & { id: string }) =>
-      apiFetch<SubAdminRow>(`/sub-admins/${id}/points`, {
+      apiFetch<SubAdminRow>(`/users/${id}/points`, {
         method: 'POST',
         body: JSON.stringify(input),
       }),
