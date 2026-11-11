@@ -31,11 +31,14 @@ export class RealtimeTicketService {
   ) {}
 
   /**
+   * items: USER chỉ nhận key_id của stream ACTIVE (có category + lobby cha ACTIVE), key_id khác bị bỏ; không còn item hợp lệ
+   * (và không tham gia stream nào) ⇒ 403. HOST / ADMIN thấy tất cả.
    * participate_stream_id: chỉ USER (HOST / ADMIN ⇒ 403), stream trong phạm vi nhìn thấy (404), đủ điểm (402 INSUFFICIENT_BALANCE).
    * key_id của stream tham gia luôn được thêm vào items.
    */
   async issue(actor: AuthUser, dto: SseTicketDto): Promise<{ ticket: string; expires_in: number }> {
-    const items = new Set(dto.items.map((s) => s.trim()).filter(Boolean));
+    const requested = [...new Set(dto.items.map((s) => s.trim()).filter(Boolean))];
+    const items = new Set(actor.role === USER_ROLE ? await this.streams.visibleKeyIds(requested) : requested);
     let participate: Participation | null = null;
     if (dto.participate_stream_id) {
       if (actor.role !== USER_ROLE) throw new ForbiddenException();
@@ -45,7 +48,10 @@ export class RealtimeTicketService {
       participate = { streamId: stream.stream_id, keyId };
       items.add(keyId);
     }
-    if (items.size === 0) throw new BadRequestException("items hoặc participate_stream_id là bắt buộc");
+    if (items.size === 0) {
+      if (requested.length > 0) throw new ForbiddenException();
+      throw new BadRequestException("items hoặc participate_stream_id là bắt buộc");
+    }
 
     const ticket = randomBytes(24).toString("base64url");
     const value: SseTicket = { user_id: actor.userId, session_id: actor.sessionId, items: [...items], participate };

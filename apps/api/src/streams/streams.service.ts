@@ -38,6 +38,24 @@ export class StreamsService {
     return qb;
   }
 
+  /**
+   * Các key_id (đã chuẩn hóa: `lobby|category|stream`) thuộc stream mà USER được thấy (stream + category + lobby đều ACTIVE).
+   * Một truy vấn cho cả danh sách; key_id không đúng dạng chuẩn hóa hoặc không tồn tại thì không có trong kết quả.
+   */
+  async visibleKeyIds(keyIds: string[]): Promise<Set<string>> {
+    if (keyIds.length === 0) return new Set();
+    const rows: { key_id: string }[] = await this.repo.query(
+      `SELECT key_id FROM (
+         SELECT ${normSql("l.lobby_name")} || '|' || ${normSql("c.category_name")} || '|' || ${normSql("s.stream_name")} AS key_id
+         FROM streams s
+         JOIN categories c ON c.category_id = s.category_id
+         JOIN lobbies l ON l.lobby_id = c.lobby_id
+         WHERE s.status = $2 AND c.status = $2 AND l.status = $2) k
+       WHERE key_id = ANY($1::text[])`,
+      [keyIds, CatalogStatus.ACTIVE]);
+    return new Set(rows.map((r) => r.key_id));
+  }
+
   async getOne(role: Role, id: string): Promise<StreamItem> {
     const row = await this.base(role).andWhere("s.streamId = :id", { id }).select(STREAM_COLUMNS).getRawOne<StreamItem>();
     if (!row) throw new NotFoundException();
