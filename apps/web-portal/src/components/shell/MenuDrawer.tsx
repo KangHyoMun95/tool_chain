@@ -17,8 +17,8 @@ type Props = {
 };
 
 /**
- * Drawer của menu hamburger: từ `sm` trở lên trượt từ phải sang trái (bo 16px góc trên-trái và dưới-trái), màn hình nhỏ
- * hiện ở trên cùng và trượt từ trên xuống (bo 16px hai góc dưới). Viền + nền giống header. Render qua portal vào body
+ * Drawer của menu hamburger: từ `sm` trở lên trượt từ phải sang trái (bo 32px góc trên-trái và dưới-trái), màn hình nhỏ
+ * hiện ở trên cùng và trượt từ trên xuống (bo 32px hai góc dưới). Viền + nền giống header. Render qua portal vào body
  * (header có z-index riêng nên `fixed` bên trong sẽ bị kẹt dưới nội dung).
  */
 export function MenuDrawer({ open, onClose, title, children }: Props) {
@@ -66,10 +66,10 @@ export function MenuDrawer({ open, onClose, title, children }: Props) {
         className={cn(
           "neon-border absolute bg-panel p-4 shadow-neon-md",
           // Màn hình nhỏ: ở trên, trượt từ trên xuống.
-          "inset-x-0 top-0 rounded-b-2xl",
+          "inset-x-0 top-0 rounded-b-[32px]",
           open ? "animate-drawer-in-top" : "animate-drawer-out-top",
           // Từ sm: bên phải, cao hết màn hình, trượt từ phải sang trái.
-          "sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:w-[320px] sm:rounded-none sm:rounded-l-2xl",
+          "sm:inset-x-auto sm:inset-y-0 sm:right-0 sm:w-[320px] sm:rounded-none sm:rounded-l-[32px]",
           open ? "sm:animate-drawer-in-right" : "sm:animate-drawer-out-right",
         )}
       >
