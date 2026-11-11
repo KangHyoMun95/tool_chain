@@ -33,6 +33,7 @@ export function CategoryStreamsView({ categoryId }: { categoryId: string }) {
     window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
   }, []);
 
+  // Bàn hiện ngay khi có danh sách; số liệu AI về sau (khung chờ trong lúc đó, lỗi thì hiện "—"), lúc đó mới xếp lại.
   // Xếp theo tỷ lệ win của shoe hiện tại, cao → thấp; bàn chưa có tỷ lệ xuống cuối; hòa thì nhiều ván hơn trước, rồi theo tên.
   const sorted = useMemo(() => {
     if (streams.status !== "success") return [];
@@ -60,15 +61,15 @@ export function CategoryStreamsView({ categoryId }: { categoryId: string }) {
         {/* Quay lại trang lobby chứa category này */}
         <PageBanner title={category.data.name} backHref={`/lobbies/${category.data.lobbyId}`} />
         {notice && <NoticeBanner message={t("billing.kickedOut")} onClose={() => setNotice(false)} />}
-        {(streams.status === "loading" || (streams.status === "success" && stats.status === "loading")) && <StreamGridSkeleton />}
+        {streams.status === "loading" && <StreamGridSkeleton />}
         {streams.status === "error" && <ErrorState error={streams.error} onRetry={streams.reload} />}
-        {streams.status === "success" && stats.status !== "loading" &&
+        {streams.status === "success" &&
           (streams.data.length === 0 ? (
             <EmptyState message={t("streams.empty")} />
           ) : (
             <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {sorted.map(({ stream, stats: s }, i) => (
-                <StreamCard key={stream.id} stream={stream} stats={s} index={i} canParticipate={canParticipate} />
+                <StreamCard key={stream.id} stream={stream} stats={s} statsLoading={stats.status === "loading"} index={i} canParticipate={canParticipate} />
               ))}
             </section>
           ))}
