@@ -5,6 +5,7 @@ import type { DataSource } from "typeorm";
 import { CatalogStatus, type ChosenPattern, type PredictResult, type PredictionDetail, type PredictionReason, type Role } from "@toolhackchain/shared";
 import { GameSessionEntity, PredictionEntity } from "../database/entities/index.js";
 import { GameSessionsService } from "../game-sessions/game-sessions.service.js";
+import { BillingService, type ChargeOutcome } from "../billing/billing.service.js";
 import { LIVE_WITHIN_MS, STATS_RECENT_RESULTS, STATS_SHOES, STATS_STREAK_WINDOW } from "./predictions.constants.js";
 
 export type CurrentPrediction = {
@@ -48,13 +49,18 @@ export type StreamListStats = {
 
 @Injectable()
 export class PredictionsService {
-  constructor(@InjectDataSource() private ds: DataSource, private sessions: GameSessionsService) {}
+  constructor(
+    @InjectDataSource() private ds: DataSource,
+    private sessions: GameSessionsService,
+    private billing: BillingService,
+  ) {}
 
   /**
-   * Một transaction: đảm bảo game_sessions tồn tại (khóa ngoại; ván có thể còn nằm trong batch của ingestion)
-   * rồi insert prediction. Trả created_at nếu thêm dòng MỚI, null nếu ván đã có prediction (retry / trùng).
+   * Một transaction: đảm bảo game_sessions tồn tại (khóa ngoại; ván có thể còn nằm trong batch của ingestion),
+   * insert prediction, và nếu là dòng MỚI có pick thì trừ tiền các participant (BillingService.charge) — cùng commit.
+   * Trả null nếu ván đã có prediction (retry / trùng): không trừ lại, không đẩy SSE lại.
    */
-  async insertFromResult(msg: PredictResult): Promise<Date | null> {
+  async insertFromResult(msg: PredictResult, participantIds: string[]): Promise<{ createdAt: Date; charge: ChargeOutcome | null } | null> {
     const detail: PredictionDetail = {
       chosen: msg.chosen, rows: msg.detail, history_used: msg.history_used, missing_previous: msg.missing_previous,
     };
@@ -67,7 +73,10 @@ export class PredictionsService {
          RETURNING created_at`,
         [msg.prediction_id, msg.stream_id, msg.game_session_id, msg.pick, msg.confidence, JSON.stringify(detail), msg.model_version, msg.reason],
       );
-      return rows[0]?.created_at ?? null;
+      if (!rows[0]) return null;
+      // pick = null (AI không dự đoán) ⇒ không trừ tiền ai.
+      const charge = msg.pick === null ? null : await this.billing.charge(m, msg.prediction_id, msg.game_session_id, participantIds);
+      return { createdAt: rows[0].created_at, charge };
     });
   }
 

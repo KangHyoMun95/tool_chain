@@ -7,5 +7,6 @@ export class PredictionSubscriptionEntity {
   @Column({ name: "prediction_id", type: "uuid" }) predictionId!: string;
   @Column({ name: "fee_amount", type: "bigint" }) feeAmount!: string; // price at charge time
   @Column({ name: "refunded_at", type: "timestamptz", nullable: true }) refundedAt!: Date | null;
+  @Column({ name: "delivered_at", type: "timestamptz", nullable: true }) deliveredAt!: Date | null; // đẩy pick thành công (best effort)
   @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
 }

@@ -1,7 +1,7 @@
 // src/predictions/predict-result.consumer.ts
 // Đọc predict:results (group predict-persist): kiểm tra hạn chót -> lưu predictions (DB) -> SSE public -> XACK.
 // Mọi bước idempotent: ván đã có prediction thì INSERT không thêm dòng và không đẩy SSE lại.
-import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
+import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
 import { Redis } from "ioredis";
 import { hostname } from "os";
 import {
@@ -11,6 +11,7 @@ import {
 import { fieldsToObject, sleep, StreamEntry } from "../common/stream.util.js";
 import { isDataError, pgErrorCode } from "../ingestion/dead-letter.js";
 import { RealtimeHub } from "../realtime/realtime.hub.js";
+import { PARTICIPANT_SOURCE, type ParticipantSource } from "../billing/participant-source.js";
 import { predictionId } from "./prediction-id.js";
 import { parsePredictResult } from "./predict-result.schema.js";
 import { PredictionsService } from "./predictions.service.js";
@@ -31,7 +32,11 @@ export class PredictResultConsumer implements OnApplicationBootstrap, OnModuleDe
   private running = true;
   private consumer = process.env.CONSUMER_NAME ?? hostname();   // cố định qua các lần restart
 
-  constructor(private predictions: PredictionsService, private hub: RealtimeHub) {}
+  constructor(
+    private predictions: PredictionsService,
+    private hub: RealtimeHub,
+    @Inject(PARTICIPANT_SOURCE) private participants: ParticipantSource,
+  ) {}
 
   async onApplicationBootstrap() {
     try {
@@ -116,9 +121,11 @@ export class PredictResultConsumer implements OnApplicationBootstrap, OnModuleDe
       return;
     }
 
-    let createdAt: Date | null;
+    // Snapshot participant ngay trước transaction: ai mở trang sau thời điểm này không bị trừ ván này (tính từ ván sau).
+    const participantIds = this.participants.participantUserIds(msg.stream_id);
+    let inserted: Awaited<ReturnType<PredictionsService["insertFromResult"]>>;
     try {
-      createdAt = await this.predictions.insertFromResult(msg);
+      inserted = await this.predictions.insertFromResult(msg, participantIds);
     } catch (e) {
       if (isDataError(e) || pgErrorCode(e) === PG_FOREIGN_KEY_VIOLATION) {
         this.log.error(`predict:results: không lưu được prediction của ${msg.game_session_id} (${pgErrorCode(e)}), bỏ qua`);
@@ -126,7 +133,11 @@ export class PredictResultConsumer implements OnApplicationBootstrap, OnModuleDe
       }
       throw e;
     }
-    if (!createdAt) return;     // đã có prediction của ván này (retry / trùng): không đẩy SSE lại
+    if (!inserted) return;      // đã có prediction của ván này (retry / trùng): không trừ lại, không đẩy SSE lại
+    const { createdAt, charge } = inserted;
+    if (charge && charge.charged.length + charge.rejected.length > 0) {
+      this.log.log(`Trừ tiền ${msg.key_id} shoe ${msg.shoe}, round ${msg.round}: ${charge.charged.length} user, ${charge.rejected.length} không trừ được`);
+    }
 
     // SSE public theo key_id (TẠM THỜI — phải chuyển sang kênh riêng theo user trước khi làm billing). Không gửi detail đầy đủ.
     const event: RealtimePrediction = {

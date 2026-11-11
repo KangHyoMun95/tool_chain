@@ -6,7 +6,7 @@ import { PredictionSubscriptionEntity } from "./prediction-subscription.entity.j
 import { RoleEntity } from "./role.entity.js";
 import { StreamEntity } from "./stream.entity.js";
 import { StreamInformationEntity } from "./stream-information.entity.js";
-import { StreamParticipantEntity } from "./stream-participant.entity.js";
+import { StreamConnectionEntity } from "./stream-connection.entity.js";
 import { TransactionEntity } from "./transaction.entity.js";
 import { UserEntity } from "./user.entity.js";
 import { UsersRegisterEntity } from "./users-register.entity.js";
@@ -19,7 +19,7 @@ export * from "./prediction-subscription.entity.js";
 export * from "./role.entity.js";
 export * from "./stream.entity.js";
 export * from "./stream-information.entity.js";
-export * from "./stream-participant.entity.js";
+export * from "./stream-connection.entity.js";
 export * from "./transaction.entity.js";
 export * from "./user.entity.js";
 export * from "./users-register.entity.js";
@@ -27,5 +27,6 @@ export * from "./users-register.entity.js";
 // Schema is owned by Flyway (db/migrations); these entities only mirror it for queries.
 export const entities = [
   RoleEntity, UserEntity, LobbyEntity, CategoryEntity, StreamEntity, StreamInformationEntity,
-  GameSessionEntity, PredictionEntity, StreamParticipantEntity, PredictionSubscriptionEntity, TransactionEntity, UsersRegisterEntity,
+  GameSessionEntity, PredictionEntity, PredictionSubscriptionEntity, TransactionEntity, UsersRegisterEntity,
+  StreamConnectionEntity,
 ];

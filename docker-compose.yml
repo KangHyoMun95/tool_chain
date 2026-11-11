@@ -67,6 +67,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
       TRUST_PROXY: ${TRUST_PROXY:-}
+      # Billing: phí mỗi dự đoán (bắt buộc), job hủy ván không có result (bật sau khi đã kiểm tra dữ liệu game_sessions)
+      PREDICTION_FEE: ${PREDICTION_FEE:?set PREDICTION_FEE in .env}
+      GAME_SESSION_CANCEL_AFTER_MINUTES: ${GAME_SESSION_CANCEL_AFTER_MINUTES:-5}
+      GAME_SESSION_CANCEL_ENABLED: ${GAME_SESSION_CANCEL_ENABLED:-false}
     ports:
       - "${API_PORT:-4000}:4000"
     depends_on:

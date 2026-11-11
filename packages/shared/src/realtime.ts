@@ -81,4 +81,6 @@ export const RedisKeys = {
   recent: (streamId: string, shoe: number) => `recent:${streamId}:${shoe}`,                      // HASH round → result, TTL 24h
   aiCounts: (streamId: string) => `ai:counts:${streamId}`,                                       // HASH "<pattern>|<B/P>" → số lần
   aiCounted: (streamId: string, shoe: number) => `ai:counted:${streamId}:${shoe}`,               // SET game_session_id đã đếm, TTL 48h
+  // Billing — API sở hữu: cờ chống sweeper gửi lại settle:requests cho cùng một ván quá dày (SET NX EX)
+  settleReq: (gameSessionId: string) => `settle_req:${gameSessionId}`,
 } as const;
