@@ -23,7 +23,7 @@ interface ManagedUserPage {
 }
 
 /** Một dòng của GET /sub-admins, đủ trường để các modal sửa / cấp điểm cũ dùng được. */
-export type ManagedUserRow = UserRow & SubAdminRow & { depth: number; children?: ManagedUserRow[] };
+export type ManagedUserRow = UserRow & SubAdminRow & { depth: number; deleted: boolean; children?: ManagedUserRow[] };
 
 export interface ManagedUserQuery {
   page: number;
@@ -44,6 +44,7 @@ const toRow = (u: ManagedUserDto): ManagedUserRow => ({
   managedBySubAdminId: u.refer_user_id,
   hostnames: [],
   depth: u.depth,
+  deleted: u.status === 'DELETED',
   createdAt: u.created_at,
   updatedAt: u.created_at,
   ...(u.children.length ? { children: u.children.map(toRow) } : {}),

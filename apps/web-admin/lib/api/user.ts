@@ -84,6 +84,14 @@ export function setUserStatus(id: string, status: 'ACTIVE' | 'DEACTIVE' | 'DELET
   });
 }
 
+export function useActivateUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => setUserStatus(id, 'ACTIVE'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
+  });
+}
+
 export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({

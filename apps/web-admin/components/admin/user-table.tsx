@@ -11,10 +11,12 @@ import {
   DeleteOutlined,
   DollarOutlined,
   EditOutlined,
+  PlayCircleOutlined,
   StopOutlined,
 } from '@ant-design/icons';
 import { AccountStatus } from '@/lib/legacy-types';
 import {
+  useActivateUser,
   useDeactivateUser,
   useDeleteUser,
 } from '@/lib/api/user';
@@ -30,6 +32,7 @@ import { GrantUserPointsModal } from './grant-user-points-modal';
 export function UserTable() {
   const actionRef = useRef<ActionType>();
   const { message, modal } = App.useApp();
+  const activate = useActivateUser();
   const deactivate = useDeactivateUser();
   const remove = useDeleteUser();
 
@@ -37,6 +40,25 @@ export function UserTable() {
   const [granting, setGranting] = useState<ManagedUserRow | null>(null);
 
   const reload = () => actionRef.current?.reload();
+
+  const confirmActivate = (record: ManagedUserRow) => {
+    modal.confirm({
+      title: 'Kích hoạt lại',
+      content: `Kích hoạt lại "${record.username}"? Tài khoản sẽ đăng nhập được trở lại.`,
+      okText: 'Kích hoạt',
+      cancelText: 'Huỷ',
+      onOk: async () => {
+        try {
+          await activate.mutateAsync(record.id);
+          message.success('Đã kích hoạt lại');
+          reload();
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : 'Kích hoạt thất bại');
+          throw err;
+        }
+      },
+    });
+  };
 
   const confirmDeactivate = (record: ManagedUserRow) => {
     modal.confirm({
@@ -143,6 +165,18 @@ export function UserTable() {
                 size="small"
                 icon={<StopOutlined style={{ color: '#d46b08' }} />}
                 onClick={() => confirmDeactivate(record)}
+              />
+            </Tooltip>,
+          );
+        }
+        if (record.depth === 1 && record.status !== AccountStatus.ACTIVE && !record.deleted) {
+          actions.push(
+            <Tooltip key="activate" title="Kích hoạt lại">
+              <Button
+                type="text"
+                size="small"
+                icon={<PlayCircleOutlined style={{ color: '#10B981' }} />}
+                onClick={() => confirmActivate(record)}
               />
             </Tooltip>,
           );
