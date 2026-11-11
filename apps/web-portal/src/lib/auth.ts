@@ -150,3 +150,18 @@ export async function login(phone: string, password: string): Promise<void> {
   if (!isUserToken(token)) throw new AuthError("invalid_credentials");
   accessToken = token;
 }
+
+/**
+ * Đăng xuất: POST /auth/logout (server xóa session + refresh token trong Redis, đóng các kết nối SSE, xóa cookie refresh).
+ * 401 nghĩa là phiên đã không còn (hết hạn / bị thu hồi) nên coi như đã đăng xuất. Lỗi mạng / 5xx ⇒ ném AuthError, token giữ nguyên.
+ */
+export async function logout(): Promise<void> {
+  let res: Response;
+  try {
+    res = await authFetch("/auth/logout", { method: "POST", credentials: "include" });
+  } catch {
+    throw new AuthError("network");
+  }
+  if (!res.ok && res.status !== 401) throw new AuthError("unknown");
+  accessToken = null;
+}

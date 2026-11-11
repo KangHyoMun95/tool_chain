@@ -3,22 +3,25 @@
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { useApi } from "@/src/hooks/use-api";
-import { useComingSoon } from "@/src/hooks/use-coming-soon";
 import { useI18n } from "@/src/i18n/provider";
 import { formatBalance, getMe } from "@/src/lib/api/me";
 import { GlobeIcon, LogOutIcon, MenuIcon, UserIcon, WalletIcon } from "../icons";
+import { LanguageDialog } from "./LanguageDialog";
+import { LogoutDialog } from "./LogoutDialog";
 import { MenuDrawer, MenuDrawerItem } from "./MenuDrawer";
 
 const ME_REFRESH_MS = 15_000;
 
-/** Header chung: logo, lời chào (số điện thoại), số dư, menu hamburger (drawer: chọn ngôn ngữ, đăng xuất). Mục drawer chưa có chức năng báo "Coming soon". */
+/** Header chung: logo, lời chào (số điện thoại), số dư, menu hamburger (drawer: chọn ngôn ngữ, đăng xuất). Mục drawer mở dialog chọn ngôn ngữ / xác nhận đăng xuất. */
 export function AppHeader() {
   const { t } = useI18n();
-  const comingSoon = useComingSoon();
   const me = useApi(getMe, [], { refreshMs: ME_REFRESH_MS });
   const ready = me.status === "success";
   const [menuOpen, setMenuOpen] = useState(false);
+  const [dialog, setDialog] = useState<"language" | "logout" | null>(null);
   const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const closeDialog = useCallback(() => setDialog(null), []);
+  const openDialog = (d: "language" | "logout") => { setMenuOpen(false); setDialog(d); };
 
   return (
     <header className="neon-border relative z-20 flex items-center justify-between rounded-2xl bg-panel px-3 py-2 sm:px-5 sm:py-2.5">
@@ -64,9 +67,12 @@ export function AppHeader() {
       </div>
 
       <MenuDrawer open={menuOpen} onClose={closeMenu} title={t("shell.menu")}>
-        <MenuDrawerItem icon={<GlobeIcon className="h-4 w-4" />} label={t("shell.menuLanguage")} onClick={comingSoon} />
-        <MenuDrawerItem icon={<LogOutIcon className="h-4 w-4" />} label={t("shell.menuLogout")} onClick={comingSoon} />
+        <MenuDrawerItem icon={<GlobeIcon className="h-4 w-4" />} label={t("shell.menuLanguage")} onClick={() => openDialog("language")} />
+        <MenuDrawerItem icon={<LogOutIcon className="h-4 w-4" />} label={t("shell.menuLogout")} onClick={() => openDialog("logout")} />
       </MenuDrawer>
+
+      <LanguageDialog open={dialog === "language"} onClose={closeDialog} />
+      <LogoutDialog open={dialog === "logout"} onClose={closeDialog} />
     </header>
   );
 }

@@ -35,6 +35,19 @@ export class SessionService {
     private config: ConfigService<EnvVars, true>,
   ) {}
 
+  private revokeListeners: ((sessionId: string) => void)[] = [];
+
+  /** Đăng ký nơi cần phản ứng ngay khi session bị thu hồi (đăng xuất, user bị khóa): đóng kết nối SSE của session đó. */
+  onRevoked(listener: (sessionId: string) => void): void {
+    this.revokeListeners.push(listener);
+  }
+
+  private notifyRevoked(sessionId: string): void {
+    for (const fn of this.revokeListeners) {
+      try { fn(sessionId); } catch { /* listener lỗi không được chặn việc thu hồi */ }
+    }
+  }
+
   private get ttl(): number {
     return this.config.get("SESSION_TTL_SECONDS", { infer: true });
   }
@@ -105,6 +118,7 @@ export class SessionService {
     const multi = this.redis.multi().del(RedisKeys.session(sessionId), RedisKeys.refresh(sessionId));
     if (session) multi.srem(RedisKeys.userSessions(session.user_id), sessionId);
     await multi.exec();
+    this.notifyRevoked(sessionId);
   }
 
   // Gọi khi user bị chuyển sang DEACTIVE / DELETED (hoặc đổi role).
@@ -114,5 +128,6 @@ export class SessionService {
     const multi = this.redis.multi().del(setKey);
     for (const sid of sessionIds) multi.del(RedisKeys.session(sid), RedisKeys.refresh(sid));
     await multi.exec();
+    sessionIds.forEach((sid) => this.notifyRevoked(sid));
   }
 }

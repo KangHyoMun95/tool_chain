@@ -134,6 +134,11 @@
     "menu": "Open menu",
     "closeMenu": "Close menu",
     "menuLanguage": "Language",
+    "logoutTitle": "Log out",
+    "logoutConfirm": "Are you sure you want to log out?",
+    "logoutYes": "Yes",
+    "logoutNo": "No",
+    "logoutFailed": "Could not log out. Please try again.",
     "menuLogout": "Log out"
   },
   "sidebar": {

@@ -10,6 +10,7 @@ import type { DataSource } from "typeorm";
 import { Redis } from "ioredis";
 import { RedisKeys, SSE_PING_INTERVAL_MS } from "@toolhackchain/shared";
 import type { StreamCloseReason } from "../database/entities/index.js";
+import { SessionService } from "../auth/session.service.js";
 import { REDIS } from "../redis/redis.module.js";
 import type { SseConnection } from "./sse-connection.js";
 
@@ -24,7 +25,11 @@ export class ConnectionRegistry implements OnModuleInit, OnModuleDestroy, Before
   private timer?: NodeJS.Timeout;
   private pinging = false;
 
-  constructor(@InjectDataSource() private ds: DataSource, @Inject(REDIS) private redis: Redis) {}
+  constructor(
+    @InjectDataSource() private ds: DataSource,
+    @Inject(REDIS) private redis: Redis,
+    private sessions: SessionService,
+  ) {}
 
   /** Lúc khởi động: mọi dòng còn mở là của lần chạy trước (một instance) ⇒ đóng với SERVER_RESTART. */
   async onModuleInit() {
@@ -37,6 +42,15 @@ export class ConnectionRegistry implements OnModuleInit, OnModuleDestroy, Before
       this.log.error(`Không đóng được stream_connections cũ: ${e}`);
     }
     this.timer = setInterval(() => void this.pingAll(), SSE_PING_INTERVAL_MS);
+    // Đăng xuất / user bị khóa: ngắt kết nối ngay, không chờ lượt ping kế tiếp (participant vẫn bị trừ tiền nếu còn mở).
+    this.sessions.onRevoked((sessionId) => this.closeSession(sessionId));
+  }
+
+  /** Đóng mọi kết nối (tham gia và chỉ nghe) của một session với SESSION_REVOKED. */
+  closeSession(sessionId: string): void {
+    for (const conn of [...this.all]) {
+      if (conn.sessionId === sessionId) this.close(conn, "SESSION_REVOKED");
+    }
   }
 
   onModuleDestroy() {
