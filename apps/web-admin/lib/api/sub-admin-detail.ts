@@ -1,7 +1,8 @@
 'use client';
 
 import { useQuery, type QueryClient } from '@tanstack/react-query';
-import { AccountStatus, PointTargetType, Role } from '@toolhackchain/shared';
+import { AccountStatus, PointTargetType } from '@/lib/legacy-types';
+import type { Role } from '@/lib/auth/roles';
 import { apiFetch } from './client';
 import { SUB_ADMINS_KEY, type SubAdminRow } from './sub-admin';
 

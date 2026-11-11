@@ -1,19 +1,16 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
-import { AuthTokenResponse, LoginRequest } from '@toolhackchain/shared';
-import { apiFetch, setSession } from './client';
+import { login, type SessionUser } from './client';
 
-/** Login mutation — posts credentials, stores the JWT + username on success. */
+export interface LoginInput {
+  phone_number: string;
+  password: string;
+}
+
+/** Đăng nhập: access token nằm trong bộ nhớ, refresh token là cookie httpOnly do API đặt. */
 export function useLogin() {
   return useMutation({
-    mutationFn: async (input: LoginRequest): Promise<AuthTokenResponse> => {
-      const res = await apiFetch<AuthTokenResponse>('/auth/login', {
-        method: 'POST',
-        body: JSON.stringify(input),
-      });
-      setSession(res.accessToken, input.username);
-      return res;
-    },
+    mutationFn: (input: LoginInput): Promise<SessionUser> => login(input.phone_number, input.password),
   });
 }

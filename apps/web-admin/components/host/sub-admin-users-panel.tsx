@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Empty, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { useQueryClient } from '@tanstack/react-query';
-import { AccountStatus } from '@toolhackchain/shared';
+import { AccountStatus } from '@/lib/legacy-types';
 import { loadSubAdminUsers, type UserRow } from '@/lib/api/sub-admin-detail';
 
 /**

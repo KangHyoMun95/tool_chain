@@ -7,7 +7,7 @@ import {
 import { Tag } from 'antd';
 import { TeamOutlined, UserOutlined } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { AccountStatus } from '@toolhackchain/shared';
+import { AccountStatus } from '@/lib/legacy-types';
 import { loadSubAdmins } from '@/lib/api/sub-admin';
 import { loadSubAdminUsers } from '@/lib/api/sub-admin-detail';
 

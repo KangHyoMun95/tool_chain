@@ -5,7 +5,8 @@ import {
   useQueryClient,
   type QueryClient,
 } from '@tanstack/react-query';
-import { AccountStatus, PointDirection, Role } from '@toolhackchain/shared';
+import { AccountStatus, PointDirection } from '@/lib/legacy-types';
+import type { Role } from '@/lib/auth/roles';
 import { apiFetch } from './client';
 import { ME_KEY } from './profile';
 

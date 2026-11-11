@@ -1,7 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
-import type { DashboardDailyPoint } from '@toolhackchain/shared';
+import type { DashboardDailyPoint } from '@/lib/legacy-types';
 
 const MONO = "'JetBrains Mono', ui-monospace, Menlo, Consolas, monospace";
 

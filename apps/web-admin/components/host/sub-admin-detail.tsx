@@ -8,7 +8,7 @@ import {
 } from '@ant-design/pro-components';
 import { Skeleton, Space, Tag } from 'antd';
 import { useQueryClient } from '@tanstack/react-query';
-import { AccountStatus } from '@toolhackchain/shared';
+import { AccountStatus } from '@/lib/legacy-types';
 import type { SubAdminRow } from '@/lib/api/sub-admin';
 import {
   loadPointTransactions,

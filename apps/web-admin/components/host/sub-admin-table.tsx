@@ -15,7 +15,7 @@ import {
 } from '@ant-design/icons';
 import Link from 'next/link';
 import { useQueryClient } from '@tanstack/react-query';
-import { AccountStatus } from '@toolhackchain/shared';
+import { AccountStatus } from '@/lib/legacy-types';
 import {
   loadSubAdmins,
   useDeactivateSubAdmin,

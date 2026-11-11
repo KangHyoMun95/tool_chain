@@ -14,7 +14,7 @@ import {
   StopOutlined,
 } from '@ant-design/icons';
 import { useQueryClient } from '@tanstack/react-query';
-import { AccountStatus } from '@toolhackchain/shared';
+import { AccountStatus } from '@/lib/legacy-types';
 import {
   loadUsers,
   useDeactivateUser,
