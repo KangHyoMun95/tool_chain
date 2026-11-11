@@ -66,7 +66,7 @@ export class AuthService implements OnModuleInit {
     };
   }
 
-  async login(phone: string, password: string, ip: string): Promise<TokenPair> {
+  async login(phone: string, password: string, ip: string, audience?: "portal"): Promise<TokenPair> {
     await this.attempts.assertNotLocked(phone);
 
     const row = await this.dataSource
@@ -84,6 +84,12 @@ export class AuthService implements OnModuleInit {
     if (!row || !passwordOk || row.status !== UserStatus.ACTIVE) {
       await this.attempts.recordFailure(phone);
       this.log.warn(`login failed phone=${this.mask(phone)} ip=${ip}`);
+      throw new UnauthorizedException(INVALID_CREDENTIALS);
+    }
+
+    // Portal chỉ dành cho USER. Cùng lỗi với sai mật khẩu để không lộ role; không tính vào số lần sai (mật khẩu đúng).
+    if (audience === "portal" && row.role !== "USER") {
+      this.log.warn(`portal login rejected: role=${row.role} user_id=${row.user_id} ip=${ip}`);
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
 
