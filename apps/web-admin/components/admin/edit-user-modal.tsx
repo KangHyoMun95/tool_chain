@@ -14,7 +14,6 @@ interface FormValues extends UpdateUserInput {
   hostnameIds?: string[];
 }
 
-/** Controlled edit modal for a User, incl. hostname multi-select. */
 export function EditUserModal({
   record,
   open,

@@ -14,7 +14,6 @@ interface FormValues extends CreateUserInput {
   hostnameIds?: string[];
 }
 
-/** "Tạo người dùng" — ProForm inside a Modal, with hostname multi-select. */
 export function CreateUserModal({ onSuccess }: { onSuccess?: () => void }) {
   const { message } = App.useApp();
   const create = useCreateUser();

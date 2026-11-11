@@ -10,11 +10,8 @@ import type { Role } from '@/lib/auth/roles';
 import { apiFetch } from './client';
 import { setUserStatus } from './user';
 
-/** Query key for every Admin(Con) list/detail query. */
 export const SUB_ADMINS_KEY = ['sub-admins'] as const;
 
-/**
-/** A row as returned by GET /sub-admins. */
 export interface SubAdminRow {
   id: string;
   username: string;
@@ -41,12 +38,10 @@ export interface GrantPointsInput {
   amount: number;
 }
 
-/** Raw fetch of all Admin(Con)s owned by the current Host (used by ProTable). */
 export function fetchSubAdmins(): Promise<SubAdminRow[]> {
   return apiFetch<SubAdminRow[]>('/sub-admins');
 }
 
-/** Fetch through the react-query cache so ProTable + hooks share one source. */
 export function loadSubAdmins(qc: QueryClient): Promise<SubAdminRow[]> {
   return qc.fetchQuery({ queryKey: SUB_ADMINS_KEY, queryFn: fetchSubAdmins });
 }

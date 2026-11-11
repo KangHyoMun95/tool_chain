@@ -178,8 +178,6 @@ export function SubAdminTable() {
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
-        // Expandable row: children are the Users managed by this Admin(Con),
-        // loaded lazily when the row is expanded.
         request={async (params) => {
           const { rows, total } = await fetchManagedUsers(toManagedUserQuery(params));
           return { data: rows, total, success: true };

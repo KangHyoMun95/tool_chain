@@ -5,7 +5,6 @@ import { App, Button } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
 import { useCreateSubAdmin, type CreateSubAdminInput } from '@/lib/api/sub-admin';
 
-/** "Tạo Admin Con" — ProForm inside a Modal. */
 export function CreateSubAdminModal({ onSuccess }: { onSuccess?: () => void }) {
   const { message } = App.useApp();
   const create = useCreateSubAdmin();

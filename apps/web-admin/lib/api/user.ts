@@ -10,11 +10,6 @@ import type { Role } from '@/lib/auth/roles';
 import { apiFetch } from './client';
 import { ME_KEY } from './profile';
 
-/**
- * Query key for the current Admin(Con)'s users. The backend scopes GET /users
- * to the logged-in Admin(Con) (managed_by_admin_con_id), so the frontend just
- * calls the endpoint — no adminConId is passed from the client.
- */
 export const USERS_KEY = ['users'] as const;
 
 export interface UserRow {

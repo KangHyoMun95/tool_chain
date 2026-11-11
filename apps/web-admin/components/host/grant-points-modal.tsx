@@ -11,7 +11,6 @@ import {
   type GrantPointsInput,
 } from '@/lib/api/sub-admin';
 
-/** Controlled "Cấp điểm" modal: chỉ cộng điểm cho cấp dưới trực tiếp. */
 export function GrantPointsModal({
   record,
   open,

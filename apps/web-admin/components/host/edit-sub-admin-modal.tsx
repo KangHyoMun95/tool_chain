@@ -8,7 +8,6 @@ import {
   type UpdateSubAdminInput,
 } from '@/lib/api/sub-admin';
 
-/** Controlled edit modal for a single Admin(Con). */
 export function EditSubAdminModal({
   record,
   open,
@@ -32,7 +31,6 @@ export function EditSubAdminModal({
       initialValues={{ phoneNumber: record?.phoneNumber ?? undefined }}
       onFinish={async (values) => {
         if (!record) return false;
-        // Only send fields that were actually filled in.
         const payload: UpdateSubAdminInput = {};
         if (values.password) payload.password = values.password;
         if ((values.phoneNumber ?? '') !== (record.phoneNumber ?? '')) {
