@@ -263,7 +263,8 @@ Các quy tắc dưới đây **không được phá vỡ**. Nếu một yêu c�
 Mọi route đều yêu cầu đăng nhập, trừ route gắn `@Public()`. Route thực tế có tiền tố `/api`.
 
 ### Luồng token
-- `POST /api/auth/login` `{ phone_number, password }` → access token JWT (HS256, ~15 phút; claims `sub`=user_id dạng string, `role`, `sid`, `jti`) trong body + refresh token trong cookie `refresh_token` (`httpOnly`, `Secure`, `SameSite=Strict`, `path=/api/auth/refresh`).
+- `POST /api/auth/login` `{ phone_number, password, audience?: "portal" }` → access token JWT (HS256, ~15 phút; claims `sub`=user_id dạng string, `role`, `sid`, `jti`) trong body + refresh token trong cookie `refresh_token` (`httpOnly`, `Secure`, `SameSite=Strict`, `path=/api/auth/refresh`).
+- **Portal chỉ cho USER:** web-portal gửi `audience: "portal"`; HOST / ADMIN nhận cùng lỗi 401 như sai mật khẩu (không tạo session, không tính vào số lần sai, log WARN `portal login rejected`). Cookie refresh dùng chung với web-admin (cùng site) nên portal cũng kiểm tra claim `role` của access token sau login / refresh và bỏ phiên không phải USER (chỉ chặn phía UI, API vẫn kiểm tra role từng route). web-admin không gửi `audience` (chưa hạn chế).
 - `POST /api/auth/refresh` (đọc cookie) xoay refresh token mỗi lần gọi. Dùng lại token cũ ⇒ thu hồi cả session (phát hiện bị đánh cắp). Không có khoảng ân hạn: hai tab refresh đồng thời có thể làm đăng xuất.
 - `POST /api/auth/logout` xóa session + cookie; `GET /api/auth/me` không bao giờ trả `password`, có `can_participate` (xem **Billing**).
 - Redis: `session:{sid}` `{user_id, role, created_at}` (TTL `SESSION_TTL_SECONDS`, sliding), `user_sessions:{user_id}` (set sid), `refresh:{sid}` (hash `current`/`previous`, chỉ lưu HMAC-SHA256 bằng `JWT_REFRESH_SECRET`), `login_fail:{phone}` / `login_lock:{phone}`.

@@ -36,7 +36,7 @@ export class AuthController {
   @HttpCode(200)
   @Throttle({ default: { limit: 10, ttl: 60_000 } }) // theo IP; khóa theo phone nằm ở LoginAttemptsService
   async login(@Body() dto: LoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const { accessToken, expiresIn, refreshToken } = await this.auth.login(dto.phone_number, dto.password, req.ip ?? "unknown");
+    const { accessToken, expiresIn, refreshToken } = await this.auth.login(dto.phone_number, dto.password, req.ip ?? "unknown", dto.audience);
     this.setRefreshCookie(res, refreshToken);
     return { access_token: accessToken, token_type: "Bearer", expires_in: expiresIn };
   }
