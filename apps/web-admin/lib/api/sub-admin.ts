@@ -20,7 +20,7 @@ export interface SubAdminRow {
   phoneNumber?: string | null;
   role: Role;
   status: AccountStatus;
-  points: number;
+  points: string | number;
   hostId: string;
   createdAt: string;
   updatedAt: string;

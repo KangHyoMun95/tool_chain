@@ -14,13 +14,15 @@ import {
   StopOutlined,
 } from '@ant-design/icons';
 import Link from 'next/link';
-import { useQueryClient } from '@tanstack/react-query';
 import { AccountStatus } from '@/lib/legacy-types';
 import {
-  loadSubAdmins,
   useDeactivateSubAdmin,
-  type SubAdminRow,
 } from '@/lib/api/sub-admin';
+import {
+  fetchManagedUsers,
+  toManagedUserQuery,
+  type ManagedUserRow,
+} from '@/lib/api/managed-users';
 import { CreateSubAdminModal } from './create-sub-admin-modal';
 import { EditSubAdminModal } from './edit-sub-admin-modal';
 import { GrantPointsModal } from './grant-points-modal';
@@ -28,16 +30,15 @@ import { SubAdminUsersPanel } from './sub-admin-users-panel';
 
 export function SubAdminTable() {
   const actionRef = useRef<ActionType>();
-  const queryClient = useQueryClient();
   const { message, modal } = App.useApp();
   const deactivate = useDeactivateSubAdmin();
 
-  const [editing, setEditing] = useState<SubAdminRow | null>(null);
-  const [granting, setGranting] = useState<SubAdminRow | null>(null);
+  const [editing, setEditing] = useState<ManagedUserRow | null>(null);
+  const [granting, setGranting] = useState<ManagedUserRow | null>(null);
 
   const reload = () => actionRef.current?.reload();
 
-  const confirmDeactivate = (record: SubAdminRow) => {
+  const confirmDeactivate = (record: ManagedUserRow) => {
     modal.confirm({
       title: 'Deactive Admin Con',
       content: `Vô hiệu hoá "${record.username}"? Admin Con sẽ không đăng nhập được.`,
@@ -57,21 +58,19 @@ export function SubAdminTable() {
     });
   };
 
-  const columns: ProColumns<SubAdminRow>[] = [
-    { title: 'Tên', dataIndex: 'username', ellipsis: true },
+  const columns: ProColumns<ManagedUserRow>[] = [
+    { title: 'Số điện thoại', dataIndex: 'phoneNumber', ellipsis: true, renderText: (v) => v || '—' },
     {
-      title: 'Số điện thoại',
-      dataIndex: 'phoneNumber',
-      ellipsis: true,
-      renderText: (value) => value || '—',
+      title: 'Vai trò',
+      dataIndex: 'role',
+      valueEnum: { ADMIN: { text: 'Admin' }, USER: { text: 'User' } },
     },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
-      search: false,
       valueEnum: {
         [AccountStatus.ACTIVE]: { text: 'Active', status: 'Success' },
-        [AccountStatus.INACTIVE]: { text: 'Deactive', status: 'Default' },
+        [AccountStatus.INACTIVE]: { text: 'Deactive', status: 'Warning' },
       },
     },
     {
@@ -79,14 +78,12 @@ export function SubAdminTable() {
       dataIndex: 'points',
       valueType: 'digit',
       search: false,
-      sorter: (a, b) => a.points - b.points,
     },
     {
       title: 'Ngày tạo',
       dataIndex: 'createdAt',
       valueType: 'dateTime',
       search: false,
-      sorter: (a, b) => a.createdAt.localeCompare(b.createdAt),
     },
     {
       title: 'Thao tác',
@@ -136,7 +133,7 @@ export function SubAdminTable() {
 
   return (
     <>
-      <ProTable<SubAdminRow>
+      <ProTable<ManagedUserRow>
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
@@ -149,29 +146,9 @@ export function SubAdminTable() {
         }}
         // Search (tên/sđt) + pagination are applied client-side over the
         // cached ['sub-admins'] list, so no page state is managed by hand.
-        request={async (params) => {
-          const all = await loadSubAdmins(queryClient);
-          const byName = (params.username ?? '').toString().toLowerCase();
-          const byPhone = (params.phoneNumber ?? '').toString().toLowerCase();
-          let rows = all;
-          if (byName) {
-            rows = rows.filter((r) =>
-              r.username.toLowerCase().includes(byName),
-            );
-          }
-          if (byPhone) {
-            rows = rows.filter((r) =>
-              (r.phoneNumber ?? '').toLowerCase().includes(byPhone),
-            );
-          }
-          const current = params.current ?? 1;
-          const pageSize = params.pageSize ?? 10;
-          const start = (current - 1) * pageSize;
-          return {
-            data: rows.slice(start, start + pageSize),
-            total: rows.length,
-            success: true,
-          };
+request={async (params) => {
+          const { rows, total } = await fetchManagedUsers(toManagedUserQuery(params));
+          return { data: rows, total, success: true };
         }}
         search={{ labelWidth: 'auto' }}
         pagination={{ pageSize: 10, showSizeChanger: true }}

@@ -24,7 +24,7 @@ export interface UserRow {
   hostnames: { id: string; name: string; url: string }[];
   role: Role;
   status: AccountStatus;
-  points: number;
+  points: string | number;
   managedBySubAdminId: string;
   createdAt: string;
   updatedAt: string;
