@@ -1,13 +1,13 @@
 // src/billing/settle-sweeper.job.ts
 // Lưới an toàn: tín hiệu settle:requests có thể mất (API chết giữa commit và XADD, Redis lỗi). Mỗi phút tìm ván đã
 // FINISHED / CANCELLED hơn SWEEP_MIN_AGE_MS mà còn subscription đủ điều kiện hoàn chưa hoàn, gửi lại (có chống trùng
-// settle_req:{gsid} NX EX). Settlement idempotent nên gửi thừa vô hại. HAS_REFUND=false ⇒ không chạy (không có gì để gửi bù).
+// settle_req:{gsid} NX EX). Settlement idempotent nên gửi thừa vô hại. Chạy cả khi HAS_REFUND=false: settlement khi đó
+// đánh dấu bỏ hoàn, nên tín hiệu bị mất lúc cờ tắt không biến thành hoàn tiền khi cờ bật lại.
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import type { DataSource } from "typeorm";
 import { GameSessionStatus, type SettleReason } from "@toolhackchain/shared";
 import { SWEEP_BATCH_LIMIT, SWEEP_INTERVAL_MS, SWEEP_LOOKBACK_DAYS, SWEEP_MIN_AGE_MS } from "./billing.constants.js";
-import { BillingService } from "./billing.service.js";
 import { SettleQueue } from "./settle-queue.service.js";
 
 @Injectable()
@@ -16,12 +16,9 @@ export class SettleSweeperJob implements OnApplicationBootstrap, OnModuleDestroy
   private timer?: NodeJS.Timeout;
   private busy = false;
 
-  constructor(@InjectDataSource() private ds: DataSource, private queue: SettleQueue, private billing: BillingService) {}
+  constructor(@InjectDataSource() private ds: DataSource, private queue: SettleQueue) {}
 
-  onApplicationBootstrap() {
-    if (!this.billing.refundEnabled) return;   // SettlementConsumer đã log WARN lúc khởi động
-    this.timer = setInterval(() => void this.tick(), SWEEP_INTERVAL_MS);
-  }
+  onApplicationBootstrap() { this.timer = setInterval(() => void this.tick(), SWEEP_INTERVAL_MS); }
   onModuleDestroy() { clearInterval(this.timer); }
 
   private async tick() {
@@ -34,7 +31,7 @@ export class SettleSweeperJob implements OnApplicationBootstrap, OnModuleDestroy
          FROM prediction_subscriptions ps
          JOIN predictions p ON p.prediction_id = ps.prediction_id
          JOIN game_sessions g ON g.game_session_id = p.game_session_id
-         WHERE ps.refunded_at IS NULL AND ps.created_at > now() - make_interval(days => $1)
+         WHERE ps.refunded_at IS NULL AND ps.refund_waived_at IS NULL AND ps.created_at > now() - make_interval(days => $1)
            AND COALESCE(g.ended_at, g.created_at) < now() - make_interval(secs => $2)
            AND (g.status = $3 OR (g.status = $4 AND g.result IS NOT NULL AND g.result <> p.predict_result))
          LIMIT $5`,
