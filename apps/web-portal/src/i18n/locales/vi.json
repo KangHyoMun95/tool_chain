@@ -131,7 +131,10 @@
     "balance": "Số dư",
     "deposit": "NẠP TIỀN",
     "notifications": "Thông báo",
-    "menu": "Mở menu"
+    "menu": "Mở menu",
+    "closeMenu": "Đóng menu",
+    "menuLanguage": "Chọn ngôn ngữ",
+    "menuLogout": "Đăng xuất"
   },
   "sidebar": {
     "label": "Điều hướng",
