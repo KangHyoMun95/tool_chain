@@ -8,9 +8,10 @@ import { stagger } from "@/src/lib/stagger";
 
 /**
  * Thẻ bàn ở danh sách. Số liệu AI lấy từ GET /categories/:id/stream-stats; tỷ lệ win là của shoe hiện tại.
+ * statsLoading = true (stats chưa về): thẻ hiện ngay, các ô số liệu là khung chờ.
  * canParticipate = false (me.can_participate do API tính) ⇒ khóa nút vào trang chi tiết (vào trang = bị trừ tiền).
  */
-export function StreamCard({ stream, stats, index, canParticipate = true }: { stream: Stream; stats?: StreamListStatsDto; index: number; canParticipate?: boolean }) {
+export function StreamCard({ stream, stats, statsLoading = false, index, canParticipate = true }: { stream: Stream; stats?: StreamListStatsDto; statsLoading?: boolean; index: number; canParticipate?: boolean }) {
   const { t } = useI18n();
   const live = stats?.live ?? false;
   const title = `${stream.categoryName} ${stream.name}`;   // giống tiêu đề trang chi tiết
@@ -23,7 +24,9 @@ export function StreamCard({ stream, stats, index, canParticipate = true }: { st
       <div>
         <div className="flex items-center justify-between gap-2 border-b border-gray-800/80 pb-2">
           <span className="truncate font-mono text-2xl font-black tracking-tight text-neon" title={title}>{title}</span>
-          {live ? (
+          {statsLoading ? (
+            <span className="block h-5 w-14 shrink-0 animate-pulse rounded-full bg-white/15" aria-hidden="true" />
+          ) : live ? (
             <span className="inline-flex shrink-0 animate-live-pulse items-center gap-1.5 rounded-full border border-emerald-500/50 bg-[#0d2a1a] px-2.5 py-0.5 font-mono text-[11px] font-bold text-emerald-400 shadow-[0_0_8px_rgba(34,197,94,0.8)]">
               <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
               {t("streams.live")}
@@ -38,24 +41,34 @@ export function StreamCard({ stream, stats, index, canParticipate = true }: { st
 
         <div className="mt-2 font-mono text-[11px] font-medium leading-relaxed text-gray-400">
           {stream.streamerId && <p className="truncate">{t("streams.streamer", { name: stream.streamerId })}</p>}
-          <p>
-            {stats?.shoe != null && stats.round != null
-              ? t("streams.session", { shoe: stats.shoe, round: stats.round })
-              : t("streams.noSession")}
-          </p>
+          {statsLoading ? (
+            <span className="block h-3 w-24 animate-pulse rounded bg-white/15" aria-hidden="true" />
+          ) : (
+            <p>
+              {stats?.shoe != null && stats.round != null
+                ? t("streams.session", { shoe: stats.shoe, round: stats.round })
+                : t("streams.noSession")}
+            </p>
+          )}
         </div>
 
         <div className="mt-3 grid grid-cols-2 gap-2 rounded-xl border border-gray-800/80 bg-[#15151e] p-2.5">
           <div className="text-center">
             <span className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t("streams.winRate")}</span>
-            <span className="mt-0.5 block font-mono text-2xl font-black leading-tight text-neon">{stats?.win_rate == null ? "—" : `${(stats.win_rate * 100).toFixed(1)}%`}</span>
+            {statsLoading
+              ? <span className="mx-auto mt-1.5 block h-6 w-16 animate-pulse rounded bg-white/15" aria-hidden="true" />
+              : <span className="mt-0.5 block font-mono text-2xl font-black leading-tight text-neon">{stats?.win_rate == null ? "—" : `${(stats.win_rate * 100).toFixed(1)}%`}</span>}
           </div>
           <div className="border-l border-gray-800 text-center">
             <span className="block font-mono text-[10px] font-semibold uppercase tracking-wider text-gray-400">{t("streams.winStreak")}</span>
-            <span className="mt-0.5 flex items-center justify-center gap-1 font-mono">
-              <span className="text-2xl font-black leading-tight text-neon">{stats?.win_streak ?? "—"}</span>
-              {(stats?.win_streak ?? 0) > 0 && <span className="text-lg">🔥</span>}
-            </span>
+            {statsLoading ? (
+              <span className="mx-auto mt-1.5 block h-6 w-10 animate-pulse rounded bg-white/15" aria-hidden="true" />
+            ) : (
+              <span className="mt-0.5 flex items-center justify-center gap-1 font-mono">
+                <span className="text-2xl font-black leading-tight text-neon">{stats?.win_streak ?? "—"}</span>
+                {(stats?.win_streak ?? 0) > 0 && <span className="text-lg">🔥</span>}
+              </span>
+            )}
           </div>
         </div>
       </div>

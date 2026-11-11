@@ -239,7 +239,7 @@ export class PredictionsService {
   }
 
   /**
-   * Thống kê của mọi stream trong một category cho danh sách bàn (vài truy vấn cho cả danh sách, không gọi từng bàn).
+   * Thống kê của mọi stream trong một category cho danh sách bàn (ba truy vấn song song cho cả danh sách, không gọi từng bàn).
    * Cùng định nghĩa với stats(): thắng = pick trùng result, T là hòa, win_rate chỉ của shoe hiện tại.
    * Phạm vi nhìn thấy như GET /streams: USER chỉ thấy stream ACTIVE có category + lobby cha ACTIVE.
    */
@@ -250,18 +250,24 @@ export class PredictionsService {
                  JOIN categories c ON c.category_id = s.category_id JOIN lobbies l ON l.lobby_id = c.lobby_id
                  WHERE s.category_id = $1 ${visible}`;
 
-    const latest: { stream_id: string; round: string; age_ms: string }[] = await this.ds.query(
-      `SELECT DISTINCT ON (gs.stream_id) gs.stream_id, gs.road_count AS round,
-              (extract(epoch FROM (now() - gs.created_at)) * 1000) AS age_ms
-       FROM game_sessions gs WHERE gs.stream_id IN (${vis})
-       ORDER BY gs.stream_id, gs.created_at DESC`, params);
+    // Mỗi stream chỉ đọc vài dòng mới nhất (LATERAL ... LIMIT 1 trên idx_game_sessions_stream_created / idx_predictions_stream_created),
+    // không quét toàn bộ lịch sử. Ba truy vấn độc lập nên chạy song song.
+    const curShoe = `vis AS (${vis}),
+         cur AS (
+           SELECT v.stream_id, c.shoe FROM vis v
+           CROSS JOIN LATERAL (
+             SELECT gs.road_shoe AS shoe FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
+             WHERE p.stream_id = v.stream_id ORDER BY p.created_at DESC LIMIT 1) c)`;
 
-    const cur: { stream_id: string; shoe: string; wins: string; losses: string; draws: string }[] = await this.ds.query(
-      `WITH cur AS (
-         SELECT DISTINCT ON (p.stream_id) p.stream_id, gs.road_shoe AS shoe
-         FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
-         WHERE p.stream_id IN (${vis})
-         ORDER BY p.stream_id, p.created_at DESC)
+    const latestQ: Promise<{ stream_id: string; round: string; age_ms: string }[]> = this.ds.query(
+      `WITH vis AS (${vis})
+       SELECT v.stream_id, l.round, l.age_ms FROM vis v
+       CROSS JOIN LATERAL (
+         SELECT gs.road_count AS round, (extract(epoch FROM (now() - gs.created_at)) * 1000) AS age_ms
+         FROM game_sessions gs WHERE gs.stream_id = v.stream_id ORDER BY gs.created_at DESC LIMIT 1) l`, params);
+
+    const curQ: Promise<{ stream_id: string; shoe: string; wins: string; losses: string; draws: string }[]> = this.ds.query(
+      `WITH ${curShoe}
        SELECT cur.stream_id, cur.shoe,
               count(*) FILTER (WHERE gs.result <> 'T' AND p.predict_result = gs.result) AS wins,
               count(*) FILTER (WHERE gs.result <> 'T' AND p.predict_result <> gs.result) AS losses,
@@ -272,22 +278,24 @@ export class PredictionsService {
        LEFT JOIN predictions p ON p.game_session_id = gs.game_session_id AND p.predict_result IS NOT NULL
        GROUP BY cur.stream_id, cur.shoe`, params);
 
-    // Dự đoán đã chấm của shoe hiện tại (rk = 1, cùng định nghĩa với `cur`: shoe của dự đoán mới nhất) và shoe trước
-    // (rk = 2: shoe khác có dự đoán mới nhất kế tiếp), theo thứ tự thời gian, để tính chuỗi thắng dài nhất của từng shoe.
-    const evaluated: { stream_id: string; rk: string; pick: string; result: string }[] = await this.ds.query(
-      `WITH shoes AS (
-         SELECT p.stream_id, gs.road_shoe AS shoe,
-                row_number() OVER (PARTITION BY p.stream_id ORDER BY max(p.created_at) DESC) AS rk
-         FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
-         WHERE p.stream_id IN (${vis})
-         GROUP BY p.stream_id, gs.road_shoe)
+    // Dự đoán đã chấm của shoe hiện tại (rk = 1: shoe của dự đoán mới nhất) và shoe trước (rk = 2: shoe khác có dự đoán mới nhất
+    // kế tiếp), theo thứ tự thời gian, để tính chuỗi thắng dài nhất của từng shoe.
+    const evaluatedQ: Promise<{ stream_id: string; rk: string; pick: string; result: string }[]> = this.ds.query(
+      `WITH ${curShoe},
+         prev AS (
+           SELECT cur.stream_id, pv.shoe FROM cur
+           CROSS JOIN LATERAL (
+             SELECT gs.road_shoe AS shoe FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
+             WHERE p.stream_id = cur.stream_id AND gs.road_shoe <> cur.shoe ORDER BY p.created_at DESC LIMIT 1) pv),
+         shoes AS (SELECT stream_id, shoe, 1 AS rk FROM cur UNION ALL SELECT stream_id, shoe, 2 AS rk FROM prev)
        SELECT s.stream_id, s.rk, p.predict_result AS pick, gs.result
        FROM shoes s
        JOIN game_sessions gs ON gs.stream_id = s.stream_id AND gs.road_shoe = s.shoe
                             AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
        JOIN predictions p ON p.game_session_id = gs.game_session_id AND p.predict_result IS NOT NULL
-       WHERE s.rk <= 2
        ORDER BY s.stream_id, s.rk, p.created_at`, params);
+
+    const [latest, cur, evaluated] = await Promise.all([latestQ, curQ, evaluatedQ]);
 
     const byShoe = new Map<string, { pick: string; result: string }[]>();   // `${stream_id}|${rk}` → cũ → mới
     for (const r of evaluated) {
