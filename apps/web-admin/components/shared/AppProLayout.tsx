@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ProLayout, type MenuDataItem } from '@ant-design/pro-components';
-import { Dropdown, Spin, Tag } from 'antd';
+import { App, Dropdown, Spin, Tag } from 'antd';
 import {
   DashboardOutlined,
   DollarOutlined,
@@ -14,19 +14,19 @@ import {
 } from '@ant-design/icons';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Role } from '@toolhackchain/shared';
+import { ROLE, type Role } from '@/lib/auth/roles';
 import { useCurrentUser, useLogout } from '@/lib/auth/current-user';
 import { useMyProfile } from '@/lib/api/profile';
 
-/** Sidebar menu per role — HOST manages Admin(Con), ADMIN_CON manages Users. */
+/** Sidebar menu per role — HOST manages Admin(Con), ADMIN manages Users. */
 function menuForRole(role: Role): MenuDataItem[] {
-  if (role === Role.HOST) {
+  if (role === ROLE.HOST) {
     return [
       { path: '/host/dashboard', name: 'Dashboard', icon: <DashboardOutlined /> },
       { path: '/host/admins', name: 'Quản lý người dùng', icon: <TeamOutlined /> },
     ];
   }
-  if (role === Role.ADMIN_CON) {
+  if (role === ROLE.ADMIN) {
     return [
       { path: '/admin/dashboard', name: 'Dashboard', icon: <DashboardOutlined /> },
       { path: '/admin/users', name: 'Quản lý người dùng', icon: <UserOutlined /> },
@@ -49,12 +49,19 @@ export function AppProLayout({ children }: { children: React.ReactNode }) {
   // to the login screen.
   const [loggingOut, setLoggingOut] = useState(false);
 
-  const handleLogout = () => {
+  const { message } = App.useApp();
+
+  const handleLogout = async () => {
     setLoggingOut(true);
-    logout();
+    try {
+      await logout();
+    } catch {
+      message.error('Không đăng xuất được. Vui lòng thử lại.');
+      setLoggingOut(false);
+    }
   };
 
-  const role = user?.role ?? Role.USER;
+  const role = user?.role ?? ROLE.USER;
 
   return (
     <ProLayout
@@ -77,12 +84,12 @@ export function AppProLayout({ children }: { children: React.ReactNode }) {
       menuItemRender={(item, dom) =>
         item.path ? <Link href={item.path}>{dom}</Link> : dom
       }
-      // Header (top-right): Admin(Con) points balance + avatar.
+      // Header (top-right): Admin(Con) points balance (bigint dạng chuỗi) + avatar.
       actionsRender={() =>
-        profile?.role === Role.ADMIN_CON
+        profile?.role === ROLE.ADMIN
           ? [
               <Tag color="gold" key="points" icon={<DollarOutlined />}>
-                {profile.points} điểm
+                {BigInt(profile.balance).toLocaleString('vi-VN')} điểm
               </Tag>,
             ]
           : []

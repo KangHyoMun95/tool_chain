@@ -7,7 +7,7 @@ import {
   ProFormTextArea,
 } from '@ant-design/pro-components';
 import { App } from 'antd';
-import { PointDirection } from '@toolhackchain/shared';
+import { PointDirection } from '@/lib/legacy-types';
 import {
   useGrantUserPoints,
   type GrantUserPointsInput,

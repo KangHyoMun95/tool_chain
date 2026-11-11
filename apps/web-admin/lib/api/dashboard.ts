@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { DashboardResponse } from '@toolhackchain/shared';
+import { DashboardResponse } from '@/lib/legacy-types';
 import { apiFetch, getToken } from './client';
 
 export const DASHBOARD_KEY = ['dashboard'] as const;
