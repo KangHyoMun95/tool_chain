@@ -2,6 +2,7 @@
 // Mọi thay đổi balance của luồng dự đoán đi qua file này (xem "Quy tắc bất biến về tiền" trong CLAUDE.md):
 // - charge(): trừ tiền participant khi có prediction mới, chạy TRONG transaction đang insert prediction.
 // - refund(): hoàn tiền một ván (dự đoán sai / kết quả T / ván CANCELLED), transaction riêng, idempotent nhờ refunded_at IS NULL.
+//   HAS_REFUND=false ⇒ refund() không hoàn mà đánh dấu refund_waived_at (V12): subscription đó không bao giờ được hoàn nữa.
 // Mọi phép tính trên balance / fee_amount làm trong SQL; TS chỉ chuyển chuỗi bigint qua lại, không cộng trừ.
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -24,6 +25,11 @@ export type ChargeOutcome = {
 @Injectable()
 export class BillingService {
   constructor(@InjectDataSource() private ds: DataSource, private config: ConfigService<EnvVars, true>) {}
+
+  /** HAS_REFUND (env, mặc định true): false ⇒ không hoàn tiền trong mọi trường hợp. */
+  get refundEnabled(): boolean {
+    return this.config.get("HAS_REFUND", { infer: true }) !== "false";
+  }
 
   /** Phí hiện tại dưới dạng chuỗi số nguyên (truyền thẳng vào SQL ::bigint). */
   get fee(): string {
@@ -111,21 +117,34 @@ export class BillingService {
   }
 
   /**
-   * Hoàn tiền một ván: subscription chưa hoàn của ván CANCELLED, hoặc của ván FINISHED có result khác pick (kể cả T).
-   * Hoàn cho cả user đã DEACTIVE / DELETED. Chạy lại bao nhiêu lần cũng không hoàn trùng. Trả số subscription vừa hoàn.
+   * Settlement một ván: subscription còn chờ quyết định (refunded_at IS NULL AND refund_waived_at IS NULL) của ván CANCELLED,
+   * hoặc của ván FINISHED có result khác pick (kể cả T).
+   * - HAS_REFUND=true: hoàn tiền (cả user đã DEACTIVE / DELETED).
+   * - HAS_REFUND=false: KHÔNG hoàn, set refund_waived_at ⇒ không bao giờ được hoàn nữa, kể cả khi bật lại cờ. Không đổi balance.
+   * Chạy lại bao nhiêu lần cũng không hoàn trùng. Trả số subscription vừa hoàn / vừa bỏ hoàn.
    */
-  async refund(gameSessionId: string): Promise<number> {
+  async refund(gameSessionId: string): Promise<{ refunded: number; waived: number }> {
+    const enabled = this.refundEnabled;   // đọc một lần cho cả transaction
     return this.ds.transaction(async (m) => {
       const due: { sid: string; user_id: string }[] = await m.query(
         `SELECT ps.prediction_subscription_id AS sid, ps.user_id
          FROM prediction_subscriptions ps
          JOIN predictions p ON p.prediction_id = ps.prediction_id
          JOIN game_sessions g ON g.game_session_id = p.game_session_id
-         WHERE p.game_session_id = $1 AND ps.refunded_at IS NULL
+         WHERE p.game_session_id = $1 AND ps.refunded_at IS NULL AND ps.refund_waived_at IS NULL
            AND (g.status = $2 OR (g.status = $3 AND g.result IS NOT NULL AND g.result <> p.predict_result))
          FOR UPDATE OF ps`,
         [gameSessionId, GameSessionStatus.CANCELLED, GameSessionStatus.FINISHED]);
-      if (due.length === 0) return 0;
+      if (due.length === 0) return { refunded: 0, waived: 0 };
+
+      if (!enabled) {
+        const waived = await updateReturning<{ sid: string }>(m,
+          `UPDATE prediction_subscriptions SET refund_waived_at = now()
+           WHERE prediction_subscription_id = ANY($1::uuid[]) AND refunded_at IS NULL AND refund_waived_at IS NULL
+           RETURNING prediction_subscription_id AS sid`,
+          [due.map((d) => d.sid)]);
+        return { refunded: 0, waived: waived.length };
+      }
 
       const userIds = [...new Set(due.map((d) => d.user_id))].sort();
       await m.query(`SELECT user_id FROM users WHERE user_id = ANY($1::uuid[]) ORDER BY user_id FOR UPDATE`, [userIds]);
@@ -135,7 +154,7 @@ export class BillingService {
         `-- top-level: INSERT (rows trả về bình thường, không dùng updateReturning)
          WITH marked AS (
            UPDATE prediction_subscriptions ps SET refunded_at = now()
-           WHERE ps.prediction_subscription_id = ANY($1::uuid[]) AND ps.refunded_at IS NULL
+           WHERE ps.prediction_subscription_id = ANY($1::uuid[]) AND ps.refunded_at IS NULL AND ps.refund_waived_at IS NULL
            RETURNING ps.prediction_subscription_id AS sid, ps.user_id, ps.fee_amount AS fee
          ), credited AS (
            UPDATE users u SET balance = u.balance + marked.fee
@@ -149,7 +168,7 @@ export class BillingService {
       if (rows.length !== due.length) {
         throw new Error(`refund ${gameSessionId}: cần hoàn ${due.length} subscription nhưng ghi ${rows.length} REFUND, rollback`);
       }
-      return rows.length;
+      return { refunded: rows.length, waived: 0 };
     });
   }
 }

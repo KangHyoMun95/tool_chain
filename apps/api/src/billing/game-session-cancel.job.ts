@@ -1,6 +1,7 @@
 // src/billing/game-session-cancel.job.ts
 // Mỗi phút: ván RUNNING chưa có result quá GAME_SESSION_CANCEL_AFTER_MINUTES phút → CANCELLED, rồi gửi settle:requests
 // (chỉ cho ván có subscription chưa hoàn) để hoàn toàn bộ. Chỉ chạy khi GAME_SESSION_CANCEL_ENABLED=true.
+// HAS_REFUND=false ⇒ vẫn gửi; settlement khi đó đánh dấu bỏ hoàn (không hoàn).
 // Ingestion bỏ qua result đến sau CANCELLED (applyResults: status <> 'CANCELLED').
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -52,11 +53,11 @@ export class GameSessionCancelJob implements OnApplicationBootstrap, OnModuleDes
          FROM c WHERE g.game_session_id = c.game_session_id
          RETURNING g.game_session_id AS id,
            EXISTS (SELECT 1 FROM predictions p JOIN prediction_subscriptions ps ON ps.prediction_id = p.prediction_id
-                   WHERE p.game_session_id = g.game_session_id AND ps.refunded_at IS NULL) AS has_subs`,
+                   WHERE p.game_session_id = g.game_session_id AND ps.refunded_at IS NULL AND ps.refund_waived_at IS NULL) AS has_subs`,
         [GameSessionStatus.RUNNING, minutes, CANCEL_BATCH_LIMIT, GameSessionStatus.CANCELLED]);
       if (rows.length === 0) return;
       const toSettle = rows.filter((r) => r.has_subs).map((r) => r.id);
-      this.log.log(`CANCELLED ${rows.length} ván không có result quá ${minutes} phút (${toSettle.length} ván cần hoàn tiền)`);
+      this.log.log(`CANCELLED ${rows.length} ván không có result quá ${minutes} phút (${toSettle.length} ván cần settlement)`);
       // Lỗi Redis ở đây: sweeper sẽ gửi lại sau SWEEP_MIN_AGE_MS.
       const sent = await this.queue.enqueue(toSettle, "CANCELLED");
       if (sent !== toSettle.length) this.log.error(`Chỉ gửi được ${sent}/${toSettle.length} settle:requests CANCELLED (sweeper sẽ gửi bù)`);

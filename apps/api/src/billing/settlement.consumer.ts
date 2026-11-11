@@ -1,6 +1,6 @@
 // src/billing/settlement.consumer.ts
 // Đọc settle:requests (group `settle`, consumer cố định, PEL trước rồi ">"): hoàn tiền ván → commit → XACK.
-// Idempotent: BillingService.refund chỉ đụng subscription refunded_at IS NULL, nên tin trùng / replay không hoàn thêm.
+// Idempotent: BillingService.refund chỉ đụng subscription refunded_at IS NULL AND refund_waived_at IS NULL, nên tin trùng / replay không hoàn thêm.
 import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
 import { Redis } from "ioredis";
 import { hostname } from "os";
@@ -25,6 +25,9 @@ export class SettlementConsumer implements OnApplicationBootstrap, OnModuleDestr
   constructor(private billing: BillingService) {}
 
   async onApplicationBootstrap() {
+    if (!this.billing.refundEnabled) {
+      this.log.warn("Hoàn tiền đang TẮT (HAS_REFUND=false): ván đủ điều kiện hoàn được đánh dấu bỏ hoàn (refund_waived_at), không bao giờ hoàn nữa");
+    }
     try {
       await this.conn.xgroup("CREATE", SETTLE_REQUEST_STREAM, SETTLE_GROUP, "$", "MKSTREAM");
     } catch (e) {
@@ -83,7 +86,8 @@ export class SettlementConsumer implements OnApplicationBootstrap, OnModuleDestr
       return;
     }
     const msg = parsed.value;
-    const n = await this.billing.refund(msg.game_session_id);
-    if (n > 0) this.log.log(`Hoàn tiền ván ${msg.game_session_id} (${msg.reason}): ${n} subscription`);
+    const { refunded, waived } = await this.billing.refund(msg.game_session_id);
+    if (refunded > 0) this.log.log(`Hoàn tiền ván ${msg.game_session_id} (${msg.reason}): ${refunded} subscription`);
+    if (waived > 0) this.log.log(`Bỏ hoàn ván ${msg.game_session_id} (${msg.reason}, HAS_REFUND=false): ${waived} subscription`);
   }
 }
