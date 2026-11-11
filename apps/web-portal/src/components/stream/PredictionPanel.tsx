@@ -46,8 +46,8 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
   const tone = online && prediction && !prediction.locked && result !== null
     ? (result === "T" ? "draw" : prediction.pick === null ? null : prediction.pick === result ? "win" : "loss")
     : null;
-  // Ảnh kết quả giữa màn hình: chỉ khi có pick để so (pick = null + kết quả T không tính là hòa của dự đoán).
-  const overlayTone = tone && prediction?.pick ? tone : null;
+  // Ảnh kết quả giữa màn hình: win / loss cần có pick để so; draw (kết quả T) hiện cả khi AI không có pick, như màu nền hòa của khung.
+  const overlayTone = tone === "draw" ? tone : tone && prediction?.pick ? tone : null;
 
   return (
     <>
