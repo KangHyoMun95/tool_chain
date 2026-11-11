@@ -58,7 +58,7 @@ export function EditSubAdminModal({
         name="password"
         label="Mật khẩu mới"
         placeholder="Để trống nếu không đổi"
-        rules={[{ min: 6 }]}
+        rules={[{ min: 12, message: 'Tối thiểu 12 ký tự' }]}
       />
     </ModalForm>
   );

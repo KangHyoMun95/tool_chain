@@ -65,10 +65,10 @@ export function useCreateSubAdmin() {
 export function useUpdateSubAdmin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...input }: UpdateSubAdminInput & { id: string }) =>
-      apiFetch<SubAdminRow>(`/sub-admins/${id}`, {
+    mutationFn: ({ id, password, phoneNumber }: UpdateSubAdminInput & { id: string }) =>
+      apiFetch<{ user_id: string }>(`/users/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify(input),
+        body: JSON.stringify({ password: password || undefined, phone_number: phoneNumber || undefined }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: SUB_ADMINS_KEY }),
   });

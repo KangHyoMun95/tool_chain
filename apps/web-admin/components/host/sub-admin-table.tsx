@@ -95,6 +95,9 @@ export function SubAdminTable() {
               <Button type="text" size="small" icon={<EyeOutlined />} />
             </Link>
           </Tooltip>,
+        ];
+        if (record.depth === 1) {
+          actions.push(
           <Tooltip key="edit" title="Sửa">
             <Button
               type="text"
@@ -103,7 +106,8 @@ export function SubAdminTable() {
               onClick={() => setEditing(record)}
             />
           </Tooltip>,
-        ];
+          );
+        }
         if (record.depth === 1 && record.status === AccountStatus.ACTIVE) {
           actions.push(
         <Tooltip key="grant" title="Cấp điểm">
@@ -116,7 +120,7 @@ export function SubAdminTable() {
         </Tooltip>,
           );
         }
-        if (record.status === AccountStatus.ACTIVE) {
+        if (record.depth === 1 && record.status === AccountStatus.ACTIVE) {
           actions.push(
             <Tooltip key="deactivate" title="Deactive">
               <Button

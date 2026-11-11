@@ -281,6 +281,9 @@ Mọi route đều yêu cầu đăng nhập, trừ route gắn `@Public()`. Rout
 ### API danh sách user cấp dưới
 `GET /api/sub-admins` (HOST / ADMIN; `users/sub-admins.*`): cây user dưới người gọi — con trực tiếp (`refer_user_id` = người gọi, `depth` 1) và toàn bộ con cháu (recursive CTE trên `refer_user_id`, tối đa 10 cấp, có chống vòng), không gồm chính người gọi. Phạm vi chỉ lấy từ token, không nhận id từ client. Query: `page`, `limit` (1–100), `status` (`ACTIVE|DEACTIVE|DELETED`), `role` (`ADMIN|USER`), `q` (số điện thoại chứa chuỗi, chỉ chữ số); sai kiểu / tham số lạ ⇒ 400. Response `{ items, total, page, limit }` dạng **cây**: `items` là con trực tiếp, mỗi item `{ user_id, phone_number, role, status, balance (chuỗi), refer_user_id, depth, created_at, children[] }` với `children` là con trực tiếp của user đó (đệ quy). `total` / `page` / `limit` tính trên con trực tiếp. Lọc `status` / `role` / `q`: giữ user khớp và mọi tổ tiên của nó (nhánh không có user khớp bị bỏ).
 
+### Sửa user
+`PATCH /api/users/:userId` `{ phone_number?, password? }` (HOST / ADMIN, `UsersService.update`; ít nhất một trường, mật khẩu >= 12 ký tự, phone chỉ chữ số 6–20): chỉ **cha sửa con trực tiếp** (`assertCanManage`). Cháu, cha, chính mình, không tồn tại ⇒ 403; user `DELETED` ⇒ 409; phone trùng ⇒ 409. Đổi mật khẩu thu hồi mọi phiên của target. Web-admin chỉ hiện icon sửa / deactive / xóa ở dòng `depth === 1`.
+
 ### Cấp điểm
 `POST /api/users/:userId/points` `{ amount }` (HOST / ADMIN, `UsersService.grantPoints`): **chỉ cộng**, **chỉ cho cấp dưới trực tiếp** đang `ACTIVE` (HOST → ADMIN con, ADMIN → USER con). Cháu, cha, chính mình, user không ACTIVE hoặc không tồn tại ⇒ 403 (cùng thông báo). HOST sinh mới (`MINT`); ADMIN chuyển từ balance của mình (`TRANSFER_OUT` + `TRANSFER_IN`, không đủ ⇒ 400 `INSUFFICIENT_BALANCE`). Một DB transaction, khóa users theo `user_id` tăng dần, tính trong SQL. Web-admin chỉ hiện nút cấp điểm ở dòng `depth === 1`.
 

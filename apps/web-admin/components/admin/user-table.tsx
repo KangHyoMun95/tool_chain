@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
   ProTable,
   type ActionType,
@@ -110,7 +110,9 @@ export function UserTable() {
       valueType: 'option',
       key: 'option',
       render: (_dom, record) => {
-        const actions = [
+        const actions: ReactNode[] = [];
+        if (record.depth === 1) {
+          actions.push(
           <Tooltip key="edit" title="Sửa">
             <Button
               type="text"
@@ -119,7 +121,8 @@ export function UserTable() {
               onClick={() => setEditing(record)}
             />
           </Tooltip>,
-        ];
+          );
+        }
         if (record.depth === 1 && record.status === AccountStatus.ACTIVE) {
           actions.push(
         <Tooltip key="grant" title="Cấp điểm">
@@ -132,7 +135,7 @@ export function UserTable() {
         </Tooltip>,
           );
         }
-        if (record.status === AccountStatus.ACTIVE) {
+        if (record.depth === 1 && record.status === AccountStatus.ACTIVE) {
           actions.push(
             <Tooltip key="deactivate" title="Deactive">
               <Button
@@ -144,7 +147,7 @@ export function UserTable() {
             </Tooltip>,
           );
         }
-        actions.push(
+        if (record.depth === 1) actions.push(
           <Tooltip key="delete" title="Xoá">
             <Button
               type="text"

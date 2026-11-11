@@ -66,10 +66,10 @@ export function useCreateUser() {
 export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...input }: UpdateUserInput & { id: string }) =>
-      apiFetch<UserRow>(`/users/${id}`, {
+    mutationFn: ({ id, password, phoneNumber }: UpdateUserInput & { id: string }) =>
+      apiFetch<{ user_id: string }>(`/users/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify(input),
+        body: JSON.stringify({ password: password || undefined, phone_number: phoneNumber || undefined }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   });
