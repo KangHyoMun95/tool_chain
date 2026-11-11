@@ -46,8 +46,58 @@ export type Tick<T = CrawlPayload> = {
 };
 
 // Event SSE xuống portal: tick gốc + stream_id của DB (streams.stream_id), null khi chưa có trong cache id.
+// Hub chỉ đẩy tick có vị trí >= phiên đang giữ (tick muộn của ván trước bị bỏ, kể cả status / total / time).
 // `type` phân loại event; client coi event thiếu `type` là "tick" (tương thích bản cũ).
 export type RealtimeTick<T = CrawlPayload> = Tick<T> & { type: "tick"; stream_id: string | null };
+
+// Event SSE kết quả một ván (hub phát MỘT lần, chỉ khi ván này MỚI HƠN kết quả gần nhất đã phát của stream — xem comparePosition).
+// Portal lấy kết quả / lịch sử / đúng-sai CHỈ từ event này (không tự dò actual_result trong tick).
+export type RealtimeRoundResult = {
+  type: "round_result"; item_id: string; stream_id: string | null; shoe: number; round: number; result: string; ts: number;
+};
+
+// ---- Vị trí ván: phiên và kết quả CHỈ ĐI TỚI (hub, ShoeObserver, portal dùng chung) ----
+/** Vị trí của một ván trong stream. Round chỉ reset khi đổi shoe. */
+export type Position = { shoe: number; round: number };
+/** Shoe hiện tại và shoe liền trước của một stream (null = chưa biết). */
+export type ShoeContext = { current: number | null; previous: number | null };
+
+// Khác shoe: chưa thấy = 3 (shoe mới, KHÔNG giả định số shoe tăng dần), current = 2, previous = 1, shoe cũ khác = 0.
+function shoeRank(shoe: number, ctx: ShoeContext): number {
+  if (shoe === ctx.current) return 2;
+  if (shoe === ctx.previous) return 1;
+  return 3;
+}
+
+/**
+ * So `incoming` (tick vừa đến) với `ref` (con trỏ đang giữ): -1 cũ hơn, 0 bằng, 1 mới hơn.
+ * Cùng shoe ⇒ chỉ so round (không có quy tắc "reset" trong cùng shoe: round chỉ reset khi đổi shoe).
+ * Khác shoe ⇒ so hạng shoe theo `ctx`; shoe của `ref` không phải current / previous (cũ hơn nữa) có hạng 0.
+ */
+export function comparePosition(incoming: Position, ref: Position, ctx: ShoeContext): -1 | 0 | 1 {
+  if (incoming.shoe === ref.shoe) return incoming.round === ref.round ? 0 : incoming.round > ref.round ? 1 : -1;
+  const a = shoeRank(incoming.shoe, ctx);
+  const b = ref.shoe === ctx.current ? 2 : ref.shoe === ctx.previous ? 1 : 0;
+  return a === b ? 0 : a > b ? 1 : -1;
+}
+
+/** Gọi khi chấp nhận một vị trí: shoe mới ⇒ shoe hiện tại thành "shoe liền trước". Trả context mới (không sửa tại chỗ). */
+export function advanceShoe(ctx: ShoeContext, shoe: number): ShoeContext {
+  return shoe === ctx.current ? ctx : { current: shoe, previous: ctx.current };
+}
+
+/** Đọc (shoe, round) của payload crawler; null nếu thiếu / không phải số nguyên >= 0 (vd tick demo không có shoe/round). */
+export function payloadPosition(d: unknown): Position | null {
+  if (!d || typeof d !== "object") return null;
+  const o = d as Record<string, unknown>;
+  const int = (v: unknown): number | null => {
+    const n = typeof v === "number" ? v : typeof v === "string" && /^\d+$/.test(v.trim()) ? Number(v) : NaN;
+    return Number.isSafeInteger(n) && n >= 0 ? n : null;
+  };
+  const shoe = int(o.stream_shoe);
+  const round = int(o.stream_round);
+  return shoe === null || round === null ? null : { shoe, round };
+}
 
 // Event SSE dự đoán — KHÔNG đi kênh public: chỉ gửi trên kết nối tham gia (participate) của user đã bị trừ tiền cho ván đó;
 // pick = null (AI không dự đoán, không ai bị trừ) thì gửi cho mọi kết nối tham gia của stream.

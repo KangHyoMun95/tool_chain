@@ -74,13 +74,22 @@ export class RealtimeController {
       conn.addCleanup(unsub);
     }
 
-    // 2) Snapshot tick mới nhất của từng item.
+    // 2) Snapshot: tick cuối hub đã chấp nhận (không lùi phiên). Hub chưa có state (vừa restart) ⇒ latest:{key_id} của crawler
+    //    (có thể là tick muộn; portal tự chặn theo vị trí).
     try {
-      const snaps = await this.redis.mget(ticket.items.map(RedisKeys.latest));
+      const missing: string[] = [];
+      for (const itemId of ticket.items) {
+        if (conn.closed) return;
+        const snap = await this.hub.snapshot(itemId);
+        if (snap === null) { missing.push(itemId); continue; }
+        if (!conn.send(snap)) this.registry.close(conn, "PING_FAILED");
+      }
+      if (missing.length === 0) return;
+      const snaps = await this.redis.mget(missing.map(RedisKeys.latest));
       for (let i = 0; i < snaps.length; i++) {
         const s = snaps[i];
         if (!s || conn.closed) continue;
-        if (!conn.send(await this.hub.withStreamId(ticket.items[i], s))) this.registry.close(conn, "PING_FAILED");
+        if (!conn.send(await this.hub.withStreamId(missing[i], s))) this.registry.close(conn, "PING_FAILED");
       }
     } catch (e) {
       this.log.warn(`SSE: không đọc được snapshot: ${e}`);

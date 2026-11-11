@@ -1,16 +1,23 @@
 // apps/web-portal/src/hooks/use-live-items.ts
 "use client";
 import { useEffect, useRef, useState } from "react";
-import type { RealtimeInsufficientBalance, RealtimePrediction, RealtimeTick } from "@toolhackchain/shared";
+import {
+  advanceShoe, comparePosition, payloadPosition,
+  type Position, type RealtimeInsufficientBalance, type RealtimePrediction, type RealtimeRoundResult, type RealtimeTick, type ShoeContext,
+} from "@toolhackchain/shared";
 import { useAuth } from "@/src/components/auth/AuthProvider";
 import { ApiError, isInsufficientBalance } from "@/src/lib/api/client";
 import { requestSseTicket } from "@/src/lib/api/realtime";
 import { apiUrl } from "@/src/lib/auth";
+import { streamDebug } from "@/src/lib/stream-debug";
 
 // Trang demo /live nhận tick kiểu bất kỳ (BTC/ETH...); trang stream dùng CrawlPayload (mặc định của RealtimeTick).
 type LiveTick<D> = Omit<RealtimeTick<D>, "stream_id" | "type"> & { type?: "tick"; stream_id?: string | null };
 /** insufficient: hết điểm (402 khi xin ticket hoặc event insufficient_balance) — dừng hẳn, không tự kết nối lại. */
 export type LiveStatus = "connecting" | "live" | "reconnecting" | "revoked" | "insufficient";
+
+/** Vị trí đang hiển thị của một item: phiên và kết quả CHỈ ĐI TỚI (comparePosition, dùng chung với hub). */
+type Tracker = { ctx: ShoeContext; session: Position | null; result: Position | null };
 
 const RETRY_BASE_MS = 1_000;
 const RETRY_MAX_MS = 15_000;
@@ -22,16 +29,20 @@ type Options<D> = {
   participate?: boolean;
   /** Gọi cho mọi tick hợp lệ mới hơn tick đã có (kể cả khi nội dung không đổi). Dùng bản mới nhất của hàm, không cần useCallback. */
   onTick?: (t: LiveTick<D>) => void;
+  /** Event `round_result` của đúng stream, mới hơn kết quả đã nhận (nguồn DUY NHẤT của kết quả / lịch sử / đúng-sai). */
+  onRoundResult?: (r: RealtimeRoundResult) => void;
   /** Event `prediction` của đúng stream (chỉ tới trên kết nối tham gia, khi đã bị trừ tiền hoặc pick = null). */
   onPrediction?: (p: RealtimePrediction) => void;
 };
 
 /**
+ * Phiên và kết quả CHỈ ĐI TỚI (hub đã lọc; client chặn thêm bằng comparePosition): tick cũ hơn phiên đang hiển thị và
+ * round_result không mới hơn kết quả đã nhận đều bị bỏ.
  * SSE theo ticket một lần: xin ticket (POST /realtime/ticket) → EventSource /stream?ticket=. Ticket chỉ dùng được một lần nên
  * không để EventSource tự kết nối lại: lỗi / server đóng ⇒ đóng hẳn rồi xin ticket mới với backoff (1s, 2s, 4s... tối đa 15s).
  * 401 không làm mới được token ⇒ chưa đăng nhập; 403 / 404 ⇒ revoked; 402 / insufficient_balance ⇒ insufficient (dừng).
  */
-export function useLiveItems<D = Record<string, unknown>>(items: string[], { streamId, participate = false, onTick, onPrediction }: Options<D> = {}) {
+export function useLiveItems<D = Record<string, unknown>>(items: string[], { streamId, participate = false, onTick, onRoundResult, onPrediction }: Options<D> = {}) {
   const { status: authStatus, markUnauthenticated } = useAuth();
   const [ticks, setTicks] = useState<Record<string, LiveTick<D>>>({});
   const [status, setStatus] = useState<LiveStatus>("connecting");
@@ -39,6 +50,8 @@ export function useLiveItems<D = Record<string, unknown>>(items: string[], { str
   const key = items.join(",");
   const onTickRef = useRef(onTick);
   onTickRef.current = onTick;
+  const onRoundResultRef = useRef(onRoundResult);
+  onRoundResultRef.current = onRoundResult;
   const onPredictionRef = useRef(onPrediction);
   onPredictionRef.current = onPrediction;
 
@@ -51,6 +64,13 @@ export function useLiveItems<D = Record<string, unknown>>(items: string[], { str
     let es: EventSource | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     const latestTs = new Map<string, number>();
+    // Sống qua các lần kết nối lại (snapshot sau reconnect / API restart có thể là ván cũ hơn ván đang hiển thị).
+    const trackers = new Map<string, Tracker>();
+    const tracker = (itemId: string): Tracker => {
+      let t = trackers.get(itemId);
+      if (!t) trackers.set(itemId, (t = { ctx: { current: null, previous: null }, session: null, result: null }));
+      return t;
+    };
 
     const stop = (next: LiveStatus) => {
       stopped = true;
@@ -72,16 +92,45 @@ export function useLiveItems<D = Record<string, unknown>>(items: string[], { str
     };
 
     const onMessage = (e: MessageEvent<string>) => {
-      let msg: LiveTick<D> | RealtimePrediction | RealtimeInsufficientBalance;
+      let msg: LiveTick<D> | RealtimePrediction | RealtimeInsufficientBalance | RealtimeRoundResult;
       try { msg = JSON.parse(e.data); } catch { return; }
       if (msg.type === "insufficient_balance") { stop("insufficient"); return; }
       // Event thiếu `type` coi là tick. Prediction không đi qua logic chống tick cũ / state của tick.
       if (msg.type === "prediction") {
-        if (!streamId || msg.stream_id === streamId) onPredictionRef.current?.(msg);
+        if (streamId && msg.stream_id !== streamId) return;
+        streamDebug(`prediction shoe ${msg.data.shoe} round ${msg.data.round}: ${msg.data.pick ?? "null"} (${msg.data.reason})`);
+        onPredictionRef.current?.(msg);
+        return;
+      }
+      if (msg.type === "round_result") {
+        if (streamId && msg.stream_id != null && msg.stream_id !== streamId) return;
+        const trk = tracker(msg.item_id);
+        const pos = { shoe: msg.shoe, round: msg.round };
+        if (trk.result && comparePosition(pos, trk.result, trk.ctx) <= 0) {
+          streamDebug(`bỏ round_result shoe ${pos.shoe} round ${pos.round}: không mới hơn kết quả shoe ${trk.result.shoe} round ${trk.result.round}`);
+          return;
+        }
+        trk.result = pos;
+        streamDebug(`round_result shoe ${pos.shoe} round ${pos.round}: ${msg.result}`);
+        onRoundResultRef.current?.(msg);
         return;
       }
       const t = msg;
       if (streamId && t.stream_id != null && t.stream_id !== streamId) return;
+      // Trạng thái trực tiếp chỉ đi tới: tick cũ hơn phiên đang hiển thị bị bỏ (tick không có shoe/round, vd trang demo, không lọc).
+      const pos = payloadPosition(t.data);
+      if (pos) {
+        const trk = tracker(t.item_id);
+        if (trk.session && comparePosition(pos, trk.session, trk.ctx) < 0) {
+          streamDebug(`bỏ tick shoe ${pos.shoe} round ${pos.round}: cũ hơn phiên đang hiển thị shoe ${trk.session.shoe} round ${trk.session.round}`);
+          return;
+        }
+        if (!trk.session || trk.session.shoe !== pos.shoe || trk.session.round !== pos.round) {
+          streamDebug(`đổi phiên → shoe ${pos.shoe} round ${pos.round}`, { from: trk.session });
+        }
+        trk.ctx = advanceShoe(trk.ctx, pos.shoe);
+        trk.session = pos;
+      }
       if ((latestTs.get(t.item_id) ?? -Infinity) >= t.ts) return;
       latestTs.set(t.item_id, t.ts);
       onTickRef.current?.(t);

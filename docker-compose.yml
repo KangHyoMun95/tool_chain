@@ -71,6 +71,8 @@ services:
       PREDICTION_FEE: ${PREDICTION_FEE:?set PREDICTION_FEE in .env}
       GAME_SESSION_CANCEL_AFTER_MINUTES: ${GAME_SESSION_CANCEL_AFTER_MINUTES:-5}
       GAME_SESSION_CANCEL_ENABLED: ${GAME_SESSION_CANCEL_ENABLED:-false}
+      HUB_STALE_RESET_MS: ${HUB_STALE_RESET_MS:-60000}
+      API_LOG_DEBUG: ${API_LOG_DEBUG:-false}
     ports:
       - "${API_PORT:-4000}:4000"
     depends_on:
@@ -112,6 +114,7 @@ services:
       # Tên consumer cố định: không dùng `docker compose up --scale ai`; cần thêm instance thì khai báo service riêng với tên riêng
       AI_CONSUMER_NAME: ai-worker-0
       LOG_LEVEL: ${AI_LOG_LEVEL:-INFO}
+      AI_HISTORY_DB_WINDOW_HOURS: ${AI_HISTORY_DB_WINDOW_HOURS:-6}
     depends_on:
       redis:
         condition: service_healthy
