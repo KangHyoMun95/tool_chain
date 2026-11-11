@@ -64,7 +64,7 @@ function StreamDetail({ stream }: { stream: Stream }) {
     () => (stats?.shoes ?? []).map((r) => ({ key: String(r.shoe), label: `#${r.shoe}`, value: Math.round(r.win_rate * 1000) / 10 })),
     [stats],
   );
-  const streak = stats?.win_streak ?? 0;
+  const streak = stats?.best_streak ?? 0;   // chuỗi thắng tốt nhất của shoe hiện tại (GET /predictions/best-streak)
 
   return (
     <>

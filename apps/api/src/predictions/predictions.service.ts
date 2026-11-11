@@ -44,6 +44,11 @@ export type PredictionStats = {
   }[];
 };
 
+export type BestStreak = {
+  shoe: number | null;             // shoe hiện tại (shoe của dự đoán mới nhất); null khi chưa có dự đoán
+  best_streak: number;             // chuỗi thắng dài nhất trong shoe đó (dự đoán đã chấm, T bỏ qua, thua đứt chuỗi); 0 khi chưa có
+};
+
 export type StreamListStats = {
   stream_id: string;
   shoe: number | null;             // shoe hiện tại (shoe của dự đoán mới nhất)
@@ -212,6 +217,25 @@ export class PredictionsService {
       win_streak: streak,
       shoes: perShoe.filter((r) => r.shoe !== currentShoe && r.win_rate !== null).slice(0, STATS_SHOES).reverse() as PredictionStats["shoes"],
     };
+  }
+
+  /** Chuỗi thắng tốt nhất của shoe hiện tại của stream (cho trang chi tiết). Cùng định nghĩa "shoe hiện tại" và thắng / hòa như stats(). */
+  async bestStreak(streamId: string): Promise<BestStreak> {
+    const cur: { shoe: string }[] = await this.ds.query(
+      `SELECT gs.road_shoe AS shoe
+       FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
+       WHERE p.stream_id = $1
+       ORDER BY p.created_at DESC LIMIT 1`,
+      [streamId]);
+    if (!cur[0]) return { shoe: null, best_streak: 0 };
+    const rows: { pick: string; result: string }[] = await this.ds.query(
+      `SELECT p.predict_result AS pick, gs.result
+       FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
+       WHERE p.stream_id = $1 AND gs.road_shoe = $2 AND p.predict_result IS NOT NULL
+         AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
+       ORDER BY p.created_at`,   // cũ → mới
+      [streamId, cur[0].shoe]);
+    return { shoe: Number(cur[0].shoe), best_streak: longestWinStreak(rows) };
   }
 
   /**

@@ -53,6 +53,12 @@ export type PredictionStatsDto = {
   shoes: { shoe: number; wins: number; losses: number; draws: number; win_rate: number }[];   // các shoe quá khứ (không gồm hiện tại), cũ → mới
 };
 
+/** GET /streams/:id/predictions/best-streak — chuỗi thắng dài nhất trong shoe hiện tại (trang chi tiết). */
+export type BestStreakDto = { shoe: number | null; best_streak: number };
+
+export const fetchBestStreak = (streamId: string): Promise<BestStreakDto> =>
+  apiGet<BestStreakDto>(`/streams/${encodeURIComponent(streamId)}/predictions/best-streak`);
+
 export const fetchPredictionStats = (streamId: string): Promise<PredictionStatsDto> =>
   apiGet<PredictionStatsDto>(`/streams/${encodeURIComponent(streamId)}/predictions/stats`);
 

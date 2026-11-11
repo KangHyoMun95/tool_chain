@@ -30,6 +30,13 @@ export class PredictionsController {
     await this.streams.getOne(actor.role, params.id);
     return this.predictions.stats(params.id);
   }
+
+  /** Chuỗi thắng tốt nhất của shoe hiện tại (trang chi tiết). Luôn 200 (`best_streak: 0` khi chưa có dự đoán). */
+  @Get("best-streak")
+  async bestStreak(@CurrentUser() actor: AuthUser, @Param() params: IdParamDto) {
+    await this.streams.getOne(actor.role, params.id);
+    return this.predictions.bestStreak(params.id);
+  }
 }
 
 /** Thống kê cho danh sách bàn của một category. Đặt dưới /categories/:id để không đụng GET /streams/:id. */
