@@ -133,27 +133,27 @@
 }
 .predict-reveal { animation: predict-reveal 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
-/* Ảnh kết quả giữa màn hình (ResultOverlay, 1.3s = SHOW_MS): hiện vào → giữ → mờ dần cuối. */
-@keyframes result-overlay-win {          /* từ trong ra ngoài, nhanh, bật quá rồi dừng dứt khoát */
+/* Ảnh kết quả giữa màn hình (ResultOverlay, 2s = SHOW_MS): hiện vào → giữ → mờ dần cuối. Phần "vào" giữ nguyên thời lượng (ms). */
+@keyframes result-overlay-win {          /* từ trong ra ngoài, nhanh (~180ms), bật quá rồi dừng dứt khoát */
   0% { clip-path: circle(0% at 50% 50%); transform: scale(0.4); opacity: 0; }
-  14% { clip-path: circle(75% at 50% 50%); transform: scale(1.12); opacity: 1; }
-  20% { transform: scale(1); }
-  85% { transform: scale(1); opacity: 1; }
+  9% { clip-path: circle(75% at 50% 50%); transform: scale(1.12); opacity: 1; }
+  13% { transform: scale(1); }
+  90% { transform: scale(1); opacity: 1; }
   100% { clip-path: circle(75% at 50% 50%); transform: scale(1.04); opacity: 0; }
 }
-@keyframes result-overlay-loss {         /* từ trên xuống dưới */
+@keyframes result-overlay-loss {         /* từ trên xuống dưới (~360ms) */
   0% { clip-path: inset(0 0 100% 0); transform: translateY(-40px); opacity: 0.4; }
-  28% { clip-path: inset(0 0 0 0); transform: translateY(0); opacity: 1; }
-  85% { clip-path: inset(0 0 0 0); transform: translateY(0); opacity: 1; }
+  18% { clip-path: inset(0 0 0 0); transform: translateY(0); opacity: 1; }
+  90% { clip-path: inset(0 0 0 0); transform: translateY(0); opacity: 1; }
   100% { clip-path: inset(0 0 0 0); transform: translateY(12px); opacity: 0; }
 }
-@keyframes result-overlay-draw {         /* từ trong ra ngoài, nhẹ nhàng (chậm, không bật quá) */
+@keyframes result-overlay-draw {         /* từ trong ra ngoài, nhẹ nhàng (~600ms, không bật) */
   0% { clip-path: circle(0% at 50% 50%); transform: scale(0.9); opacity: 0; }
-  45% { clip-path: circle(75% at 50% 50%); transform: scale(1); opacity: 1; }
-  85% { clip-path: circle(75% at 50% 50%); opacity: 1; }
+  30% { clip-path: circle(75% at 50% 50%); transform: scale(1); opacity: 1; }
+  90% { clip-path: circle(75% at 50% 50%); opacity: 1; }
   100% { clip-path: circle(75% at 50% 50%); opacity: 0; }
 }
-.result-overlay-win { animation: result-overlay-win 1.3s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
-.result-overlay-loss { animation: result-overlay-loss 1.3s cubic-bezier(0.33, 1, 0.68, 1) both; }
-.result-overlay-draw { animation: result-overlay-draw 1.3s ease-out both; }
+.result-overlay-win { animation: result-overlay-win 2s cubic-bezier(0.2, 0.9, 0.3, 1.2) both; }
+.result-overlay-loss { animation: result-overlay-loss 2s cubic-bezier(0.33, 1, 0.68, 1) both; }
+.result-overlay-draw { animation: result-overlay-draw 2s ease-out both; }
 .predict-pulse { display: inline-block; animation: predict-pulse 1.8s ease-in-out infinite; }

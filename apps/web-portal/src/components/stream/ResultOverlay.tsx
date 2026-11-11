@@ -6,11 +6,11 @@ import { createPortal } from "react-dom";
 export type ResultTone = "win" | "loss" | "draw";
 
 /** Thời gian hiện ảnh (ms), phải khớp độ dài animation result-overlay-* trong globals.css. */
-const SHOW_MS = 1300;
+const SHOW_MS = 2000;
 const SRC: Record<ResultTone, string> = { win: "/images/win.png", loss: "/images/loss.png", draw: "/images/draw.png" };
 
 /**
- * Ảnh win / loss / draw ở giữa màn hình ~1.3s khi ván có kết quả so với dự đoán, mỗi ván (roundKey) một lần.
+ * Ảnh win / loss / draw ở giữa màn hình ~2s khi ván có kết quả so với dự đoán, mỗi ván (roundKey) một lần.
  * Win: từ trong ra ngoài, nhanh và dứt khoát. Loss: từ trên xuống. Draw: từ trong ra ngoài, nhẹ nhàng.
  * Render qua portal vào body: các khối cha có transform (stagger) sẽ làm `fixed` bị neo theo khối thay vì màn hình.
  */
