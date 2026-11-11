@@ -2,7 +2,8 @@
 import { Injectable } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import type { DataSource } from "typeorm";
-import { CatalogStatus, type ChosenPattern, type PredictResult, type PredictionDetail, type PredictionReason, type Role } from "@toolhackchain/shared";
+import { CatalogStatus, GameSessionStatus, type ChosenPattern, type PredictResult, type PredictionDetail, type PredictionEvent, type PredictionReason, type Role } from "@toolhackchain/shared";
+import type { AuthUser } from "../auth/auth.types.js";
 import { GameSessionEntity, PredictionEntity } from "../database/entities/index.js";
 import { GameSessionsService } from "../game-sessions/game-sessions.service.js";
 import { BillingService, type ChargeOutcome } from "../billing/billing.service.js";
@@ -20,7 +21,16 @@ export type CurrentPrediction = {
   reason: PredictionReason;
   model_version: string;
   created_at: Date;
+  session_status: string;         // trạng thái game_session của ván (nội bộ, không trả ra API)
 };
+
+/**
+ * GET /streams/:id/predictions/current. Ván còn RUNNING có pick: chỉ user đã bị trừ tiền cho ván đó mới thấy pick,
+ * người khác (kể cả HOST / ADMIN) nhận locked. Ván đã FINISHED / CANCELLED, hoặc pick = null: công khai.
+ */
+export type CurrentPredictionView =
+  | ({ locked: false } & Omit<CurrentPrediction, "session_status">)
+  | { locked: true; prediction_id: string; game_session_id: string; stream_id: string; shoe: number; round: number; created_at: Date };
 
 export type PredictionStats = {
   shoe: number | null;             // shoe hiện tại = shoe của dự đoán mới nhất của stream; null khi chưa có dự đoán nào
@@ -44,8 +54,11 @@ export type StreamListStats = {
   draws: number;
   win_rate: number | null;         // wins / (wins + losses) của shoe hiện tại, 0–1; null khi chưa có ván nào
   win_streak: number;
-  recent: boolean[];               // tối đa STATS_RECENT_RESULTS dự đoán gần nhất của shoe hiện tại (bỏ ván hòa; ít hơn thì lấy đúng số đang có), cũ → mới: true = thắng
+  recent: RecentResult[];          // tối đa STATS_RECENT_RESULTS dự đoán gần nhất của shoe hiện tại (bỏ ván hòa; ít hơn thì lấy đúng số đang có), cũ → mới
 };
+
+/** Một dự đoán đã chấm của ván FINISHED (công khai). win = pick trùng result. */
+export type RecentResult = { pick: "B" | "P"; result: "B" | "P"; win: boolean };
 
 @Injectable()
 export class PredictionsService {
@@ -87,6 +100,7 @@ export class PredictionsService {
         "p.predictionId AS prediction_id", "p.gameSessionId AS game_session_id", "p.streamId AS stream_id",
         "gs.roadShoe AS shoe", "gs.roadCount AS round", "p.predictResult AS pick", "p.confidenceScore AS confidence",
         "p.detail AS detail", "p.reason AS reason", "p.modelVersion AS model_version", "p.createdAt AS created_at",
+        "gs.status AS session_status",
       ])
       .from(PredictionEntity, "p")
       .innerJoin(GameSessionEntity, "gs", "gs.gameSessionId = p.gameSessionId")
@@ -100,6 +114,54 @@ export class PredictionsService {
       prediction_id: r.prediction_id, game_session_id: r.game_session_id, stream_id: r.stream_id,
       shoe: Number(r.shoe), round: Number(r.round), pick: r.pick, confidence: r.confidence === null ? null : Number(r.confidence),
       chosen: detail.chosen, reason: r.reason, model_version: r.model_version, created_at: r.created_at,
+      session_status: r.session_status,
+    };
+  }
+
+  /** Prediction mới nhất của stream theo góc nhìn của actor (xem CurrentPredictionView). null nếu chưa có. */
+  async currentFor(actor: AuthUser, streamId: string): Promise<CurrentPredictionView | null> {
+    const p = await this.current(streamId);
+    if (!p) return null;
+    const { session_status, ...pub } = p;
+    if (session_status !== GameSessionStatus.RUNNING || p.pick === null) return { locked: false, ...pub };
+    if (actor.role === "USER" && await this.claimSubscription(p.prediction_id, actor.userId)) return { locked: false, ...pub };
+    return {
+      locked: true, prediction_id: p.prediction_id, game_session_id: p.game_session_id, stream_id: p.stream_id,
+      shoe: p.shoe, round: p.round, created_at: p.created_at,
+    };
+  }
+
+  /** true nếu user đã bị trừ tiền cho prediction này; đồng thời set delivered_at nếu chưa có (pick được giao qua API). */
+  private async claimSubscription(predictionId: string, userId: string): Promise<boolean> {
+    const rows: { subscribed: boolean }[] = await this.ds.query(
+      `-- top-level: SELECT (rows trả về bình thường, không dùng updateReturning)
+       WITH s AS (
+         SELECT prediction_subscription_id FROM prediction_subscriptions WHERE prediction_id = $1 AND user_id = $2),
+       d AS (
+         UPDATE prediction_subscriptions ps SET delivered_at = now()
+         FROM s WHERE ps.prediction_subscription_id = s.prediction_subscription_id AND ps.delivered_at IS NULL
+         RETURNING 1)
+       SELECT EXISTS (SELECT 1 FROM s) AS subscribed`,
+      [predictionId, userId]);
+    return rows[0]?.subscribed === true;
+  }
+
+  /** Dữ liệu event SSE của một prediction đã lưu (giao lại khi xử lý lại message). null nếu không có. */
+  async eventData(predictionId: string): Promise<PredictionEvent | null> {
+    const rows: {
+      game_session_id: string; stream_id: string; shoe: number; round: number; pick: "B" | "P" | null;
+      confidence: string | null; detail: PredictionDetail; reason: PredictionReason; created_at: Date;
+    }[] = await this.ds.query(
+      `SELECT p.game_session_id, p.stream_id, gs.road_shoe AS shoe, gs.road_count AS round, p.predict_result AS pick,
+              p.confidence_score AS confidence, p.detail, p.reason, p.created_at
+       FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
+       WHERE p.prediction_id = $1`, [predictionId]);
+    const r = rows[0];
+    if (!r) return null;
+    return {
+      game_session_id: r.game_session_id, stream_id: r.stream_id, shoe: Number(r.shoe), round: Number(r.round),
+      pick: r.pick, confidence: r.confidence === null ? null : Number(r.confidence), chosen: r.detail.chosen,
+      reason: r.reason, created_at: new Date(r.created_at).toISOString(),
     };
   }
 
@@ -221,7 +283,8 @@ export class PredictionsService {
         wins, losses, draws: Number(c?.draws ?? 0),
         win_rate: wins + losses > 0 ? wins / (wins + losses) : null,
         win_streak: streak,
-        recent: rows.filter((r) => Number(r.shoe) === (c ? Number(c.shoe) : null)).slice(0, STATS_RECENT_RESULTS).reverse().map((r) => r.pick === r.result),   // chỉ shoe hiện tại; ít hơn 10 thì lấy đúng số đang có
+        recent: rows.filter((r) => Number(r.shoe) === (c ? Number(c.shoe) : null)).slice(0, STATS_RECENT_RESULTS).reverse()
+          .map((r) => ({ pick: r.pick as RecentResult["pick"], result: r.result as RecentResult["result"], win: r.pick === r.result })),   // chỉ shoe hiện tại; ít hơn 10 thì lấy đúng số đang có
       };
     });
   }

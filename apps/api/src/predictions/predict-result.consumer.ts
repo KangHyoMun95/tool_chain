@@ -1,17 +1,18 @@
 // src/predictions/predict-result.consumer.ts
-// Đọc predict:results (group predict-persist): kiểm tra hạn chót -> lưu predictions (DB) -> SSE public -> XACK.
-// Mọi bước idempotent: ván đã có prediction thì INSERT không thêm dòng và không đẩy SSE lại.
-import { Inject, Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
+// Đọc predict:results (group predict-persist): kiểm tra hạn chót -> lưu predictions + trừ tiền participant (một transaction)
+// -> giao pick riêng cho user đã trừ (sau commit) -> XACK.
+// Mọi bước idempotent: ván đã có prediction thì INSERT không thêm dòng, không trừ lại; chỉ giao lại cho subscription chưa giao.
+import { Injectable, Logger, OnApplicationBootstrap, OnModuleDestroy } from "@nestjs/common";
 import { Redis } from "ioredis";
 import { hostname } from "os";
 import {
   PREDICT_PERSIST_GROUP, PREDICT_RESULT_STREAM, RedisKeys,
-  type PredictResult, type RealtimePrediction,
+  type PredictionEvent, type PredictResult, type RealtimePrediction,
 } from "@toolhackchain/shared";
 import { fieldsToObject, sleep, StreamEntry } from "../common/stream.util.js";
 import { isDataError, pgErrorCode } from "../ingestion/dead-letter.js";
-import { RealtimeHub } from "../realtime/realtime.hub.js";
-import { PARTICIPANT_SOURCE, type ParticipantSource } from "../billing/participant-source.js";
+import { ConnectionRegistry } from "../realtime/connection-registry.js";
+import { PredictionDeliveryService } from "./prediction-delivery.service.js";
 import { predictionId } from "./prediction-id.js";
 import { parsePredictResult } from "./predict-result.schema.js";
 import { PredictionsService } from "./predictions.service.js";
@@ -34,8 +35,8 @@ export class PredictResultConsumer implements OnApplicationBootstrap, OnModuleDe
 
   constructor(
     private predictions: PredictionsService,
-    private hub: RealtimeHub,
-    @Inject(PARTICIPANT_SOURCE) private participants: ParticipantSource,
+    private registry: ConnectionRegistry,
+    private delivery: PredictionDeliveryService,
   ) {}
 
   async onApplicationBootstrap() {
@@ -122,7 +123,7 @@ export class PredictResultConsumer implements OnApplicationBootstrap, OnModuleDe
     }
 
     // Snapshot participant ngay trước transaction: ai mở trang sau thời điểm này không bị trừ ván này (tính từ ván sau).
-    const participantIds = this.participants.participantUserIds(msg.stream_id);
+    const participantIds = this.registry.participantUserIds(msg.stream_id);
     let inserted: Awaited<ReturnType<PredictionsService["insertFromResult"]>>;
     try {
       inserted = await this.predictions.insertFromResult(msg, participantIds);
@@ -133,21 +134,38 @@ export class PredictResultConsumer implements OnApplicationBootstrap, OnModuleDe
       }
       throw e;
     }
-    if (!inserted) return;      // đã có prediction của ván này (retry / trùng): không trừ lại, không đẩy SSE lại
+    if (!inserted) {
+      // Đã có prediction (xử lý lại sau lỗi / trùng): không trừ lại; giao lại pick cho subscription chưa giao (đọc từ DB).
+      const data = await this.predictions.eventData(msg.prediction_id);
+      if (data?.pick) {
+        const r = await this.delivery.deliverPaid(msg.prediction_id, this.event(msg.key_id, data));
+        if (r.due > 0) this.log.log(`Giao lại prediction ${msg.key_id} shoe ${msg.shoe}, round ${msg.round}: ${r.delivered}/${r.due} user`);
+      }
+      return;
+    }
     const { createdAt, charge } = inserted;
-    if (charge && charge.charged.length + charge.rejected.length > 0) {
-      this.log.log(`Trừ tiền ${msg.key_id} shoe ${msg.shoe}, round ${msg.round}: ${charge.charged.length} user, ${charge.rejected.length} không trừ được`);
+    const event = this.event(msg.key_id, {
+      game_session_id: msg.game_session_id, stream_id: msg.stream_id, shoe: msg.shoe, round: msg.round,
+      pick: msg.pick, confidence: msg.confidence, chosen: msg.chosen, reason: msg.reason, created_at: createdAt.toISOString(),
+    });
+
+    if (msg.pick === null) {
+      // AI không dự đoán: không ai bị trừ, báo cho mọi participant.
+      const n = this.delivery.deliverUnpaid(event);
+      this.log.log(`Prediction ${msg.key_id} shoe ${msg.shoe}, round ${msg.round}: ${msg.reason} (${n} kết nối)`);
+      return;
     }
 
-    // SSE public theo key_id (TẠM THỜI — phải chuyển sang kênh riêng theo user trước khi làm billing). Không gửi detail đầy đủ.
-    const event: RealtimePrediction = {
-      type: "prediction", item_id: msg.key_id, ts: createdAt.getTime() / 1000, stream_id: msg.stream_id,
-      data: {
-        game_session_id: msg.game_session_id, stream_id: msg.stream_id, shoe: msg.shoe, round: msg.round,
-        pick: msg.pick, confidence: msg.confidence, chosen: msg.chosen, reason: msg.reason, created_at: createdAt.toISOString(),
-      },
-    };
-    this.hub.publishPrediction(msg.key_id, JSON.stringify(event));
-    this.log.log(`Prediction ${msg.key_id} shoe ${msg.shoe}, round ${msg.round}: ${msg.pick ?? msg.reason}`);
+    // Có pick: chỉ user đã trừ tiền nhận pick (lọc ở server). Participant không trừ được thì bị đóng kết nối.
+    if (charge) this.delivery.closeRejected(msg.stream_id, charge.rejected);
+    const r = await this.delivery.deliverPaid(msg.prediction_id, event);
+    this.log.log(
+      `Prediction ${msg.key_id} shoe ${msg.shoe}, round ${msg.round}: ${msg.pick}; ` +
+      `trừ ${charge?.charged.length ?? 0} user, không trừ được ${charge?.rejected.length ?? 0}` +
+      `${charge?.skipped ? ` (${charge.skipped})` : ""}, giao ${r.delivered}/${r.due}`);
+  }
+
+  private event(keyId: string, data: PredictionEvent): RealtimePrediction {
+    return { type: "prediction", item_id: keyId, ts: Date.parse(data.created_at) / 1000, stream_id: data.stream_id, data };
   }
 }

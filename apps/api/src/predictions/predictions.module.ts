@@ -10,15 +10,11 @@ import { CategoriesModule } from "../categories/categories.module.js";
 import { CategoryStreamStatsController, PredictionsController } from "./predictions.controller.js";
 import { PredictionsService } from "./predictions.service.js";
 import { BillingModule } from "../billing/billing.module.js";
-import { noParticipants, PARTICIPANT_SOURCE } from "../billing/participant-source.js";
+import { PredictionDeliveryService } from "./prediction-delivery.service.js";
 
 @Module({
-  imports: [IngestionModule, GameSessionsModule, StreamsModule, CategoriesModule, RealtimeModule, BillingModule],   // BillingService (trừ tiền); IdCache, insertMany, quyền xem stream, RealtimeHub
+  imports: [IngestionModule, GameSessionsModule, StreamsModule, CategoriesModule, RealtimeModule, BillingModule],   // BillingService (trừ tiền); IdCache, insertMany, quyền xem stream, ConnectionRegistry (participant + giao pick)
   controllers: [PredictionsController, CategoryStreamStatsController],
-  providers: [
-    PredictTriggerService, PredictResultConsumer, PredictionsService,
-    // TODO(billing PR2): thay bằng connection registry của RealtimeHub. Hiện chưa có kết nối tham gia nên không ai bị trừ tiền.
-    { provide: PARTICIPANT_SOURCE, useValue: noParticipants },
-  ],
+  providers: [PredictTriggerService, PredictResultConsumer, PredictionsService, PredictionDeliveryService],
 })
 export class PredictionsModule {}

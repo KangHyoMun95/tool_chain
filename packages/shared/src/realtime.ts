@@ -49,9 +49,18 @@ export type Tick<T = CrawlPayload> = {
 // `type` phân loại event; client coi event thiếu `type` là "tick" (tương thích bản cũ).
 export type RealtimeTick<T = CrawlPayload> = Tick<T> & { type: "tick"; stream_id: string | null };
 
-// Event SSE dự đoán (kênh public theo key_id — TẠM THỜI, phải chuyển sang kênh riêng theo user trước khi làm billing).
+// Event SSE dự đoán — KHÔNG đi kênh public: chỉ gửi trên kết nối tham gia (participate) của user đã bị trừ tiền cho ván đó;
+// pick = null (AI không dự đoán, không ai bị trừ) thì gửi cho mọi kết nối tham gia của stream.
 // item_id = key_id, ts = epoch giây của created_at (để client dùng chung logic chống tick cũ).
 export type RealtimePrediction = { type: "prediction"; item_id: string; ts: number; stream_id: string; data: PredictionEvent };
+
+// Gửi trên kết nối tham gia khi không trừ được tiền vì số dư < phí; server đóng kết nối ngay sau event này.
+// Portal: báo hết điểm, quay về danh sách (không tự kết nối lại).
+export type RealtimeInsufficientBalance = { type: "insufficient_balance"; stream_id: string; ts: number };
+
+// SSE: GET /api/stream?ticket=<ticket> (ticket một lần từ POST /api/realtime/ticket, TTL 30s).
+export const SSE_TICKET_TTL_SECONDS = 30;
+export const SSE_PING_INTERVAL_MS = 15_000;   // server gửi "event: ping" mỗi khoảng này
 
 // Chuẩn hóa tên CHỈ để chống trùng, không lưu DB. Phải khớp normalize_name() ở contract.py và biểu thức unique index.
 export const normalizeName = (s: string): string => s.trim().replace(/\s+/g, " ").toLowerCase();
@@ -83,4 +92,6 @@ export const RedisKeys = {
   aiCounted: (streamId: string, shoe: number) => `ai:counted:${streamId}:${shoe}`,               // SET game_session_id đã đếm, TTL 48h
   // Billing — API sở hữu: cờ chống sweeper gửi lại settle:requests cho cùng một ván quá dày (SET NX EX)
   settleReq: (gameSessionId: string) => `settle_req:${gameSessionId}`,
+  // SSE — API sở hữu: ticket một lần (JSON {user_id, session_id, items, participate}), TTL SSE_TICKET_TTL_SECONDS, đọc bằng GETDEL
+  sseTicket: (ticket: string) => `sse_ticket:${ticket}`,
 } as const;
