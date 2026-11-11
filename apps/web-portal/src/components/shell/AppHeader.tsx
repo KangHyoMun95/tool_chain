@@ -12,7 +12,7 @@ import { MenuDrawer, MenuDrawerItem } from "./MenuDrawer";
 
 const ME_REFRESH_MS = 15_000;
 
-/** Header chung: logo, lời chào (số điện thoại), số dư, menu hamburger (drawer: chọn ngôn ngữ, đăng xuất). Mục drawer mở dialog chọn ngôn ngữ / xác nhận đăng xuất. */
+/** Header chung: logo, lời chào (số điện thoại; ẩn ở màn hình nhỏ), số dư (luôn hiện), menu hamburger (drawer: chọn ngôn ngữ, đăng xuất). Mục drawer mở dialog chọn ngôn ngữ / xác nhận đăng xuất. */
 export function AppHeader() {
   const { t } = useI18n();
   const me = useApi(getMe, [], { refreshMs: ME_REFRESH_MS });
@@ -36,7 +36,7 @@ export function AppHeader() {
       </Link>
 
       <div className="flex items-center gap-2 sm:gap-3.5">
-        <div className="flex items-center gap-2 rounded-full border border-red-900/60 bg-[#121218] px-3 py-1.5 shadow-inner">
+        <div className="hidden items-center gap-2 rounded-full border border-red-900/60 bg-[#121218] px-3 py-1.5 shadow-inner sm:flex">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-red-600 to-rose-400 text-white shadow-neon-sm">
             <UserIcon className="h-3.5 w-3.5" />
           </span>
@@ -46,7 +46,7 @@ export function AppHeader() {
           </span>
         </div>
 
-        <div className="hidden flex-col px-2 text-right sm:flex">
+        <div className="flex flex-col px-1 text-right sm:px-2">
           <span className="text-[10px] text-gray-400">{t("shell.balance")}</span>
           <span className="flex items-center justify-end gap-1 font-mono text-sm font-extrabold text-gold-light drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]">
             <WalletIcon className="h-3.5 w-3.5 text-neon" />
