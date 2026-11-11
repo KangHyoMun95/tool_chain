@@ -17,7 +17,7 @@ interface HierarchyRow {
   key: string;
   kind: RowKind;
   username: string;
-  points: number;
+  points: string | number;
   status: AccountStatus;
   createdAt: string;
   children?: HierarchyRow[];

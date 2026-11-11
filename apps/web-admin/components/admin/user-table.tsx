@@ -6,38 +6,39 @@ import {
   type ActionType,
   type ProColumns,
 } from '@ant-design/pro-components';
-import { App, Button, Space, Tag, Tooltip } from 'antd';
+import { App, Button, Tooltip } from 'antd';
 import {
   DeleteOutlined,
   DollarOutlined,
   EditOutlined,
   StopOutlined,
 } from '@ant-design/icons';
-import { useQueryClient } from '@tanstack/react-query';
 import { AccountStatus } from '@/lib/legacy-types';
 import {
-  loadUsers,
   useDeactivateUser,
   useDeleteUser,
-  type UserRow,
 } from '@/lib/api/user';
+import {
+  fetchManagedUsers,
+  toManagedUserQuery,
+  type ManagedUserRow,
+} from '@/lib/api/managed-users';
 import { CreateUserModal } from './create-user-modal';
 import { EditUserModal } from './edit-user-modal';
 import { GrantUserPointsModal } from './grant-user-points-modal';
 
 export function UserTable() {
   const actionRef = useRef<ActionType>();
-  const queryClient = useQueryClient();
   const { message, modal } = App.useApp();
   const deactivate = useDeactivateUser();
   const remove = useDeleteUser();
 
-  const [editing, setEditing] = useState<UserRow | null>(null);
-  const [granting, setGranting] = useState<UserRow | null>(null);
+  const [editing, setEditing] = useState<ManagedUserRow | null>(null);
+  const [granting, setGranting] = useState<ManagedUserRow | null>(null);
 
   const reload = () => actionRef.current?.reload();
 
-  const confirmDeactivate = (record: UserRow) => {
+  const confirmDeactivate = (record: ManagedUserRow) => {
     modal.confirm({
       title: 'Deactive người dùng',
       content: `Vô hiệu hoá "${record.username}"? User sẽ không đăng nhập được.`,
@@ -57,7 +58,7 @@ export function UserTable() {
     });
   };
 
-  const confirmDelete = (record: UserRow) => {
+  const confirmDelete = (record: ManagedUserRow) => {
     modal.confirm({
       title: 'Xoá người dùng',
       content: `Xoá vĩnh viễn "${record.username}"? Hành động không thể hoàn tác.`,
@@ -77,13 +78,16 @@ export function UserTable() {
     });
   };
 
-  const columns: ProColumns<UserRow>[] = [
-    { title: 'Tên', dataIndex: 'username', ellipsis: true },
+  const columns: ProColumns<ManagedUserRow>[] = [
     { title: 'Số điện thoại', dataIndex: 'phoneNumber', ellipsis: true, renderText: (v) => v || '—' },
+    {
+      title: 'Vai trò',
+      dataIndex: 'role',
+      valueEnum: { ADMIN: { text: 'Admin' }, USER: { text: 'User' } },
+    },
     {
       title: 'Trạng thái',
       dataIndex: 'status',
-      search: false,
       valueEnum: {
         [AccountStatus.ACTIVE]: { text: 'Active', status: 'Success' },
         [AccountStatus.INACTIVE]: { text: 'Deactive', status: 'Warning' },
@@ -94,31 +98,12 @@ export function UserTable() {
       dataIndex: 'points',
       valueType: 'digit',
       search: false,
-      sorter: (a, b) => a.points - b.points,
     },
     {
       title: 'Ngày tạo',
       dataIndex: 'createdAt',
       valueType: 'dateTime',
       search: false,
-      sorter: (a, b) => a.createdAt.localeCompare(b.createdAt),
-    },
-    {
-      title: 'Trang chủ',
-      dataIndex: 'hostnames',
-      search: false,
-      render: (_dom, r) =>
-        r.hostnames?.length ? (
-          <Space size={[0, 4]} wrap>
-            {r.hostnames.map((h) => (
-              <Tag key={h.id} color="geekblue">
-                {h.name}
-              </Tag>
-            ))}
-          </Space>
-        ) : (
-          '—'
-        ),
     },
     {
       title: 'Thao tác',
@@ -173,24 +158,13 @@ export function UserTable() {
 
   return (
     <>
-      <ProTable<UserRow>
+      <ProTable<ManagedUserRow>
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
-        // The backend already scopes /users to the current Admin(Con); the
-        // frontend just fetches. Search/pagination are applied client-side over
-        // the cached ['users'] list.
         request={async (params) => {
-          const all = await loadUsers(queryClient);
-          const byName = (params.username ?? '').toString().toLowerCase();
-          const byPhone = (params.phoneNumber ?? '').toString().toLowerCase();
-          let rows = all;
-          if (byName) rows = rows.filter((r) => r.username.toLowerCase().includes(byName));
-          if (byPhone) rows = rows.filter((r) => (r.phoneNumber ?? '').toLowerCase().includes(byPhone));
-          const current = params.current ?? 1;
-          const pageSize = params.pageSize ?? 10;
-          const start = (current - 1) * pageSize;
-          return { data: rows.slice(start, start + pageSize), total: rows.length, success: true };
+          const { rows, total } = await fetchManagedUsers(toManagedUserQuery(params));
+          return { data: rows, total, success: true };
         }}
         search={{ labelWidth: 'auto' }}
         pagination={{ pageSize: 10, showSizeChanger: true }}
