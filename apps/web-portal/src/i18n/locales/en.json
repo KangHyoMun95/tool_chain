@@ -22,7 +22,7 @@
     "offline": "OFFLINE",
     "live": "LIVE",
     "winRate": "CURRENT SHOE WIN",
-    "winStreak": "RECENT BEST WIN STREAK",
+    "winStreak": "RECENT BEST STREAK",
     "viewDetail": "AI Prediction Details",
     "empty": "No tables in this game yet.",
     "streamer": "Streamer: {name}",
