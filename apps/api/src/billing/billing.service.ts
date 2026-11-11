@@ -2,6 +2,7 @@
 // Mọi thay đổi balance của luồng dự đoán đi qua file này (xem "Quy tắc bất biến về tiền" trong CLAUDE.md):
 // - charge(): trừ tiền participant khi có prediction mới, chạy TRONG transaction đang insert prediction.
 // - refund(): hoàn tiền một ván (dự đoán sai / kết quả T / ván CANCELLED), transaction riêng, idempotent nhờ refunded_at IS NULL.
+//   HAS_REFUND=false ⇒ refund() không làm gì (không đụng DB).
 // Mọi phép tính trên balance / fee_amount làm trong SQL; TS chỉ chuyển chuỗi bigint qua lại, không cộng trừ.
 import { Injectable } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
@@ -24,6 +25,11 @@ export type ChargeOutcome = {
 @Injectable()
 export class BillingService {
   constructor(@InjectDataSource() private ds: DataSource, private config: ConfigService<EnvVars, true>) {}
+
+  /** HAS_REFUND (env, mặc định true): false ⇒ không hoàn tiền trong mọi trường hợp. */
+  get refundEnabled(): boolean {
+    return this.config.get("HAS_REFUND", { infer: true }) !== "false";
+  }
 
   /** Phí hiện tại dưới dạng chuỗi số nguyên (truyền thẳng vào SQL ::bigint). */
   get fee(): string {
@@ -113,8 +119,10 @@ export class BillingService {
   /**
    * Hoàn tiền một ván: subscription chưa hoàn của ván CANCELLED, hoặc của ván FINISHED có result khác pick (kể cả T).
    * Hoàn cho cả user đã DEACTIVE / DELETED. Chạy lại bao nhiêu lần cũng không hoàn trùng. Trả số subscription vừa hoàn.
+   * HAS_REFUND=false ⇒ trả 0 ngay, không đụng DB (subscription giữ refunded_at NULL).
    */
   async refund(gameSessionId: string): Promise<number> {
+    if (!this.refundEnabled) return 0;
     return this.ds.transaction(async (m) => {
       const due: { sid: string; user_id: string }[] = await m.query(
         `SELECT ps.prediction_subscription_id AS sid, ps.user_id

@@ -25,6 +25,7 @@ export class SettlementConsumer implements OnApplicationBootstrap, OnModuleDestr
   constructor(private billing: BillingService) {}
 
   async onApplicationBootstrap() {
+    if (!this.billing.refundEnabled) this.log.warn("Hoàn tiền đang TẮT (HAS_REFUND=false): settle:requests được đọc và XACK nhưng không hoàn tiền");
     try {
       await this.conn.xgroup("CREATE", SETTLE_REQUEST_STREAM, SETTLE_GROUP, "$", "MKSTREAM");
     } catch (e) {
@@ -83,6 +84,10 @@ export class SettlementConsumer implements OnApplicationBootstrap, OnModuleDestr
       return;
     }
     const msg = parsed.value;
+    if (!this.billing.refundEnabled) {
+      this.log.debug(`settle:requests ${id}: bỏ qua hoàn tiền ván ${msg.game_session_id} (${msg.reason}) vì HAS_REFUND=false`);
+      return;
+    }
     const n = await this.billing.refund(msg.game_session_id);
     if (n > 0) this.log.log(`Hoàn tiền ván ${msg.game_session_id} (${msg.reason}): ${n} subscription`);
   }
