@@ -1,6 +1,7 @@
 // Nguồn dự đoán cho một ván.
 // - live (mặc định): dự đoán do AI tính và API đẩy xuống qua SSE (event `prediction`); vào giữa ván / tải lại trang thì hỏi
 //   GET /streams/:id/predictions/current. Event SSE được use-stream-session đưa vào predictionStore.
+//   Event chỉ tới khi user đã bị trừ tiền cho ván (hoặc AI không dự đoán); vào giữa ván thì current trả locked ⇒ "Dự đoán từ ván sau".
 // - mock: giả lập (~2.5s, giá trị xác định từ (stream, shoe, round)) để thử UI khi không chạy AI.
 // Chọn bằng NEXT_PUBLIC_PREDICTION_SOURCE=live|mock (xem .env.example).
 import type { PredictionReason } from "@toolhackchain/shared";
@@ -8,8 +9,14 @@ import { fetchCurrentPrediction } from "./api/predictions";
 import { predictionStore } from "./prediction-store";
 
 export type Outcome = "B" | "P" | "T";
-/** pick = null khi AI không đủ dữ liệu để dự đoán (reason ≠ OK). confidence là phần trăm 0–100. */
-export type Prediction = { pick: "B" | "P" | null; confidence: number | null; reason: PredictionReason };
+/**
+ * pick = null khi AI không đủ dữ liệu để dự đoán (reason ≠ OK) hoặc khi locked. confidence là phần trăm 0–100.
+ * locked = ván này đã có dự đoán nhưng user không được nhận (vào sau khi dự đoán được phát / không bị trừ tiền).
+ */
+export type Prediction = { pick: "B" | "P" | null; confidence: number | null; reason: PredictionReason | null; locked: boolean };
+
+/** Dự đoán của ván bị khóa với user này. */
+export const LOCKED_PREDICTION: Prediction = { pick: null, confidence: null, reason: null, locked: true };
 
 export interface PredictionSource {
   /** Resolve khi có dự đoán của (stream, shoe, round); reject khi `signal` bị hủy. */
@@ -25,6 +32,7 @@ export const toPrediction = (d: { pick: "B" | "P" | null; confidence: number | n
   pick: d.pick,
   confidence: d.confidence === null ? null : d.confidence * 100,
   reason: d.reason,
+  locked: false,
 });
 
 function hash(text: string): number {
@@ -36,7 +44,7 @@ function hash(text: string): number {
 /** Giá trị XÁC ĐỊNH từ (stream, shoe, round): cùng ván luôn cùng dự đoán, kể cả khi tải lại trang. */
 function mockValue(streamId: string, shoe: number, round: number): Prediction {
   const h = hash(`${streamId}|${shoe}|${round}`);
-  return { pick: h % 2 === 0 ? "B" : "P", confidence: 80 + ((h >>> 8) % 150) / 10, reason: "OK" };   // 80.0 – 94.9
+  return { pick: h % 2 === 0 ? "B" : "P", confidence: 80 + ((h >>> 8) % 150) / 10, reason: "OK", locked: false };   // 80.0 – 94.9
 }
 
 export const mockPredictionSource: PredictionSource = {
@@ -64,7 +72,8 @@ export const livePredictionSource: PredictionSource = {
 
       // Vào giữa ván / tải lại trang: event SSE đã qua, hỏi API. Lỗi mạng thì bỏ qua, event SSE sẽ tới.
       fetchCurrentPrediction(streamId).then((cur) => {
-        if (cur) predictionStore.put(streamId, cur.shoe, cur.round, toPrediction(cur));   // khớp ván đang chờ thì listener ở trên resolve
+        // khớp ván đang chờ thì listener ở trên resolve
+        if (cur) predictionStore.put(streamId, cur.shoe, cur.round, cur.locked ? LOCKED_PREDICTION : toPrediction(cur));
       }).catch(() => undefined);
     }),
 };
