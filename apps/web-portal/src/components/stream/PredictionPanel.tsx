@@ -7,6 +7,7 @@ import { cn } from "@/src/lib/cn";
 import { HudCard } from "../ui/HudCard";
 import { Radar } from "../ui/Radar";
 import { DecorImage } from "./DecorImage";
+import { ResultOverlay } from "./ResultOverlay";
 
 type Props = {
   streamId: string;
@@ -45,8 +46,12 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
   const tone = online && prediction && !prediction.locked && result !== null
     ? (result === "T" ? "draw" : prediction.pick === null ? null : prediction.pick === result ? "win" : "loss")
     : null;
+  // Ảnh kết quả giữa màn hình: chỉ khi có pick để so (pick = null + kết quả T không tính là hòa của dự đoán).
+  const overlayTone = tone && prediction?.pick ? tone : null;
 
   return (
+    <>
+    <ResultOverlay tone={overlayTone} roundKey={`${streamId}:${shoe}:${round}`} />
     <HudCard glow className={cn("relative flex h-[236px] flex-col items-center justify-start overflow-hidden p-3", tone && tone !== "win" && TONE_CLASS[tone])} aria-live="polite">
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <DecorImage src="/images/pedestal-bg.png" className="h-full w-full object-cover opacity-70 mix-blend-screen" />
@@ -111,5 +116,6 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
         )
       )}
     </HudCard>
+    </>
   );
 }

@@ -7,7 +7,7 @@ import type { AuthUser } from "../auth/auth.types.js";
 import { GameSessionEntity, PredictionEntity } from "../database/entities/index.js";
 import { GameSessionsService } from "../game-sessions/game-sessions.service.js";
 import { BillingService, type ChargeOutcome } from "../billing/billing.service.js";
-import { LIVE_WITHIN_MS, STATS_RECENT_RESULTS, STATS_SHOES, STATS_STREAK_WINDOW } from "./predictions.constants.js";
+import { LIST_STREAK_MIN, LIST_STREAK_MIN_ROUNDS, LIVE_WITHIN_MS, STATS_SHOES, STATS_STREAK_WINDOW } from "./predictions.constants.js";
 
 export type CurrentPrediction = {
   prediction_id: string;
@@ -53,12 +53,8 @@ export type StreamListStats = {
   losses: number;
   draws: number;
   win_rate: number | null;         // wins / (wins + losses) của shoe hiện tại, 0–1; null khi chưa có ván nào
-  win_streak: number;
-  recent: RecentResult[];          // tối đa STATS_RECENT_RESULTS dự đoán gần nhất của shoe hiện tại (bỏ ván hòa; ít hơn thì lấy đúng số đang có), cũ → mới
+  win_streak: number;              // xem listStreak(): chuỗi dài nhất của shoe hiện tại, hoặc của shoe trước khi shoe hiện tại còn ít
 };
-
-/** Một dự đoán đã chấm của ván FINISHED (công khai). win = pick trùng result. */
-export type RecentResult = { pick: "B" | "P"; result: "B" | "P"; win: boolean };
 
 @Injectable()
 export class PredictionsService {
@@ -252,40 +248,65 @@ export class PredictionsService {
        LEFT JOIN predictions p ON p.game_session_id = gs.game_session_id AND p.predict_result IS NOT NULL
        GROUP BY cur.stream_id, cur.shoe`, params);
 
-    const evaluated: { stream_id: string; shoe: string; pick: string; result: string }[] = await this.ds.query(
-      `SELECT stream_id, shoe, pick, result FROM (
-         SELECT p.stream_id, gs.road_shoe AS shoe, p.predict_result AS pick, gs.result,
-                row_number() OVER (PARTITION BY p.stream_id ORDER BY p.created_at DESC) AS rn
+    // Dự đoán đã chấm của shoe hiện tại (rk = 1, cùng định nghĩa với `cur`: shoe của dự đoán mới nhất) và shoe trước
+    // (rk = 2: shoe khác có dự đoán mới nhất kế tiếp), theo thứ tự thời gian, để tính chuỗi thắng dài nhất của từng shoe.
+    const evaluated: { stream_id: string; rk: string; pick: string; result: string }[] = await this.ds.query(
+      `WITH shoes AS (
+         SELECT p.stream_id, gs.road_shoe AS shoe,
+                row_number() OVER (PARTITION BY p.stream_id ORDER BY max(p.created_at) DESC) AS rk
          FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
-         WHERE p.stream_id IN (${vis}) AND p.predict_result IS NOT NULL AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
-       ) x WHERE rn <= $${params.length + 1} ORDER BY stream_id, rn`,
-      [...params, STATS_STREAK_WINDOW]);   // mỗi stream: mới → cũ
+         WHERE p.stream_id IN (${vis})
+         GROUP BY p.stream_id, gs.road_shoe)
+       SELECT s.stream_id, s.rk, p.predict_result AS pick, gs.result
+       FROM shoes s
+       JOIN game_sessions gs ON gs.stream_id = s.stream_id AND gs.road_shoe = s.shoe
+                            AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
+       JOIN predictions p ON p.game_session_id = gs.game_session_id AND p.predict_result IS NOT NULL
+       WHERE s.rk <= 2
+       ORDER BY s.stream_id, s.rk, p.created_at`, params);
 
-    const byStream = new Map<string, { shoe: string; pick: string; result: string }[]>();
+    const byShoe = new Map<string, { pick: string; result: string }[]>();   // `${stream_id}|${rk}` → cũ → mới
     for (const r of evaluated) {
-      const list = byStream.get(r.stream_id) ?? [];
+      const k = `${r.stream_id}|${Number(r.rk)}`;
+      const list = byShoe.get(k) ?? [];
       list.push(r);
-      byStream.set(r.stream_id, list);
+      byShoe.set(k, list);
     }
     const ids = new Set([...latest.map((r) => r.stream_id), ...cur.map((r) => r.stream_id)]);
     return [...ids].map((id) => {
       const l = latest.find((r) => r.stream_id === id);
       const c = cur.find((r) => r.stream_id === id);
-      const wins = Number(c?.wins ?? 0), losses = Number(c?.losses ?? 0);
-      const rows = (byStream.get(id) ?? []).filter((r) => r.result !== "T");   // mới → cũ, bỏ ván hòa
-      let streak = 0;
-      for (const r of rows) { if (r.pick !== r.result) break; streak++; }
+      const wins = Number(c?.wins ?? 0), losses = Number(c?.losses ?? 0), draws = Number(c?.draws ?? 0);
       return {
         stream_id: id,
         shoe: c ? Number(c.shoe) : null,
         round: l ? Number(l.round) : null,
         live: l ? Number(l.age_ms) <= LIVE_WITHIN_MS : false,
-        wins, losses, draws: Number(c?.draws ?? 0),
+        wins, losses, draws,
         win_rate: wins + losses > 0 ? wins / (wins + losses) : null,
-        win_streak: streak,
-        recent: rows.filter((r) => Number(r.shoe) === (c ? Number(c.shoe) : null)).slice(0, STATS_RECENT_RESULTS).reverse()
-          .map((r) => ({ pick: r.pick as RecentResult["pick"], result: r.result as RecentResult["result"], win: r.pick === r.result })),   // chỉ shoe hiện tại; ít hơn 10 thì lấy đúng số đang có
+        win_streak: listStreak(byShoe.get(`${id}|1`) ?? [], byShoe.get(`${id}|2`)),
       };
     });
   }
+}
+
+/** Chuỗi thắng dài nhất trong một shoe (dự đoán đã chấm, cũ → mới): T bỏ qua, thua thì đứt chuỗi. */
+function longestWinStreak(rows: { pick: string; result: string }[]): number {
+  let best = 0, run = 0;
+  for (const r of rows) {
+    if (r.result === "T") continue;
+    run = r.pick === r.result ? run + 1 : 0;
+    if (run > best) best = run;
+  }
+  return best;
+}
+
+/**
+ * Chuỗi ở danh sách bàn: chuỗi dài nhất của shoe hiện tại (N); nếu nó < LIST_STREAK_MIN hoặc N có < LIST_STREAK_MIN_ROUNDS
+ * lượt đã chấm (kể cả hòa) thì lấy chuỗi dài nhất của shoe trước (N−1). Chưa có shoe trước ⇒ giữ của N.
+ */
+function listStreak(current: { pick: string; result: string }[], previous: { pick: string; result: string }[] | undefined): number {
+  const n = longestWinStreak(current);
+  if ((n < LIST_STREAK_MIN || current.length < LIST_STREAK_MIN_ROUNDS) && previous) return longestWinStreak(previous);
+  return n;
 }

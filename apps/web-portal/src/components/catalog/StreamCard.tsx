@@ -5,7 +5,6 @@ import { useI18n } from "@/src/i18n/provider";
 import type { Stream } from "@/src/lib/api/catalog";
 import type { StreamListStatsDto } from "@/src/lib/api/predictions";
 import { stagger } from "@/src/lib/stagger";
-import { ResultBeads } from "../ResultBeads";
 
 /**
  * Thẻ bàn ở danh sách. Số liệu AI lấy từ GET /categories/:id/stream-stats; tỷ lệ win là của shoe hiện tại.
@@ -14,7 +13,6 @@ import { ResultBeads } from "../ResultBeads";
 export function StreamCard({ stream, stats, index, canParticipate = true }: { stream: Stream; stats?: StreamListStatsDto; index: number; canParticipate?: boolean }) {
   const { t } = useI18n();
   const live = stats?.live ?? false;
-  const recent = stats?.recent ?? [];
   const title = `${stream.categoryName} ${stream.name}`;   // giống tiêu đề trang chi tiết
 
   return (
@@ -59,11 +57,6 @@ export function StreamCard({ stream, stats, index, canParticipate = true }: { st
               {(stats?.win_streak ?? 0) > 0 && <span className="text-lg">🔥</span>}
             </span>
           </div>
-        </div>
-
-        <div className="mt-3">
-          <span className="mb-1.5 block font-mono text-[11px] font-semibold text-gray-300">{t("streams.recentResults", { count: recent.length })}</span>
-          {recent.length > 0 ? <ResultBeads results={recent} /> : <p className="font-mono text-[11px] text-gray-500">{t("streams.noRecent")}</p>}
         </div>
       </div>
 
