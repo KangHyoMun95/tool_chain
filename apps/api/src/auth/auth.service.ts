@@ -96,8 +96,21 @@ export class AuthService implements OnModuleInit {
 
     await this.attempts.clear(phone);
     const { sessionId, refreshToken } = await this.sessions.create(row.user_id, row.role);
+    await this.touchLastLogin(row.user_id);
     this.log.log(`login ok user_id=${row.user_id} ip=${ip}`);
     return this.issue(row.user_id, row.role, sessionId, refreshToken);
+  }
+
+  /** Ghi lần hoạt động gần nhất (login / refresh), tối đa 1 lần / giờ / user; lỗi chỉ log, không chặn đăng nhập. */
+  private async touchLastLogin(userId: string): Promise<void> {
+    try {
+      await this.dataSource.query(
+        `UPDATE users SET last_login_at = now() WHERE user_id = $1 AND (last_login_at IS NULL OR last_login_at < now() - interval '1 hour')`,
+        [userId],
+      );
+    } catch (e) {
+      this.log.warn(`last_login_at update failed user_id=${userId}: ${e instanceof Error ? e.message : e}`);
+    }
   }
 
   async refresh(presentedToken: string | undefined, ip: string): Promise<TokenPair> {
@@ -119,6 +132,7 @@ export class AuthService implements OnModuleInit {
     }
 
     await this.sessions.updateRole(result.sessionId, result.session, user.role);
+    await this.touchLastLogin(user.user_id);
     return this.issue(user.user_id, user.role, result.sessionId, result.refreshToken);
   }
 
