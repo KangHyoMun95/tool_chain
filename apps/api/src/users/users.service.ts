@@ -84,11 +84,11 @@ export class UsersService {
     return { user_id: target.userId, ...(dto.phone_number !== undefined ? { phone_number: dto.phone_number } : {}) };
   }
 
-  async updateStatus(actor: AuthUser, targetUserId: string, status: UserStatus) {
+  async updateStatus(actor: AuthUser, targetUserId: string, status: UserStatus, transferToAdminId?: string) {
     const target = await this.permissions.assertCanManage(actor, targetUserId);
-    // Xóa (soft delete) User là quyền của Admin; Host chỉ được kích hoạt / hủy kích hoạt Admin.
-    if (status === UserStatus.DELETED && actor.role !== "ADMIN") throw new ForbiddenException();
     if (target.status === UserStatus.DELETED) throw new ConflictException("User is deleted");
+    if (status === UserStatus.DELETED) return this.remove(actor, target.userId, transferToAdminId);
+    if (transferToAdminId !== undefined) throw new BadRequestException("transfer_to_admin_id is only for deleting an admin");
 
     await this.dataSource
       .createQueryBuilder()
@@ -100,6 +100,78 @@ export class UsersService {
     if (status !== UserStatus.ACTIVE) await this.sessions.revokeAllSessions(target.userId);
     this.log.log(`status changed actor=${actor.userId} target=${target.userId} ${target.status}->${status}`);
     return { user_id: target.userId, status };
+  }
+
+  /**
+   * Xóa mềm cấp dưới TRỰC TIẾP (HOST → ADMIN, ADMIN → USER; caller đã kiểm tra bằng assertCanManage). Điều kiện: target đang DEACTIVE
+   * (409 nếu còn ACTIVE). Một DB transaction, khóa users theo user_id tăng dần, tính trong SQL:
+   * - Điểm còn lại của target được THU HỒI về actor: hai dòng transactions loại `INVOKE` (target giảm, actor tăng), created_by = actor.
+   * - ADMIN xóa USER: không nhận `transferToAdminId`; USER không có cấp dưới nên không phải chuyển gì.
+   * - HOST xóa ADMIN: BẮT BUỘC `transferToAdminId` (ADMIN khác, ACTIVE, con trực tiếp của HOST); mọi cấp dưới chưa xóa của ADMIN bị xóa
+   *   được chuyển `refer_user_id` sang ADMIN đó.
+   * Sau commit thu hồi mọi phiên của target (portal gọi /auth/me sẽ bị 401).
+   */
+  private async remove(actor: AuthUser, targetUserId: string, transferToAdminId?: string) {
+    if (actor.role === "HOST") {
+      if (!transferToAdminId) throw new BadRequestException("transfer_to_admin_id is required");
+      if (transferToAdminId === targetUserId) throw new BadRequestException("transfer_to_admin_id must be a different admin");
+    } else if (transferToAdminId !== undefined) {
+      throw new BadRequestException("transfer_to_admin_id is only for deleting an admin");
+    }
+
+    const result = await this.dataSource.transaction(async (m) => {
+      const ids = [actor.userId, targetUserId, ...(transferToAdminId ? [transferToAdminId] : [])];
+      const locked = await m.query(
+        `SELECT u.user_id, u.status, u.refer_user_id, u.balance::text AS balance, r.role_name AS role
+         FROM users u JOIN roles r ON r.role_id = u.role_id
+         WHERE u.user_id = ANY($1::uuid[]) ORDER BY u.user_id FOR UPDATE OF u`,
+        [ids],
+      ) as { user_id: string; status: string; refer_user_id: string | null; balance: string; role: string }[];
+      const target = locked.find((r) => r.user_id === targetUserId);
+      if (!target || target.refer_user_id !== actor.userId) throw new ForbiddenException();
+      if (target.status === UserStatus.DELETED) throw new ConflictException("User is deleted");
+      if (target.status !== UserStatus.DEACTIVE) throw new ConflictException("Chỉ được xóa người dùng đã deactive");
+
+      if (transferToAdminId) {
+        const heir = locked.find((r) => r.user_id === transferToAdminId);
+        if (!heir || heir.refer_user_id !== actor.userId || heir.role !== "ADMIN" || heir.status !== UserStatus.ACTIVE) {
+          throw new ForbiddenException("Admin nhận bàn giao phải là Admin đang hoạt động thuộc quyền quản lý của bạn");
+        }
+        await m.query(`UPDATE users SET refer_user_id = $2 WHERE refer_user_id = $1 AND status <> 'DELETED'`, [targetUserId, transferToAdminId]);
+      } else {
+        const [child] = await m.query(`SELECT 1 FROM users WHERE refer_user_id = $1 AND status <> 'DELETED' LIMIT 1`, [targetUserId]) as unknown[];
+        if (child) throw new ConflictException("Người dùng còn cấp dưới chưa xóa");
+      }
+
+      const amount = target.balance;
+      if (amount !== "0") {
+        const [out] = await updateReturning<{ balance_before: string; balance_after: string }>(
+          m,
+          `UPDATE users SET balance = balance - $2::bigint WHERE user_id = $1 AND balance >= $2::bigint
+           RETURNING (balance + $2::bigint)::text AS balance_before, balance::text AS balance_after`,
+          [targetUserId, amount],
+        );
+        if (!out) throw new ConflictException("Balance changed, please retry");
+        const [inc] = await updateReturning<{ balance_before: string; balance_after: string }>(
+          m,
+          `UPDATE users SET balance = balance + $2::bigint WHERE user_id = $1
+           RETURNING (balance - $2::bigint)::text AS balance_before, balance::text AS balance_after`,
+          [actor.userId, amount],
+        );
+        await m.query(
+          `INSERT INTO transactions (user_id, transaction_type, amount, balance_before, balance_after, created_by)
+           VALUES ($1, 'INVOKE', $3::bigint, $4::bigint, $5::bigint, $2),
+                  ($2, 'INVOKE', $3::bigint, $6::bigint, $7::bigint, $2)`,
+          [targetUserId, actor.userId, amount, out.balance_before, out.balance_after, inc.balance_before, inc.balance_after],
+        );
+      }
+      await m.query(`UPDATE users SET status = 'DELETED' WHERE user_id = $1`, [targetUserId]);
+      return { user_id: targetUserId, status: UserStatus.DELETED, returned_points: amount, transferred_to: transferToAdminId ?? null };
+    });
+
+    await this.sessions.revokeAllSessions(targetUserId);
+    this.log.log(`user deleted actor=${actor.userId} target=${targetUserId} returned=${result.returned_points} heir=${transferToAdminId ?? "-"}`);
+    return result;
   }
 
   /**

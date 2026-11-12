@@ -8,6 +8,7 @@ import {
 } from '@ant-design/pro-components';
 import { App, Button, Tooltip } from 'antd';
 import {
+  DeleteOutlined,
   DollarOutlined,
   EditOutlined,
   EyeOutlined,
@@ -27,6 +28,7 @@ import {
 } from '@/lib/api/managed-users';
 import { CreateSubAdminModal } from './create-sub-admin-modal';
 import { EditSubAdminModal } from './edit-sub-admin-modal';
+import { DeleteSubAdminModal } from './delete-sub-admin-modal';
 import { GrantPointsModal } from './grant-points-modal';
 
 export function SubAdminTable() {
@@ -37,6 +39,7 @@ export function SubAdminTable() {
 
   const [editing, setEditing] = useState<ManagedUserRow | null>(null);
   const [granting, setGranting] = useState<ManagedUserRow | null>(null);
+  const [deleting, setDeleting] = useState<ManagedUserRow | null>(null);
 
   const reload = () => actionRef.current?.reload();
 
@@ -61,8 +64,8 @@ export function SubAdminTable() {
 
   const confirmDeactivate = (record: ManagedUserRow) => {
     modal.confirm({
-      title: 'Deactive Admin Con',
-      content: `Vô hiệu hoá "${record.username}"? Admin Con sẽ không đăng nhập được.`,
+      title: 'Deactive người dùng',
+      content: `Vô hiệu hoá "${record.username}"? người dùng sẽ không đăng nhập được.`,
       okText: 'Deactive',
       okButtonProps: { danger: true },
       cancelText: 'Huỷ',
@@ -171,6 +174,15 @@ export function SubAdminTable() {
                 onClick={() => confirmActivate(record)}
               />
             </Tooltip>,
+            <Tooltip key="delete" title="Xoá">
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => setDeleting(record)}
+              />
+            </Tooltip>,
           );
         }
         return actions;
@@ -209,6 +221,7 @@ export function SubAdminTable() {
         onOpenChange={(o) => !o && setGranting(null)}
         onSuccess={reload}
       />
+      <DeleteSubAdminModal record={deleting} onClose={() => setDeleting(null)} onSuccess={reload} />
     </>
   );
 }
