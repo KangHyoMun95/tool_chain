@@ -28,6 +28,7 @@ export class SubAdminsService {
   /**
    * Cây user dưới người gọi: `items` là con trực tiếp (depth 1), mỗi user có `children` là con trực tiếp của nó, đệ quy.
    * Không gồm chính người gọi. Phạm vi chỉ phụ thuộc actor.userId, không nhận id từ client.
+   * User `DELETED` bị ẩn (cùng nhánh bên dưới), trừ khi lọc `status=DELETED` rõ ràng.
    * Lọc (status / role / q): giữ user khớp và mọi tổ tiên của nó (để vẫn nằm đúng chỗ trong cây), `children` chỉ gồm nhánh có user khớp.
    * Phân trang (`total`, `page`, `limit`) tính trên con trực tiếp.
    */
@@ -36,11 +37,11 @@ export class SubAdminsService {
       `-- top-level: SELECT
        WITH RECURSIVE tree AS (
          SELECT user_id, 1 AS depth, ARRAY[user_id] AS path
-         FROM users WHERE refer_user_id = $1
+         FROM users WHERE refer_user_id = $1 AND ($3::boolean OR status <> 'DELETED')
          UNION ALL
          SELECT c.user_id, t.depth + 1, t.path || c.user_id
          FROM users c JOIN tree t ON c.refer_user_id = t.user_id
-         WHERE t.depth < $2 AND NOT c.user_id = ANY(t.path)
+         WHERE t.depth < $2 AND NOT c.user_id = ANY(t.path) AND ($3::boolean OR c.status <> 'DELETED')
        )
        SELECT u.user_id, u.phone_number, u.display_name, r.role_name AS role, u.status, u.balance::text AS balance,
               u.refer_user_id, t.depth::int AS depth, u.created_at
@@ -48,7 +49,7 @@ export class SubAdminsService {
        JOIN users u ON u.user_id = t.user_id
        JOIN roles r ON r.role_id = u.role_id
        ORDER BY t.depth, u.created_at DESC, u.user_id`,
-      [actor.userId, MAX_DEPTH],
+      [actor.userId, MAX_DEPTH, dto.status === "DELETED"],
     );
 
     const nodes = new Map<string, SubAdminItem>(flat.map((u) => [u.user_id, { ...u, children: [] }]));
@@ -110,12 +111,12 @@ export class SubAdminsService {
          SELECT u.user_id, u.phone_number, u.display_name, r.role_name AS role, u.status, u.balance::text AS balance,
                 u.refer_user_id, 1 AS depth, u.created_at
          FROM users u JOIN roles r ON r.role_id = u.role_id
-         WHERE u.refer_user_id = $1
+         WHERE u.refer_user_id = $1 AND u.status <> 'DELETED'
          ORDER BY u.created_at DESC, u.user_id
          LIMIT $2 OFFSET $3`,
         [targetId, limit, (page - 1) * limit],
       ),
-      this.dataSource.query(`SELECT count(*)::int AS n FROM users WHERE refer_user_id = $1`, [targetId]),
+      this.dataSource.query(`SELECT count(*)::int AS n FROM users WHERE refer_user_id = $1 AND status <> 'DELETED'`, [targetId]),
     ]);
     return { items, total: count[0].n, page, limit };
   }
