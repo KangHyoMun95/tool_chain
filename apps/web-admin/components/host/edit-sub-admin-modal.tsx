@@ -8,7 +8,6 @@ import {
   type UpdateSubAdminInput,
 } from '@/lib/api/sub-admin';
 
-/** Controlled edit modal for a single Admin(Con). */
 export function EditSubAdminModal({
   record,
   open,
@@ -29,15 +28,13 @@ export function EditSubAdminModal({
       open={open}
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
-      initialValues={{ username: record?.username, phoneNumber: record?.phoneNumber ?? undefined }}
+      initialValues={{ displayName: record?.displayName ?? undefined, phoneNumber: record?.phoneNumber ?? undefined }}
       onFinish={async (values) => {
         if (!record) return false;
-        // Only send fields that were actually filled in.
         const payload: UpdateSubAdminInput = {};
-        if (values.username && values.username !== record.username) {
-          payload.username = values.username;
-        }
         if (values.password) payload.password = values.password;
+        const nextName = (values.displayName ?? '').trim();
+        if (nextName !== (record.displayName ?? '')) payload.displayName = nextName || null;
         if ((values.phoneNumber ?? '') !== (record.phoneNumber ?? '')) {
           payload.phoneNumber = values.phoneNumber ?? '';
         }
@@ -53,20 +50,21 @@ export function EditSubAdminModal({
       }}
     >
       <ProFormText
-        name="username"
-        label="Tên đăng nhập"
-        rules={[{ min: 3 }]}
+        name="displayName"
+        label="Tên hiển thị"
+        placeholder="Không bắt buộc"
+        rules={[{ max: 50, message: 'Tối đa 50 ký tự' }]}
+      />
+      <ProFormText
+        name="phoneNumber"
+        label="Số điện thoại"
+        rules={[{ pattern: /^\d{6,20}$/, message: 'Chỉ chữ số, 6–20 ký tự' }]}
       />
       <ProFormText.Password
         name="password"
         label="Mật khẩu mới"
         placeholder="Để trống nếu không đổi"
-        rules={[{ min: 6 }]}
-      />
-      <ProFormText
-        name="phoneNumber"
-        label="Số điện thoại"
-        rules={[{ max: 20, message: 'Tối đa 20 ký tự' }]}
+        rules={[{ min: 12, message: 'Tối thiểu 12 ký tự' }]}
       />
     </ModalForm>
   );

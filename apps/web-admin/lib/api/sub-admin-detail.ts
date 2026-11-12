@@ -1,76 +1,64 @@
 'use client';
 
-import { useQuery, type QueryClient } from '@tanstack/react-query';
-import { AccountStatus, PointTargetType, Role } from '@toolhackchain/shared';
+import { useQuery } from '@tanstack/react-query';
+import { SUB_ADMINS_KEY } from './sub-admin';
 import { apiFetch } from './client';
-import { SUB_ADMINS_KEY, type SubAdminRow } from './sub-admin';
+import { toRow, type ManagedUserRow } from './managed-users';
 
-/** A User row as shown read-only on the Host's Sub-Admin detail page. */
-export interface UserRow {
-  id: string;
-  username: string;
-  phoneNumber?: string | null;
-  hostnames: { id: string; name: string; url: string }[];
-  role: Role;
-  status: AccountStatus;
-  points: number;
-  managedBySubAdminId: string;
-  createdAt: string;
-  updatedAt: string;
-}
+/** User thuộc một Admin, hiển thị chỉ xem ở trang chi tiết (dòng GET /sub-admins/:id/users). */
+export type UserRow = ManagedUserRow;
 
-/** A points transaction row (from PointTransaction). */
+/** Một lần nhận điểm (MINT / TRANSFER_IN) của user, từ GET /sub-admins/:id/point-transactions. */
 export interface PointTransactionRow {
   id: string;
-  fromAdminId: string;
-  toEntityType: PointTargetType;
-  toEntityId: string;
-  /** Signed: positive = credit, negative = debit. */
-  amount: number;
-  reason: string | null;
+  /** transactions.transaction_type: MINT (HOST sinh điểm) | TRANSFER_IN (ADMIN chuyển điểm). */
+  type: string;
+  amount: string;
+  granterId: string | null;
+  granterName: string | null;
   createdAt: string;
+}
+
+interface Page<T> { items: T[]; total: number }
+type UserDto = Parameters<typeof toRow>[0];
+interface TransactionDto {
+  transaction_id: string;
+  amount: string;
+  granter_id: string | null;
+  granter_name: string | null;
+  type: string;
+  created_at: string;
 }
 
 const detailKey = (id: string) => [...SUB_ADMINS_KEY, id] as const;
-const usersKey = (id: string) => [...SUB_ADMINS_KEY, id, 'users'] as const;
-const txKey = (id: string) => [...SUB_ADMINS_KEY, id, 'point-transactions'] as const;
 
-/** Sub-Admin detail (GET /sub-admins/:id). */
+/** Chi tiết một user trong cây của người đăng nhập (GET /sub-admins/:id). */
 export function useSubAdmin(id: string) {
   return useQuery({
     queryKey: detailKey(id),
-    queryFn: () => apiFetch<SubAdminRow>(`/sub-admins/${id}`),
+    queryFn: async () => toRow(await apiFetch<UserDto>(`/sub-admins/${id}`)),
     enabled: !!id,
   });
 }
 
-/** Read-only list of the Users managed by this Sub-Admin (Host view). */
-export async function loadSubAdminUsers(
-  qc: QueryClient,
-  id: string,
-): Promise<UserRow[]> {
-  try {
-    return await qc.fetchQuery({
-      queryKey: usersKey(id),
-      queryFn: () => apiFetch<UserRow[]>(`/sub-admins/${id}/users`),
-    });
-  } catch {
-    return [];
-  }
+/** User con trực tiếp của Admin này, phân trang ở server. */
+export async function fetchSubAdminUsers(id: string, page: number, limit: number): Promise<{ rows: UserRow[]; total: number }> {
+  const res = await apiFetch<Page<UserDto>>(`/sub-admins/${id}/users?page=${page}&limit=${limit}`);
+  return { rows: res.items.map(toRow), total: res.total };
 }
 
-/** Read-only points-transaction history for this Sub-Admin. */
-export async function loadPointTransactions(
-  qc: QueryClient,
-  id: string,
-): Promise<PointTransactionRow[]> {
-  try {
-    return await qc.fetchQuery({
-      queryKey: txKey(id),
-      queryFn: () =>
-        apiFetch<PointTransactionRow[]>(`/sub-admins/${id}/point-transactions`),
-    });
-  } catch {
-    return [];
-  }
+/** Lịch sử điểm Admin này nhận được, phân trang ở server. */
+export async function fetchPointTransactions(id: string, page: number, limit: number): Promise<{ rows: PointTransactionRow[]; total: number }> {
+  const res = await apiFetch<Page<TransactionDto>>(`/sub-admins/${id}/point-transactions?page=${page}&limit=${limit}`);
+  return {
+    rows: res.items.map((t) => ({
+      id: t.transaction_id,
+      type: t.type,
+      amount: t.amount,
+      granterId: t.granter_id,
+      granterName: t.granter_name,
+      createdAt: t.created_at,
+    })),
+    total: res.total,
+  };
 }

@@ -9,8 +9,8 @@ import {
 } from '@ant-design/icons';
 import { App, Button, Spin, Typography } from 'antd';
 import { useRouter } from 'next/navigation';
-import { LoginRequest } from '@toolhackchain/shared';
-import { useLogin } from '@/lib/api/auth';
+import { useLogin, type LoginInput } from '@/lib/api/auth';
+import { AuthError, type AuthErrorCode } from '@/lib/api/client';
 import { homeForRole } from '@/lib/auth/current-user';
 
 // Mirrors the dark SOC theme tokens in app/providers.tsx — kept local since
@@ -19,6 +19,14 @@ const MONO =
   "ui-monospace, 'JetBrains Mono', 'Space Mono', 'SFMono-Regular', Menlo, Consolas, monospace";
 const CYAN = '#22D3EE';
 
+const LOGIN_ERRORS: Record<AuthErrorCode, string> = {
+  invalid_input: 'Số điện thoại hoặc mật khẩu không hợp lệ',
+  invalid_credentials: 'Sai số điện thoại hoặc mật khẩu',
+  locked: 'Thử quá nhiều lần. Vui lòng thử lại sau',
+  network: 'Không kết nối được máy chủ',
+  unknown: 'Đăng nhập thất bại',
+};
+
 export default function LoginPage() {
   const router = useRouter();
   const { message } = App.useApp();
@@ -26,7 +34,7 @@ export default function LoginPage() {
   // Keeps the overlay up from a successful response until the target page loads.
   const [redirecting, setRedirecting] = useState(false);
 
-  const onFinish = async (values: LoginRequest) => {
+  const onFinish = async (values: LoginInput) => {
     try {
       const res = await login.mutateAsync(values);
       message.success('Đăng nhập thành công');
@@ -34,7 +42,7 @@ export default function LoginPage() {
       router.replace(homeForRole(res.role));
       return true;
     } catch (err) {
-      message.error(err instanceof Error ? err.message : 'Đăng nhập thất bại');
+      message.error(err instanceof AuthError ? LOGIN_ERRORS[err.code] : LOGIN_ERRORS.unknown);
       return false;
     }
   };
@@ -150,22 +158,25 @@ export default function LoginPage() {
           Trung tâm điều hành &amp; quản trị ToolHackChain
         </Typography.Text>
 
-        <ProForm<LoginRequest>
+        <ProForm<LoginInput>
           onFinish={onFinish}
           submitter={false}
           layout="vertical"
           style={{ marginTop: 24 }}
         >
           <ProFormText
-            name="username"
-            label="Tên đăng nhập"
-            placeholder="Nhập tên đăng nhập"
+            name="phone_number"
+            label="Số điện thoại"
+            placeholder="Nhập số điện thoại"
             fieldProps={{
               size: 'large',
               prefix: <UserOutlined style={{ color: '#6B7280' }} />,
               style: { fontFamily: MONO },
             }}
-            rules={[{ required: true, message: 'Nhập tên đăng nhập' }]}
+            rules={[
+              { required: true, message: 'Nhập số điện thoại' },
+              { pattern: /^\d{6,20}$/, message: 'Số điện thoại gồm 6–20 chữ số' },
+            ]}
           />
           <ProFormText.Password
             name="password"

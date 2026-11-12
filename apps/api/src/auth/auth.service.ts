@@ -22,6 +22,7 @@ export type TokenPair = { accessToken: string; expiresIn: number; refreshToken: 
 export type MeResponse = {
   user_id: string;
   phone_number: string;
+  display_name: string | null; // tên hiển thị, null = chưa đặt
   role: Role;
   status: UserStatus;
   balance: string; // bigint → string
@@ -66,7 +67,7 @@ export class AuthService implements OnModuleInit {
     };
   }
 
-  async login(phone: string, password: string, ip: string, audience?: "portal"): Promise<TokenPair> {
+  async login(phone: string, password: string, ip: string, audience?: "portal" | "admin"): Promise<TokenPair> {
     await this.attempts.assertNotLocked(phone);
 
     const row = await this.dataSource
@@ -87,16 +88,29 @@ export class AuthService implements OnModuleInit {
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
 
-    // Portal chỉ dành cho USER. Cùng lỗi với sai mật khẩu để không lộ role; không tính vào số lần sai (mật khẩu đúng).
-    if (audience === "portal" && row.role !== "USER") {
-      this.log.warn(`portal login rejected: role=${row.role} user_id=${row.user_id} ip=${ip}`);
+    // Portal chỉ dành cho USER, web-admin chỉ cho HOST / ADMIN. Cùng lỗi với sai mật khẩu để không lộ role; không tính vào số lần sai (mật khẩu đúng).
+    if (audience && (audience === "portal") !== (row.role === "USER")) {
+      this.log.warn(`${audience} login rejected: role=${row.role} user_id=${row.user_id} ip=${ip}`);
       throw new UnauthorizedException(INVALID_CREDENTIALS);
     }
 
     await this.attempts.clear(phone);
     const { sessionId, refreshToken } = await this.sessions.create(row.user_id, row.role);
+    await this.touchLastLogin(row.user_id);
     this.log.log(`login ok user_id=${row.user_id} ip=${ip}`);
     return this.issue(row.user_id, row.role, sessionId, refreshToken);
+  }
+
+  /** Ghi lần hoạt động gần nhất (login / refresh), tối đa 1 lần / giờ / user; lỗi chỉ log, không chặn đăng nhập. */
+  private async touchLastLogin(userId: string): Promise<void> {
+    try {
+      await this.dataSource.query(
+        `UPDATE users SET last_login_at = now() WHERE user_id = $1 AND (last_login_at IS NULL OR last_login_at < now() - interval '1 hour')`,
+        [userId],
+      );
+    } catch (e) {
+      this.log.warn(`last_login_at update failed user_id=${userId}: ${e instanceof Error ? e.message : e}`);
+    }
   }
 
   async refresh(presentedToken: string | undefined, ip: string): Promise<TokenPair> {
@@ -118,6 +132,7 @@ export class AuthService implements OnModuleInit {
     }
 
     await this.sessions.updateRole(result.sessionId, result.session, user.role);
+    await this.touchLastLogin(user.user_id);
     return this.issue(user.user_id, user.role, result.sessionId, result.refreshToken);
   }
 
@@ -136,6 +151,7 @@ export class AuthService implements OnModuleInit {
       .createQueryBuilder()
       .select("u.user_id", "user_id")
       .addSelect("u.phone_number", "phone_number")
+      .addSelect("u.display_name", "display_name")
       .addSelect("r.role_name", "role")
       .addSelect("u.status", "status")
       .addSelect("u.balance", "balance")

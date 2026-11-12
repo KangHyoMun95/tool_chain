@@ -3,18 +3,14 @@
 import {
   ModalForm,
   ProFormDigit,
-  ProFormSelect,
-  ProFormTextArea,
 } from '@ant-design/pro-components';
 import { App } from 'antd';
-import { PointDirection } from '@toolhackchain/shared';
 import {
   useGrantPoints,
   type SubAdminRow,
   type GrantPointsInput,
 } from '@/lib/api/sub-admin';
 
-/** Controlled "Cấp điểm" modal: amount + direction + reason. */
 export function GrantPointsModal({
   record,
   open,
@@ -35,12 +31,11 @@ export function GrantPointsModal({
       open={open}
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
-      initialValues={{ direction: PointDirection.CREDIT }}
       onFinish={async (values) => {
         if (!record) return false;
         try {
           await grant.mutateAsync({ id: record.id, ...values });
-          message.success('Đã cập nhật điểm');
+          message.success('Đã cấp điểm');
           onSuccess?.();
           return true;
         } catch (err) {
@@ -49,26 +44,12 @@ export function GrantPointsModal({
         }
       }}
     >
-      <ProFormSelect
-        name="direction"
-        label="Loại"
-        rules={[{ required: true }]}
-        options={[
-          { label: 'Cộng điểm', value: PointDirection.CREDIT },
-          { label: 'Trừ điểm', value: PointDirection.DEBIT },
-        ]}
-      />
       <ProFormDigit
         name="amount"
         label="Số điểm"
         min={1}
         fieldProps={{ precision: 0 }}
         rules={[{ required: true, message: 'Nhập số điểm' }]}
-      />
-      <ProFormTextArea
-        name="reason"
-        label="Lý do"
-        placeholder="Ghi chú lý do (tuỳ chọn)"
       />
     </ModalForm>
   );

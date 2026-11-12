@@ -102,6 +102,19 @@ services:
       - "${PORTAL_PORT:-5001}:3001"
     depends_on:
       - api
+  web-admin:
+    build:
+      context: .
+      dockerfile: apps/web-admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000}
+    image: tool-chain-web-admin
+    container_name: tool-chain-web-admin
+    restart: unless-stopped
+    ports:
+      - "${ADMIN_PORT:-5000}:3000"
+    depends_on:
+      - api
   ai:
     build: ./apps/ai
     image: tool-chain-ai

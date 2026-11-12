@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Spin } from 'antd';
-import { Role } from '@toolhackchain/shared';
+import type { Role } from '@/lib/auth/roles';
 import { homeForRole, useCurrentUser } from '@/lib/auth/current-user';
 
 /**
