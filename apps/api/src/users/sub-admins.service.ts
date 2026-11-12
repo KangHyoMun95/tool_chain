@@ -15,7 +15,7 @@ export type SubAdminItem = {
 export type SubAdminNode = Omit<SubAdminItem, "children">;
 export type PointTransactionItem = {
   transaction_id: string; type: string; amount: string;
-  granter_id: string | null; granter_name: string | null; created_at: Date;   // không trả số điện thoại của người cấp
+  granter_id: string | null; granter_name: string | null; reason: string | null; created_at: Date;   // không trả số điện thoại của người cấp
 };
 type Flat = Omit<SubAdminItem, "children">;
 
@@ -127,7 +127,7 @@ export class SubAdminsService {
       this.dataSource.query(
         `-- top-level: SELECT
          SELECT t.transaction_id::text AS transaction_id, t.transaction_type AS type, t.amount::text AS amount,
-                t.created_by AS granter_id, g.display_name AS granter_name, t.created_at
+                t.created_by AS granter_id, g.display_name AS granter_name, t.reason, t.created_at
          FROM transactions t LEFT JOIN users g ON g.user_id = t.created_by
          WHERE t.user_id = $1 AND t.transaction_type IN ('MINT', 'TRANSFER_IN')
          ORDER BY t.created_at DESC, t.transaction_id DESC

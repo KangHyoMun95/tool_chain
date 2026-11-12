@@ -41,6 +41,8 @@ export interface UpdateUserInput {
 
 export interface GrantUserPointsInput {
   amount: number;
+  /** Nguyên nhân cấp điểm, tùy chọn (API: 1–200 ký tự). */
+  reason?: string;
 }
 
 export function fetchUsers(): Promise<UserRow[]> {

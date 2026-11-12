@@ -42,6 +42,7 @@ export function SubAdminDetail({ id }: { id: string }) {
       render: (_dom, r) => <Tag color="green">+{r.amount}</Tag>,
     },
     { title: 'Người cấp', dataIndex: 'granterName', ellipsis: true, render: (_d, r) => r.granterName || '—' },
+    { title: 'Nguyên nhân', dataIndex: 'reason', ellipsis: true, render: (_d, r) => r.reason || '—' },
   ];
 
   return (

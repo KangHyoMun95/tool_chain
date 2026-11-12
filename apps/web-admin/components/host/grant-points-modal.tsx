@@ -3,6 +3,7 @@
 import {
   ModalForm,
   ProFormDigit,
+  ProFormTextArea,
 } from '@ant-design/pro-components';
 import { App } from 'antd';
 import {
@@ -34,7 +35,7 @@ export function GrantPointsModal({
       onFinish={async (values) => {
         if (!record) return false;
         try {
-          await grant.mutateAsync({ id: record.id, ...values });
+          await grant.mutateAsync({ id: record.id, ...values, reason: values.reason?.trim() || undefined });
           message.success('Đã cấp điểm');
           onSuccess?.();
           return true;
@@ -50,6 +51,12 @@ export function GrantPointsModal({
         min={1}
         fieldProps={{ precision: 0 }}
         rules={[{ required: true, message: 'Nhập số điểm' }]}
+      />
+      <ProFormTextArea
+        name="reason"
+        label="Nguyên nhân"
+        placeholder="Không bắt buộc"
+        fieldProps={{ maxLength: 200, showCount: true, autoSize: { minRows: 2, maxRows: 4 } }}
       />
     </ModalForm>
   );
