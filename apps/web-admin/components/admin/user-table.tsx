@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import {
   ProTable,
   type ActionType,
@@ -11,10 +11,12 @@ import {
   DeleteOutlined,
   DollarOutlined,
   EditOutlined,
+  PlayCircleOutlined,
   StopOutlined,
 } from '@ant-design/icons';
 import { AccountStatus } from '@/lib/legacy-types';
 import {
+  useActivateUser,
   useDeactivateUser,
   useDeleteUser,
 } from '@/lib/api/user';
@@ -30,6 +32,7 @@ import { GrantUserPointsModal } from './grant-user-points-modal';
 export function UserTable() {
   const actionRef = useRef<ActionType>();
   const { message, modal } = App.useApp();
+  const activate = useActivateUser();
   const deactivate = useDeactivateUser();
   const remove = useDeleteUser();
 
@@ -37,6 +40,25 @@ export function UserTable() {
   const [granting, setGranting] = useState<ManagedUserRow | null>(null);
 
   const reload = () => actionRef.current?.reload();
+
+  const confirmActivate = (record: ManagedUserRow) => {
+    modal.confirm({
+      title: 'Kích hoạt lại',
+      content: `Kích hoạt lại "${record.username}"? Tài khoản sẽ đăng nhập được trở lại.`,
+      okText: 'Kích hoạt',
+      cancelText: 'Huỷ',
+      onOk: async () => {
+        try {
+          await activate.mutateAsync(record.id);
+          message.success('Đã kích hoạt lại');
+          reload();
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : 'Kích hoạt thất bại');
+          throw err;
+        }
+      },
+    });
+  };
 
   const confirmDeactivate = (record: ManagedUserRow) => {
     modal.confirm({
@@ -61,7 +83,7 @@ export function UserTable() {
   const confirmDelete = (record: ManagedUserRow) => {
     modal.confirm({
       title: 'Xoá người dùng',
-      content: `Xoá vĩnh viễn "${record.username}"? Hành động không thể hoàn tác.`,
+      content: `Xoá "${record.username}"? User sẽ không đăng nhập được nữa và không thể khôi phục.`,
       okText: 'Xoá',
       okButtonProps: { danger: true },
       cancelText: 'Huỷ',
@@ -110,7 +132,9 @@ export function UserTable() {
       valueType: 'option',
       key: 'option',
       render: (_dom, record) => {
-        const actions = [
+        const actions: ReactNode[] = [];
+        if (record.depth === 1) {
+          actions.push(
           <Tooltip key="edit" title="Sửa">
             <Button
               type="text"
@@ -119,7 +143,8 @@ export function UserTable() {
               onClick={() => setEditing(record)}
             />
           </Tooltip>,
-        ];
+          );
+        }
         if (record.depth === 1 && record.status === AccountStatus.ACTIVE) {
           actions.push(
         <Tooltip key="grant" title="Cấp điểm">
@@ -132,7 +157,7 @@ export function UserTable() {
         </Tooltip>,
           );
         }
-        if (record.status === AccountStatus.ACTIVE) {
+        if (record.depth === 1 && record.status === AccountStatus.ACTIVE) {
           actions.push(
             <Tooltip key="deactivate" title="Deactive">
               <Button
@@ -144,7 +169,19 @@ export function UserTable() {
             </Tooltip>,
           );
         }
-        actions.push(
+        if (record.depth === 1 && record.status !== AccountStatus.ACTIVE && !record.deleted) {
+          actions.push(
+            <Tooltip key="activate" title="Kích hoạt lại">
+              <Button
+                type="text"
+                size="small"
+                icon={<PlayCircleOutlined style={{ color: '#10B981' }} />}
+                onClick={() => confirmActivate(record)}
+              />
+            </Tooltip>,
+          );
+        }
+        if (record.depth === 1) actions.push(
           <Tooltip key="delete" title="Xoá">
             <Button
               type="text"

@@ -10,11 +10,6 @@ import type { Role } from '@/lib/auth/roles';
 import { apiFetch } from './client';
 import { ME_KEY } from './profile';
 
-/**
- * Query key for the current Admin(Con)'s users. The backend scopes GET /users
- * to the logged-in Admin(Con) (managed_by_admin_con_id), so the frontend just
- * calls the endpoint — no adminConId is passed from the client.
- */
 export const USERS_KEY = ['users'] as const;
 
 export interface UserRow {
@@ -31,13 +26,11 @@ export interface UserRow {
 }
 
 export interface CreateUserInput {
-  username: string;
+  phone_number: string;
   password: string;
-  phoneNumber?: string;
 }
 
 export interface UpdateUserInput {
-  username?: string;
   password?: string;
   phoneNumber?: string;
 }
@@ -57,8 +50,10 @@ export function loadUsers(qc: QueryClient): Promise<UserRow[]> {
 export function useCreateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: CreateUserInput) =>
-      apiFetch<UserRow>('/users', { method: 'POST', body: JSON.stringify(input) }),
+    mutationFn: async (input: CreateUserInput) => {
+      const created = await apiFetch<{ user_id: string }>('/users', { method: 'POST', body: JSON.stringify(input) });
+      return { id: created.user_id };
+    },
     onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   });
 }
@@ -66,21 +61,37 @@ export function useCreateUser() {
 export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...input }: UpdateUserInput & { id: string }) =>
-      apiFetch<UserRow>(`/users/${id}`, {
+    mutationFn: ({ id, password, phoneNumber }: UpdateUserInput & { id: string }) =>
+      apiFetch<{ user_id: string }>(`/users/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify(input),
+        body: JSON.stringify({ password: password || undefined, phone_number: phoneNumber || undefined }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   });
 }
 
-/** Hard delete — Admin(Con) may delete its own Users (see CLAUDE.md). */
+/** Xóa mềm (status DELETED): chỉ ADMIN, chỉ User con trực tiếp. */
+/** PATCH /users/:id/status — API chỉ cho cha đổi status của con trực tiếp. */
+export function setUserStatus(id: string, status: 'ACTIVE' | 'DEACTIVE' | 'DELETED') {
+  return apiFetch<{ user_id: string; status: string }>(`/users/${id}/status`, {
+    method: 'PATCH',
+    body: JSON.stringify({ status }),
+  });
+}
+
+export function useActivateUser() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => setUserStatus(id, 'ACTIVE'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
+  });
+}
+
 export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiFetch<void>(`/users/${id}`, { method: 'DELETE' }),
+      setUserStatus(id, 'DELETED'),
     onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   });
 }
@@ -89,7 +100,7 @@ export function useDeactivateUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiFetch<UserRow>(`/users/${id}/deactivate`, { method: 'PATCH' }),
+      setUserStatus(id, 'DEACTIVE'),
     onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   });
 }

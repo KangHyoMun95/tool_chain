@@ -8,12 +8,10 @@ import {
 import { AccountStatus } from '@/lib/legacy-types';
 import type { Role } from '@/lib/auth/roles';
 import { apiFetch } from './client';
+import { setUserStatus } from './user';
 
-/** Query key for every Admin(Con) list/detail query. */
 export const SUB_ADMINS_KEY = ['sub-admins'] as const;
 
-/**
-/** A row as returned by GET /sub-admins. */
 export interface SubAdminRow {
   id: string;
   username: string;
@@ -27,13 +25,11 @@ export interface SubAdminRow {
 }
 
 export interface CreateSubAdminInput {
-  username: string;
+  phone_number: string;
   password: string;
-  phoneNumber?: string;
 }
 
 export interface UpdateSubAdminInput {
-  username?: string;
   password?: string;
   phoneNumber?: string;
 }
@@ -42,12 +38,10 @@ export interface GrantPointsInput {
   amount: number;
 }
 
-/** Raw fetch of all Admin(Con)s owned by the current Host (used by ProTable). */
 export function fetchSubAdmins(): Promise<SubAdminRow[]> {
   return apiFetch<SubAdminRow[]>('/sub-admins');
 }
 
-/** Fetch through the react-query cache so ProTable + hooks share one source. */
 export function loadSubAdmins(qc: QueryClient): Promise<SubAdminRow[]> {
   return qc.fetchQuery({ queryKey: SUB_ADMINS_KEY, queryFn: fetchSubAdmins });
 }
@@ -56,7 +50,7 @@ export function useCreateSubAdmin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: CreateSubAdminInput) =>
-      apiFetch<SubAdminRow>('/sub-admins', {
+      apiFetch<{ user_id: string }>('/users', {
         method: 'POST',
         body: JSON.stringify(input),
       }),
@@ -67,10 +61,10 @@ export function useCreateSubAdmin() {
 export function useUpdateSubAdmin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, ...input }: UpdateSubAdminInput & { id: string }) =>
-      apiFetch<SubAdminRow>(`/sub-admins/${id}`, {
+    mutationFn: ({ id, password, phoneNumber }: UpdateSubAdminInput & { id: string }) =>
+      apiFetch<{ user_id: string }>(`/users/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify(input),
+        body: JSON.stringify({ password: password || undefined, phone_number: phoneNumber || undefined }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: SUB_ADMINS_KEY }),
   });
@@ -80,9 +74,7 @@ export function useDeactivateSubAdmin() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
-      apiFetch<SubAdminRow>(`/sub-admins/${id}/deactivate`, {
-        method: 'PATCH',
-      }),
+      setUserStatus(id, 'DEACTIVE'),
     onSuccess: () => qc.invalidateQueries({ queryKey: SUB_ADMINS_KEY }),
   });
 }

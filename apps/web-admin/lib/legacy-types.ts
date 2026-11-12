@@ -1,6 +1,4 @@
-// Kiểu dữ liệu của các trang web-admin chưa nối API mới (dashboard, quản lý admin / user, cấp điểm). Trước đây nằm trong
-// @toolhackchain/shared nhưng đã bị gỡ khỏi shared từ lâu (API thật không còn các endpoint này). Mỗi trang sẽ được dựng lại
-// theo API thật rồi xóa kiểu tương ứng ở đây; không thêm lại vào shared.
+// Kiểu dữ liệu dùng chung của các trang web-admin (trạng thái tài khoản, điểm, dashboard); không nằm trong @toolhackchain/shared.
 
 export enum AccountStatus {
   ACTIVE = 'ACTIVE',

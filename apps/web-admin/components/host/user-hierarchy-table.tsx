@@ -28,11 +28,6 @@ const STATUS_VALUE_ENUM = {
   [AccountStatus.INACTIVE]: { text: 'Deactive', status: 'Default' as const },
 };
 
-/**
- * Host view: a parent-child (expandable) table of the whole hierarchy — each
- * Admin(Con) is a parent row and the Users it manages
- * (managed_by_admin_con_id) are its child rows.
- */
 export function UserHierarchyTable() {
   const qc = useQueryClient();
 
@@ -101,8 +96,6 @@ export function UserHierarchyTable() {
               points: s.points,
               status: s.status,
               createdAt: s.createdAt,
-              // Only attach children when there are users, so parents without
-              // users don't render an empty expand control.
               ...(children.length ? { children } : {}),
             };
           }),

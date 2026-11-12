@@ -14,7 +14,6 @@ interface FormValues extends UpdateUserInput {
   hostnameIds?: string[];
 }
 
-/** Controlled edit modal for a User, incl. hostname multi-select. */
 export function EditUserModal({
   record,
   open,
@@ -38,16 +37,12 @@ export function EditUserModal({
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
       initialValues={{
-        username: record?.username,
         phoneNumber: record?.phoneNumber ?? undefined,
         hostnameIds: record?.hostnames?.map((h) => h.id) ?? [],
       }}
       onFinish={async ({ hostnameIds, ...values }) => {
         if (!record) return false;
         const payload: UpdateUserInput = {};
-        if (values.username && values.username !== record.username) {
-          payload.username = values.username;
-        }
         if (values.password) payload.password = values.password;
         if ((values.phoneNumber ?? '') !== (record.phoneNumber ?? '')) {
           payload.phoneNumber = values.phoneNumber ?? '';
@@ -70,17 +65,16 @@ export function EditUserModal({
         }
       }}
     >
-      <ProFormText name="username" label="Tên đăng nhập" rules={[{ min: 3 }]} />
+      <ProFormText
+        name="phoneNumber"
+        label="Số điện thoại"
+        rules={[{ pattern: /^\d{6,20}$/, message: 'Chỉ chữ số, 6–20 ký tự' }]}
+      />
       <ProFormText.Password
         name="password"
         label="Mật khẩu mới"
         placeholder="Để trống nếu không đổi"
-        rules={[{ min: 6 }]}
-      />
-      <ProFormText
-        name="phoneNumber"
-        label="Số điện thoại"
-        rules={[{ max: 20, message: 'Tối đa 20 ký tự' }]}
+        rules={[{ min: 12, message: 'Tối thiểu 12 ký tự' }]}
       />
       <ProFormSelect
         name="hostnameIds"

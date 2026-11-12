@@ -6,7 +6,6 @@ import { apiFetch, getToken, type MeResponse } from './client';
 /** Query key for the current account profile (GET /auth/me). */
 export const ME_KEY = ['me'] as const;
 
-/** Fetches the current account profile from GET /auth/me. */
 export function useMyProfile() {
   return useQuery({
     queryKey: ME_KEY,

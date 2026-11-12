@@ -11,10 +11,12 @@ import {
   DollarOutlined,
   EditOutlined,
   EyeOutlined,
+  PlayCircleOutlined,
   StopOutlined,
 } from '@ant-design/icons';
 import Link from 'next/link';
 import { AccountStatus } from '@/lib/legacy-types';
+import { useActivateUser } from '@/lib/api/user';
 import {
   useDeactivateSubAdmin,
 } from '@/lib/api/sub-admin';
@@ -30,12 +32,32 @@ import { GrantPointsModal } from './grant-points-modal';
 export function SubAdminTable() {
   const actionRef = useRef<ActionType>();
   const { message, modal } = App.useApp();
+  const activate = useActivateUser();
   const deactivate = useDeactivateSubAdmin();
 
   const [editing, setEditing] = useState<ManagedUserRow | null>(null);
   const [granting, setGranting] = useState<ManagedUserRow | null>(null);
 
   const reload = () => actionRef.current?.reload();
+
+  const confirmActivate = (record: ManagedUserRow) => {
+    modal.confirm({
+      title: 'Kích hoạt lại',
+      content: `Kích hoạt lại "${record.username}"? Tài khoản sẽ đăng nhập được trở lại.`,
+      okText: 'Kích hoạt',
+      cancelText: 'Huỷ',
+      onOk: async () => {
+        try {
+          await activate.mutateAsync(record.id);
+          message.success('Đã kích hoạt lại');
+          reload();
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : 'Kích hoạt thất bại');
+          throw err;
+        }
+      },
+    });
+  };
 
   const confirmDeactivate = (record: ManagedUserRow) => {
     modal.confirm({
@@ -95,6 +117,9 @@ export function SubAdminTable() {
               <Button type="text" size="small" icon={<EyeOutlined />} />
             </Link>
           </Tooltip>,
+        ];
+        if (record.depth === 1) {
+          actions.push(
           <Tooltip key="edit" title="Sửa">
             <Button
               type="text"
@@ -103,7 +128,8 @@ export function SubAdminTable() {
               onClick={() => setEditing(record)}
             />
           </Tooltip>,
-        ];
+          );
+        }
         if (record.depth === 1 && record.status === AccountStatus.ACTIVE) {
           actions.push(
         <Tooltip key="grant" title="Cấp điểm">
@@ -116,7 +142,7 @@ export function SubAdminTable() {
         </Tooltip>,
           );
         }
-        if (record.status === AccountStatus.ACTIVE) {
+        if (record.depth === 1 && record.status === AccountStatus.ACTIVE) {
           actions.push(
             <Tooltip key="deactivate" title="Deactive">
               <Button
@@ -125,6 +151,18 @@ export function SubAdminTable() {
                 danger
                 icon={<StopOutlined />}
                 onClick={() => confirmDeactivate(record)}
+              />
+            </Tooltip>,
+          );
+        }
+        if (record.depth === 1 && record.status !== AccountStatus.ACTIVE && !record.deleted) {
+          actions.push(
+            <Tooltip key="activate" title="Kích hoạt lại">
+              <Button
+                type="text"
+                size="small"
+                icon={<PlayCircleOutlined style={{ color: '#10B981' }} />}
+                onClick={() => confirmActivate(record)}
               />
             </Tooltip>,
           );
@@ -140,8 +178,6 @@ export function SubAdminTable() {
         actionRef={actionRef}
         rowKey="id"
         columns={columns}
-        // Expandable row: children are the Users managed by this Admin(Con),
-        // loaded lazily when the row is expanded.
         request={async (params) => {
           const { rows, total } = await fetchManagedUsers(toManagedUserQuery(params));
           return { data: rows, total, success: true };

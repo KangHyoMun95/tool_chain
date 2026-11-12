@@ -7,10 +7,6 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AccountStatus } from '@/lib/legacy-types';
 import { loadSubAdminUsers, type UserRow } from '@/lib/api/sub-admin-detail';
 
-/**
- * Read-only nested table of the Users managed by one Admin(Con), rendered as an
- * expandable row on the Host's list. Loaded lazily when the row is expanded.
- */
 export function SubAdminUsersPanel({ subAdminId }: { subAdminId: string }) {
   const queryClient = useQueryClient();
   const [rows, setRows] = useState<UserRow[] | null>(null);

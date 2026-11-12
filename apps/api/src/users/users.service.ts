@@ -11,6 +11,7 @@ import { PermissionService } from "../auth/permission.service.js";
 import { SessionService } from "../auth/session.service.js";
 import { RoleEntity, UserEntity } from "../database/entities/index.js";
 import type { CreateUserDto } from "./dto/create-user.dto.js";
+import type { UpdateUserDto } from "./dto/update-user.dto.js";
 
 const UNIQUE_VIOLATION = "23505";
 
@@ -56,6 +57,29 @@ export class UsersService {
       }
       throw e;
     }
+  }
+
+  /** Đổi số điện thoại / mật khẩu của cấp dưới TRỰC TIẾP (cha → con). Cháu, cha, chính mình ⇒ 403. Đổi mật khẩu thu hồi mọi phiên của target. */
+  async update(actor: AuthUser, targetUserId: string, dto: UpdateUserDto) {
+    if (dto.phone_number === undefined && dto.password === undefined) throw new BadRequestException("Nothing to update");
+    const target = await this.permissions.assertCanManage(actor, targetUserId);
+    if (target.status === UserStatus.DELETED) throw new ConflictException("User is deleted");
+
+    const set: { phoneNumber?: string; password?: string } = {};
+    if (dto.phone_number !== undefined) set.phoneNumber = dto.phone_number;
+    if (dto.password !== undefined) set.password = await argon2.hash(dto.password, ARGON2_OPTIONS);
+    try {
+      await this.dataSource.createQueryBuilder().update(UserEntity).set(set).where("user_id = :userId", { userId: target.userId }).execute();
+    } catch (e) {
+      if (e instanceof QueryFailedError && (e.driverError as { code?: string } | undefined)?.code === UNIQUE_VIOLATION) {
+        throw new ConflictException("Phone number already exists");
+      }
+      throw e;
+    }
+
+    if (set.password) await this.sessions.revokeAllSessions(target.userId);
+    this.log.log(`user updated actor=${actor.userId} target=${target.userId} fields=${Object.keys(set).join(",")}`);
+    return { user_id: target.userId, ...(dto.phone_number !== undefined ? { phone_number: dto.phone_number } : {}) };
   }
 
   async updateStatus(actor: AuthUser, targetUserId: string, status: UserStatus) {

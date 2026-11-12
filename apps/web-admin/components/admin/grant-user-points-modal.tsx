@@ -11,7 +11,6 @@ import {
   type UserRow,
 } from '@/lib/api/user';
 
-/** Controlled "Cấp điểm" modal for a User: chỉ cộng điểm cho cấp dưới trực tiếp. */
 export function GrantUserPointsModal({
   record,
   open,
