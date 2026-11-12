@@ -361,6 +361,7 @@ pnpm --filter @toolhackchain/shared dev           # build watch cho shared (api/
 pnpm --filter @toolhackchain/api start:dev                       # API
 pnpm --filter @toolhackchain/web-admin dev        # admin, port 3000
 pnpm --filter @toolhackchain/web-portal dev       # portal, port 3001
+# docker compose: web-admin cổng host 5000 (ADMIN_PORT), web-portal 5001 (PORTAL_PORT); CORS_ORIGINS phải gồm cả hai origin
 pnpm build                                        # build theo thứ tự shared -> api -> web-admin -> web-portal
 pnpm --filter @toolhackchain/api lint                            # oxlint
 
@@ -400,6 +401,6 @@ Khi tạo/sửa UI, PHẢI đọc và bám file design của đúng app; hai app
 
 - **Đăng nhập web-admin** (`apps/web-admin/lib/api/client.ts`): như portal: đăng nhập bằng `phone_number` + `password` (`audience: "admin"`), access token chỉ nằm trong bộ nhớ, khôi phục bằng cookie refresh (`POST /auth/refresh`, `credentials: "include"`, single-flight vì refresh token xoay mỗi lần), request gặp 401 thì refresh một lần rồi gọi lại, không được thì về `/login`; đăng xuất gọi `POST /auth/logout`. Sau login / refresh gọi `GET /auth/me`: chỉ HOST / ADMIN còn `ACTIVE` được vào (cookie refresh dùng chung với portal). Role runtime ở `lib/auth/roles.ts` (`ROLE`; shared chỉ xuất type `Role`). Không tạo trang mới ở web-admin: các trang hiện có giữ nguyên, chỉ nối API thật.
 
-- **Quản lý người dùng web-admin** (`/host/admins`, `/admin/users`): bảng cây lấy từ `GET /sub-admins` (`lib/api/managed-users.ts`; phân trang / lọc ở server, con cháu nằm trong `children`, điểm hiển thị từ `balance` dạng chuỗi). Tạo = `POST /users`, sửa = `PATCH /users/:id`, deactive / kích hoạt lại / xóa = `PATCH /users/:id/status`, cấp điểm = `POST /users/:id/points`; icon thao tác chỉ hiện ở dòng `depth === 1` (cha chỉ thao tác con trực tiếp, API cũng chặn). Dashboard (`/host/dashboard`, `/admin/dashboard`) gọi `GET /dashboard`; chi tiết ở `/host/admins/[id]` gọi `GET /sub-admins/:id*`. Không còn trang / trường "trang chủ" (hostname) ở web-admin. Bảng phân cấp `/host/users` vẫn gọi endpoint cũ chưa có. Kiểu dữ liệu dùng chung của các trang ở `lib/legacy-types.ts`.
+- **Quản lý người dùng web-admin** (`/host/admins`, `/admin/users`): bảng cây lấy từ `GET /sub-admins` (`lib/api/managed-users.ts`; phân trang / lọc ở server, con cháu nằm trong `children`, điểm hiển thị từ `balance` dạng chuỗi). Tạo = `POST /users`, sửa = `PATCH /users/:id`, deactive / kích hoạt lại / xóa = `PATCH /users/:id/status`, cấp điểm = `POST /users/:id/points`; icon thao tác chỉ hiện ở dòng `depth === 1` (cha chỉ thao tác con trực tiếp, API cũng chặn). Dashboard (`/host/dashboard`, `/admin/dashboard`) gọi `GET /dashboard`; chi tiết ở `/host/admins/[id]` gọi `GET /sub-admins/:id*`. Không còn trang / trường "trang chủ" (hostname) ở web-admin. Trang bảng phân cấp `/host/users` đã xóa (trùng với cây ở `/host/admins`, và làm vỡ build). Kiểu dữ liệu dùng chung của các trang ở `lib/legacy-types.ts`.
 
 Skills khác trong `.claude/skills/`: `rbac-guard` (scope dữ liệu theo cấp trên), `flyway-migration`, `security-review`.
