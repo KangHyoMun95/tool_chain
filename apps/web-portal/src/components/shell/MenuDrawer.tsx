@@ -13,6 +13,8 @@ type Props = {
   open: boolean;
   onClose: () => void;
   title: string;
+  /** Nội dung đầu drawer (vd chip số điện thoại), nằm cạnh nút đóng; bỏ trống thì hiện `title`. */
+  header?: ReactNode;
   children: ReactNode;
 };
 
@@ -21,7 +23,7 @@ type Props = {
  * hiện ở trên cùng và trượt từ trên xuống (bo 32px hai góc dưới). Viền + nền giống header. Render qua portal vào body
  * (header có z-index riêng nên `fixed` bên trong sẽ bị kẹt dưới nội dung).
  */
-export function MenuDrawer({ open, onClose, title, children }: Props) {
+export function MenuDrawer({ open, onClose, title, header, children }: Props) {
   const { t } = useI18n();
   const [mounted, setMounted] = useState(open);
   const closeBtn = useRef<HTMLButtonElement>(null);
@@ -74,13 +76,13 @@ export function MenuDrawer({ open, onClose, title, children }: Props) {
         )}
       >
         <div className="mb-3 flex items-center justify-between">
-          <span className="font-display text-sm font-black uppercase tracking-widest text-gray-200">{title}</span>
+          {header ?? <span className="font-display text-sm font-black uppercase tracking-widest text-gray-200">{title}</span>}
           <button
             ref={closeBtn}
             type="button"
             onClick={onClose}
             aria-label={t("shell.closeMenu")}
-            className="btn-fx-soft rounded-lg border border-red-900/40 bg-[#14141c] p-2 text-gray-300 hover:text-white"
+            className="btn-fx-soft ml-2 shrink-0 rounded-lg border border-red-900/40 bg-[#14141c] p-2 text-gray-300 hover:text-white"
           >
             <XIcon className="h-4 w-4" />
           </button>
