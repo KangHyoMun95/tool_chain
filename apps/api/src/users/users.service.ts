@@ -165,7 +165,11 @@ export class UsersService {
           [targetUserId, actor.userId, amount, out.balance_before, out.balance_after, inc.balance_before, inc.balance_after],
         );
       }
-      await m.query(`UPDATE users SET status = 'DELETED' WHERE user_id = $1`, [targetUserId]);
+      // Giải phóng số điện thoại (UNIQUE) để dùng lại cho tài khoản mới: '<số gốc>_<epoch ms>', số gốc vẫn là phần trước dấu '_'.
+      await m.query(
+        `UPDATE users SET status = 'DELETED', phone_number = phone_number || '_' || (extract(epoch FROM clock_timestamp()) * 1000)::bigint WHERE user_id = $1`,
+        [targetUserId],
+      );
       return { user_id: targetUserId, status: UserStatus.DELETED, returned_points: amount, transferred_to: transferToAdminId ?? null };
     });
 
