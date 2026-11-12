@@ -13,7 +13,7 @@ export default function SubAdminDetailPage() {
 
   return (
     <PageContainer
-      title="Chi tiết Admin Con"
+      title="Chi tiết Admin"
       extra={[
         <Link key="back" href="/host/admins">
           <Button icon={<ArrowLeftOutlined />}>Về danh sách</Button>

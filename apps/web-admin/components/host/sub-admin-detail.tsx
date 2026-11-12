@@ -52,7 +52,7 @@ export function SubAdminDetail({ id }: { id: string }) {
 
   return (
     <>
-      <ProCard title="Thông tin Admin Con" bordered headerBordered style={{ marginBottom: 16 }}>
+      <ProCard title="Thông tin Admin" bordered headerBordered style={{ marginBottom: 16 }}>
         {isLoading || !subAdmin ? (
           <Skeleton active />
         ) : (
@@ -70,7 +70,7 @@ export function SubAdminDetail({ id }: { id: string }) {
         )}
       </ProCard>
 
-      <ProCard title="User thuộc Admin Con (chỉ xem)" bordered headerBordered style={{ marginBottom: 16 }}>
+      <ProCard title="User thuộc Admin (chỉ xem)" bordered headerBordered style={{ marginBottom: 16 }}>
         <ProTable<UserRow>
           rowKey="id"
           search={false}
