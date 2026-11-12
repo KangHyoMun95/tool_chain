@@ -39,8 +39,6 @@ export interface UpdateSubAdminInput {
 
 export interface GrantPointsInput {
   amount: number;
-  /** Nguyên nhân cấp điểm, tùy chọn (API: 1–200 ký tự). */
-  reason?: string;
 }
 
 export function fetchSubAdmins(): Promise<SubAdminRow[]> {

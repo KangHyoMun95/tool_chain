@@ -22,6 +22,11 @@ const STATUS_VALUE_ENUM = {
   [AccountStatus.INACTIVE]: { text: 'Deactive', status: 'Default' as const },
 };
 
+const TRANSACTION_TYPE_LABEL: Record<string, string> = {
+  MINT: 'Cấp mới',
+  TRANSFER_IN: 'Chuyển điểm',
+};
+
 export function SubAdminDetail({ id }: { id: string }) {
   const { data: subAdmin, isLoading } = useSubAdmin(id);
 
@@ -42,7 +47,7 @@ export function SubAdminDetail({ id }: { id: string }) {
       render: (_dom, r) => <Tag color="green">+{r.amount}</Tag>,
     },
     { title: 'Người cấp', dataIndex: 'granterName', ellipsis: true, render: (_d, r) => r.granterName || '—' },
-    { title: 'Nguyên nhân', dataIndex: 'reason', ellipsis: true, render: (_d, r) => r.reason || '—' },
+    { title: 'Loại giao dịch', dataIndex: 'type', width: 160, render: (_d, r) => TRANSACTION_TYPE_LABEL[r.type] ?? r.type },
   ];
 
   return (

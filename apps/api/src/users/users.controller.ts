@@ -36,6 +36,6 @@ export class UsersController {
   @Roles("HOST", "ADMIN")
   @HttpCode(200)
   grantPoints(@CurrentUser() actor: AuthUser, @Param() params: UserIdParamDto, @Body() dto: GrantPointsDto) {
-    return this.users.grantPoints(actor, params.userId, dto.amount, dto.reason);
+    return this.users.grantPoints(actor, params.userId, dto.amount);
   }
 }

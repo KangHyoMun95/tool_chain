@@ -105,9 +105,8 @@ export class UsersService {
   /**
    * Cấp điểm (chỉ cộng) cho cấp dưới TRỰC TIẾP: HOST sinh mới cho ADMIN (MINT); ADMIN chuyển từ balance của mình cho USER
    * (TRANSFER_OUT + TRANSFER_IN). Cháu, cha, chính mình, user không ACTIVE ⇒ 403. Một DB transaction, khóa users theo user_id tăng dần.
-   * `reason` (tùy chọn) ghi vào cả hai dòng transactions.
    */
-  async grantPoints(actor: AuthUser, targetUserId: string, amount: number, reason?: string) {
+  async grantPoints(actor: AuthUser, targetUserId: string, amount: number) {
     try {
       await this.permissions.assertCanGrantPoints(actor, targetUserId);
     } catch (e) {
@@ -138,9 +137,9 @@ export class UsersService {
         if (!out) throw new BadRequestException({ code: "INSUFFICIENT_BALANCE", message: "Không đủ điểm để cấp" });
         actorAfter = out.balance_after;
         await m.query(
-          `INSERT INTO transactions (user_id, transaction_type, amount, balance_before, balance_after, created_by, reason)
-           VALUES ($1, 'TRANSFER_OUT', $2::bigint, $3::bigint, $4::bigint, $1, $5)`,
-          [actor.userId, fee, out.balance_before, out.balance_after, reason ?? null],
+          `INSERT INTO transactions (user_id, transaction_type, amount, balance_before, balance_after, created_by)
+           VALUES ($1, 'TRANSFER_OUT', $2::bigint, $3::bigint, $4::bigint, $1)`,
+          [actor.userId, fee, out.balance_before, out.balance_after],
         );
       }
 
@@ -151,9 +150,9 @@ export class UsersService {
         [targetUserId, fee],
       );
       await m.query(
-        `INSERT INTO transactions (user_id, transaction_type, amount, balance_before, balance_after, created_by, reason)
-         VALUES ($1, $5, $2::bigint, $3::bigint, $4::bigint, $6, $7)`,
-        [targetUserId, fee, inc.balance_before, inc.balance_after, actor.role === "ADMIN" ? "TRANSFER_IN" : "MINT", actor.userId, reason ?? null],
+        `INSERT INTO transactions (user_id, transaction_type, amount, balance_before, balance_after, created_by)
+         VALUES ($1, $5, $2::bigint, $3::bigint, $4::bigint, $6)`,
+        [targetUserId, fee, inc.balance_before, inc.balance_after, actor.role === "ADMIN" ? "TRANSFER_IN" : "MINT", actor.userId],
       );
       return { user_id: targetUserId, amount: fee, balance: inc.balance_after, actor_balance: actorAfter };
     });
