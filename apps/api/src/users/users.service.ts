@@ -107,13 +107,12 @@ export class UsersService {
    * (409 nếu còn ACTIVE). Một DB transaction, khóa users theo user_id tăng dần, tính trong SQL:
    * - Điểm còn lại của target được THU HỒI về actor: hai dòng transactions loại `INVOKE` (target giảm, actor tăng), created_by = actor.
    * - ADMIN xóa USER: không nhận `transferToAdminId`; USER không có cấp dưới nên không phải chuyển gì.
-   * - HOST xóa ADMIN: BẮT BUỘC `transferToAdminId` (ADMIN khác, ACTIVE, con trực tiếp của HOST); mọi cấp dưới chưa xóa của ADMIN bị xóa
-   *   được chuyển `refer_user_id` sang ADMIN đó.
+   * - HOST xóa ADMIN: nếu ADMIN còn cấp dưới chưa xóa thì BẮT BUỘC `transferToAdminId` (ADMIN khác, ACTIVE, con trực tiếp của HOST), thiếu ⇒ 409
+   *   `{ code: "TRANSFER_REQUIRED" }`; các cấp dưới đó được chuyển `refer_user_id` sang ADMIN đó. Không còn cấp dưới thì xóa luôn, không cần chọn.
    * Sau commit thu hồi mọi phiên của target (portal gọi /auth/me sẽ bị 401).
    */
   private async remove(actor: AuthUser, targetUserId: string, transferToAdminId?: string) {
     if (actor.role === "HOST") {
-      if (!transferToAdminId) throw new BadRequestException("transfer_to_admin_id is required");
       if (transferToAdminId === targetUserId) throw new BadRequestException("transfer_to_admin_id must be a different admin");
     } else if (transferToAdminId !== undefined) {
       throw new BadRequestException("transfer_to_admin_id is only for deleting an admin");
@@ -140,6 +139,7 @@ export class UsersService {
         await m.query(`UPDATE users SET refer_user_id = $2 WHERE refer_user_id = $1 AND status <> 'DELETED'`, [targetUserId, transferToAdminId]);
       } else {
         const [child] = await m.query(`SELECT 1 FROM users WHERE refer_user_id = $1 AND status <> 'DELETED' LIMIT 1`, [targetUserId]) as unknown[];
+        if (child && actor.role === "HOST") throw new ConflictException({ code: "TRANSFER_REQUIRED", message: "Admin còn người dùng, cần chọn Admin nhận bàn giao" });
         if (child) throw new ConflictException("Người dùng còn cấp dưới chưa xóa");
       }
 

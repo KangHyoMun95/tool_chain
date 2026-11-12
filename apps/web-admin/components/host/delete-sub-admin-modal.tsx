@@ -15,7 +15,7 @@ async function loadHeirs(excludeId: string) {
 }
 
 /**
- * HOST xóa Admin: bắt buộc chọn Admin khác nhận bàn giao cấp dưới. Khi xác nhận, API chuyển cấp trên của các user thuộc Admin này sang
+ * HOST xóa Admin còn user (API trả 409 TRANSFER_REQUIRED): bắt buộc chọn Admin khác nhận bàn giao cấp dưới. Khi xác nhận, API chuyển cấp trên của các user thuộc Admin này sang
  * Admin được chọn, thu hồi điểm còn lại về HOST (giao dịch INVOKE) rồi xóa Admin.
  */
 export function DeleteSubAdminModal({

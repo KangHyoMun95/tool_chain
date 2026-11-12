@@ -171,14 +171,21 @@ async function authFetch(path: string, init: RequestInit = {}): Promise<Response
   return send();
 }
 
+/** Lỗi API có mã máy đọc được (body.code, vd "TRANSFER_REQUIRED") và HTTP status. */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number, readonly code?: string) {
+    super(message);
+  }
+}
+
 /** fetch tới API, parse JSON, ném Error khi không phải 2xx. 401 không làm mới được ⇒ về /login. */
 export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await authFetch(path, init);
   if (!res.ok) {
     if (res.status === 401) redirectToLogin();
     const body = await res.json().catch(() => ({}));
-    const message = (body as { message?: string | string[] }).message;
-    throw new Error(Array.isArray(message) ? message.join(', ') : (message ?? `HTTP ${res.status}`));
+    const { message, code } = body as { message?: string | string[]; code?: string };
+    throw new ApiError(Array.isArray(message) ? message.join(', ') : (message ?? `HTTP ${res.status}`), res.status, code);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

@@ -17,7 +17,8 @@ import {
 } from '@ant-design/icons';
 import Link from 'next/link';
 import { AccountStatus } from '@/lib/legacy-types';
-import { useActivateUser } from '@/lib/api/user';
+import { ApiError } from '@/lib/api/client';
+import { useActivateUser, useDeleteUser } from '@/lib/api/user';
 import {
   useDeactivateSubAdmin,
 } from '@/lib/api/sub-admin';
@@ -36,6 +37,7 @@ export function SubAdminTable() {
   const { message, modal } = App.useApp();
   const activate = useActivateUser();
   const deactivate = useDeactivateSubAdmin();
+  const remove = useDeleteUser();
 
   const [editing, setEditing] = useState<ManagedUserRow | null>(null);
   const [granting, setGranting] = useState<ManagedUserRow | null>(null);
@@ -77,6 +79,31 @@ export function SubAdminTable() {
         } catch (err) {
           message.error(err instanceof Error ? err.message : 'Deactive thất bại');
           throw err; // keep the modal open on failure
+        }
+      },
+    });
+  };
+
+  // Admin không có user ⇒ xóa luôn. API trả 409 TRANSFER_REQUIRED khi còn user ⇒ mở dialog chọn Admin nhận bàn giao.
+  const confirmDelete = (record: ManagedUserRow) => {
+    modal.confirm({
+      title: 'Xoá người dùng',
+      content: `Xoá "${record.username}"? Tài khoản không thể khôi phục. Điểm còn lại (${record.points}) sẽ được thu hồi về tài khoản của bạn.`,
+      okText: 'Xoá',
+      okButtonProps: { danger: true },
+      cancelText: 'Huỷ',
+      onOk: async () => {
+        try {
+          await remove.mutateAsync({ id: record.id });
+          message.success('Đã xoá người dùng');
+          reload();
+        } catch (err) {
+          if (err instanceof ApiError && err.code === 'TRANSFER_REQUIRED') {
+            setDeleting(record);
+            return;
+          }
+          message.error(err instanceof Error ? err.message : 'Xoá thất bại');
+          throw err;
         }
       },
     });
@@ -180,7 +207,7 @@ export function SubAdminTable() {
                 size="small"
                 danger
                 icon={<DeleteOutlined />}
-                onClick={() => setDeleting(record)}
+                onClick={() => confirmDelete(record)}
               />
             </Tooltip>,
           );

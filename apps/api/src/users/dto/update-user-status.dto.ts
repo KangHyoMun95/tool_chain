@@ -8,6 +8,6 @@ export class UserIdParamDto {
 
 export class UpdateUserStatusDto {
   @IsEnum(UserStatus) status!: UserStatus;
-  /** Chỉ khi HOST xóa ADMIN (bắt buộc lúc đó): ADMIN nhận bàn giao cấp dưới của ADMIN bị xóa. */
+  /** Chỉ khi HOST xóa ADMIN (bắt buộc nếu ADMIN còn cấp dưới chưa xóa): ADMIN nhận bàn giao cấp dưới của ADMIN bị xóa. */
   @IsOptional() @IsUUID() transfer_to_admin_id?: string;
 }
