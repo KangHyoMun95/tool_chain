@@ -11,6 +11,8 @@ export type UserRow = ManagedUserRow;
 /** Một lần nhận điểm (MINT / TRANSFER_IN) của user, từ GET /sub-admins/:id/point-transactions. */
 export interface PointTransactionRow {
   id: string;
+  /** transactions.transaction_type: MINT (HOST sinh điểm) | TRANSFER_IN (ADMIN chuyển điểm). */
+  type: string;
   amount: string;
   granterId: string | null;
   granterName: string | null;
@@ -24,6 +26,7 @@ interface TransactionDto {
   amount: string;
   granter_id: string | null;
   granter_name: string | null;
+  type: string;
   created_at: string;
 }
 
@@ -50,6 +53,7 @@ export async function fetchPointTransactions(id: string, page: number, limit: nu
   return {
     rows: res.items.map((t) => ({
       id: t.transaction_id,
+      type: t.type,
       amount: t.amount,
       granterId: t.granter_id,
       granterName: t.granter_name,
