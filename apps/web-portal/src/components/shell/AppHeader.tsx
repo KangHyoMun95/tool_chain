@@ -67,7 +67,7 @@ export function AppHeader() {
             </span>
             <span className="min-w-0 text-left text-xs leading-tight">
               <span className="block text-[10px] text-gray-400">{t("shell.greeting")}</span>
-              <span className="block truncate font-bold text-gray-100">{ready ? me.data.phone : "—"}</span>
+              <span className="block truncate font-bold text-gray-100">{ready ? me.data.name : "—"}</span>
             </span>
           </div>
         }
