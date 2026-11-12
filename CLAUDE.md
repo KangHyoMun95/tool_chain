@@ -203,7 +203,7 @@ Portal: xem **Stream detail realtime** (kết nối SSE) và **Dữ liệu web-p
 |---|---|---|
 | `roles` | role_id, role_name | HOST / ADMIN / USER |
 | `users` | user_id, phone_number, display_name, last_login_at, password, role_id, refer_user_id, balance, status, created_at | `display_name` (V14): NULL được, không unique, 1–50 ký tự đã trim (CHECK ở DB), tên hiển thị thay số điện thoại; password luôn hash; status: `ACTIVE` (default) \| `DEACTIVE` \| `DELETED` |
-| `users_register` | user_register_id, phone_number (unique) | số điện thoại đăng ký từ portal, chờ Admin cấp tài khoản; chỉ hai cột |
+| `users_register` | user_register_id, phone_number (unique), created_at | số điện thoại đăng ký từ portal, chờ HOST cấp tài khoản; `created_at` (V16) NULL được (dòng cũ NULL, dòng mới ghi `now()`) |
 | `lobbies` | lobby_id, lobby_name, created_at (default now), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `categories` | category_id, category_name, lobby_id, created_at (default now), status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
 | `streams` | stream_id, stream_name, category_id, status | status: `ACTIVE` (default) \| `DEACTIVE` \| `ARCHIVE` |
@@ -306,7 +306,7 @@ Cùng `users/sub-admins.*`, HOST / ADMIN, `:id` phải là UUID. Phạm vi: `:id
 - **USER chỉ thấy bản ghi `ACTIVE`** (bỏ qua `status` truyền vào) và chỉ khi các cấp cha (lobby, category) cũng `ACTIVE`; HOST / ADMIN thấy tất cả và lọc được theo `status`.
 
 ### Đăng ký số điện thoại (công khai)
-`POST /api/users-register` `{ phone_number }` (`@Public()`, `@Throttle` 5 lần/phút/IP): ghi số điện thoại vào bảng `users_register` để Admin cấp tài khoản sau. **Không** tạo user, không đặt mật khẩu, không gửi SMS. `phone_number` chỉ chữ số, 6–20 ký tự (không khoảng trắng / dấu `+`; portal tự bỏ khoảng trắng và dấu `-` trước khi gửi). Idempotent: số đã đăng ký, hoặc đã là user, đều trả `201 { status: "received" }` y hệt số mới (không để dò số nào có trong hệ thống). Sai định dạng / có trường lạ ⇒ 400. Chưa có API đọc `users_register` cho Admin.
+`POST /api/users-register` `{ phone_number }` (`@Public()`, `@Throttle` 5 lần/phút/IP): ghi số điện thoại vào bảng `users_register` để Admin cấp tài khoản sau. **Không** tạo user, không đặt mật khẩu, không gửi SMS. `phone_number` chỉ chữ số, 6–20 ký tự (không khoảng trắng / dấu `+`; portal tự bỏ khoảng trắng và dấu `-` trước khi gửi). Idempotent: số đã đăng ký, hoặc đã là user, đều trả `201 { status: "received" }` y hệt số mới (không để dò số nào có trong hệ thống). Sai định dạng / có trường lạ ⇒ 400. API cho HOST (trang web-admin `/host/new-users` "Quản lý người mới"): `GET /api/users-register?page&limit` → `{ items[{user_register_id, phone_number, created_at}], total, page, limit }` (mới nhất trước, dòng không có ngày xuống cuối); `GET /api/users-register/admins` → Admin ACTIVE là con trực tiếp của HOST `[{user_id, phone_number, display_name}]` (dropdown); `POST /api/users-register/:id/activate` `{ admin_id, password (>= 12 ký tự), display_name? }` → một transaction: xóa dòng `users_register` + INSERT `users` role **USER**, `refer_user_id = admin_id` (Admin phải là con trực tiếp ACTIVE của HOST, ngoài phạm vi ⇒ 403; id đăng ký không tồn tại ⇒ 404; phone đã là user ⇒ 409, rollback nên dòng đăng ký còn nguyên). Chỉ HOST.
 
 ### SSE
 - Event trên một kết nối: `tick` (trạng thái trực tiếp, chỉ đi tới), `round_result` (kết quả ván, chỉ đi tới), `prediction` (chỉ kết nối tham gia), `insufficient_balance`; ping là `event: ping`. Client coi event thiếu `type` là tick.

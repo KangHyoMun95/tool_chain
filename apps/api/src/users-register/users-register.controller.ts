@@ -1,7 +1,10 @@
 // src/users-register/users-register.controller.ts
-import { Body, Controller, HttpCode, Post } from "@nestjs/common";
+import { Body, Controller, Get, HttpCode, Param, Post, Query } from "@nestjs/common";
 import { Throttle } from "@nestjs/throttler";
-import { Public } from "../auth/decorators.js";
+import type { AuthUser } from "../auth/auth.types.js";
+import { CurrentUser, Public, Roles } from "../auth/decorators.js";
+import { ActivateRegisterDto, RegisterIdParamDto } from "./dto/activate-register.dto.js";
+import { RegisterListQueryDto } from "./dto/register-list-query.dto.js";
 import { RegisterPhoneDto } from "./dto/register-phone.dto.js";
 import { UsersRegisterService } from "./users-register.service.js";
 
@@ -17,5 +20,24 @@ export class UsersRegisterController {
   async register(@Body() dto: RegisterPhoneDto) {
     await this.usersRegister.register(dto.phone_number);
     return { status: "received" };
+  }
+
+  @Get()
+  @Roles("HOST")
+  list(@Query() q: RegisterListQueryDto) {
+    return this.usersRegister.list(q.page, q.limit);
+  }
+
+  @Get("admins")
+  @Roles("HOST")
+  admins(@CurrentUser() actor: AuthUser) {
+    return this.usersRegister.adminOptions(actor);
+  }
+
+  @Post(":id/activate")
+  @Roles("HOST")
+  @HttpCode(201)
+  activate(@CurrentUser() actor: AuthUser, @Param() p: RegisterIdParamDto, @Body() dto: ActivateRegisterDto) {
+    return this.usersRegister.activate(actor, p.id, dto);
   }
 }
