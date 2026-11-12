@@ -20,11 +20,11 @@ RUN pnpm --filter @toolhackchain/shared build \
  && pnpm --filter @toolhackchain/web-admin build
 
 FROM node:22-bookworm-slim AS runtime
-ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=5000 HOSTNAME=0.0.0.0
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=3000 HOSTNAME=0.0.0.0
 WORKDIR /app
 # standalone output keeps the monorepo layout (apps/web-admin/server.js); web-admin has no public/ directory
 COPY --from=build --chown=node:node /repo/apps/web-admin/.next/standalone ./
 COPY --from=build --chown=node:node /repo/apps/web-admin/.next/static ./apps/web-admin/.next/static
 USER node
-EXPOSE 5000
+EXPOSE 3000
 CMD ["node", "apps/web-admin/server.js"]
