@@ -16,6 +16,7 @@ export interface UserRow {
   id: string;
   username: string;
   phoneNumber?: string | null;
+  displayName?: string | null;
   hostnames: { id: string; name: string; url: string }[];
   role: Role;
   status: AccountStatus;
@@ -26,11 +27,14 @@ export interface UserRow {
 }
 
 export interface CreateUserInput {
+  display_name?: string;
   phone_number: string;
   password: string;
 }
 
 export interface UpdateUserInput {
+  /** Chuỗi = đặt tên, null = xóa tên, bỏ trống = không đổi. */
+  displayName?: string | null;
   password?: string;
   phoneNumber?: string;
 }
@@ -61,10 +65,10 @@ export function useCreateUser() {
 export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, password, phoneNumber }: UpdateUserInput & { id: string }) =>
+    mutationFn: ({ id, password, phoneNumber, displayName }: UpdateUserInput & { id: string }) =>
       apiFetch<{ user_id: string }>(`/users/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ password: password || undefined, phone_number: phoneNumber || undefined }),
+        body: JSON.stringify({ password: password || undefined, phone_number: phoneNumber || undefined, display_name: displayName }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
   });

@@ -20,7 +20,7 @@ export function CreateSubAdminModal({ onSuccess }: { onSuccess?: () => void }) {
       modalProps={{ destroyOnClose: true }}
       onFinish={async (values) => {
         try {
-          await create.mutateAsync(values);
+          await create.mutateAsync({ ...values, display_name: values.display_name?.trim() || undefined });
           message.success('Đã tạo Admin Con');
           onSuccess?.();
           return true;
@@ -30,6 +30,12 @@ export function CreateSubAdminModal({ onSuccess }: { onSuccess?: () => void }) {
         }
       }}
     >
+      <ProFormText
+        name="display_name"
+        label="Tên hiển thị"
+        placeholder="Không bắt buộc"
+        rules={[{ max: 50, message: 'Tối đa 50 ký tự' }]}
+      />
       <ProFormText
         name="phone_number"
         label="Số điện thoại"

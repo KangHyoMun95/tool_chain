@@ -5,6 +5,7 @@ import { UserStatus } from "@toolhackchain/shared";
 export class UserEntity {
   @PrimaryGeneratedColumn("uuid", { name: "user_id" }) userId!: string;
   @Column({ name: "phone_number", length: 20, unique: true }) phoneNumber!: string;
+  @Column({ name: "display_name", type: "varchar", length: 50, nullable: true }) displayName!: string | null;
   @Column({ length: 255, select: false }) password!: string; // always a hash; never selected by default
   @Column({ name: "role_id", type: "smallint" }) roleId!: number;
   @Column({ name: "refer_user_id", type: "uuid", nullable: true }) referUserId!: string | null;

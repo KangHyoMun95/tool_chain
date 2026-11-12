@@ -6,6 +6,7 @@ import { apiFetch } from './client';
 interface ManagedUserDto {
   user_id: string;
   phone_number: string;
+  display_name: string | null;
   role: 'ADMIN' | 'USER';
   status: 'ACTIVE' | 'DEACTIVE' | 'DELETED';
   balance: string;
@@ -37,6 +38,7 @@ export const toRow = (u: ManagedUserDto): ManagedUserRow => ({
   id: u.user_id,
   username: u.phone_number,
   phoneNumber: u.phone_number,
+  displayName: u.display_name ?? null,
   role: u.role,
   status: u.status === 'ACTIVE' ? AccountStatus.ACTIVE : AccountStatus.INACTIVE,
   points: u.balance,
@@ -60,7 +62,7 @@ export async function fetchManagedUsers(query: ManagedUserQuery): Promise<{ rows
   return { rows: res.items.map(toRow), total: res.total };
 }
 
-/** Tham số tìm kiếm của ProTable → query API (số điện thoại chỉ giữ chữ số). */
+/** Tham số tìm kiếm của ProTable → query API (ô tìm kiếm khớp số điện thoại hoặc tên hiển thị). */
 export function toManagedUserQuery(params: {
   current?: number;
   pageSize?: number;
@@ -68,7 +70,7 @@ export function toManagedUserQuery(params: {
   status?: string;
   role?: string;
 }): ManagedUserQuery {
-  const q = (params.phoneNumber ?? '').replace(/\D/g, '');
+  const q = (params.phoneNumber ?? '').trim();   // khớp số điện thoại hoặc tên hiển thị
   return {
     page: params.current ?? 1,
     limit: params.pageSize ?? 10,

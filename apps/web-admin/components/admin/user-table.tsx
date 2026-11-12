@@ -101,7 +101,13 @@ export function UserTable() {
   };
 
   const columns: ProColumns<ManagedUserRow>[] = [
-    { title: 'Số điện thoại', dataIndex: 'phoneNumber', ellipsis: true, renderText: (v) => v || '—' },
+    { title: 'Tên', dataIndex: 'displayName', ellipsis: true, search: false, renderText: (v) => v || '—' },
+    {
+      title: (_, type) => (type === 'form' ? 'Tên / Số điện thoại' : 'Số điện thoại'),
+      dataIndex: 'phoneNumber',
+      ellipsis: true,
+      renderText: (v) => v || '—',
+    },
     {
       title: 'Vai trò',
       dataIndex: 'role',

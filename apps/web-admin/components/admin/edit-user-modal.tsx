@@ -37,6 +37,7 @@ export function EditUserModal({
       onOpenChange={onOpenChange}
       modalProps={{ destroyOnClose: true }}
       initialValues={{
+        displayName: record?.displayName ?? undefined,
         phoneNumber: record?.phoneNumber ?? undefined,
         hostnameIds: record?.hostnames?.map((h) => h.id) ?? [],
       }}
@@ -44,6 +45,8 @@ export function EditUserModal({
         if (!record) return false;
         const payload: UpdateUserInput = {};
         if (values.password) payload.password = values.password;
+        const nextName = (values.displayName ?? '').trim();
+        if (nextName !== (record.displayName ?? '')) payload.displayName = nextName || null;
         if ((values.phoneNumber ?? '') !== (record.phoneNumber ?? '')) {
           payload.phoneNumber = values.phoneNumber ?? '';
         }
@@ -65,6 +68,12 @@ export function EditUserModal({
         }
       }}
     >
+      <ProFormText
+        name="displayName"
+        label="Tên hiển thị"
+        placeholder="Không bắt buộc"
+        rules={[{ max: 50, message: 'Tối đa 50 ký tự' }]}
+      />
       <ProFormText
         name="phoneNumber"
         label="Số điện thoại"

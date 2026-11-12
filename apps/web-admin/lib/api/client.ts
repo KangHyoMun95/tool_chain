@@ -10,6 +10,7 @@ export const API_BASE = `${ORIGIN}/api`;
 export interface MeResponse {
   user_id: string;
   phone_number: string;
+  display_name: string | null;
   role: Role;
   status: string;
   balance: string;
@@ -21,6 +22,8 @@ export interface SessionUser {
   sub: string;
   role: Role;
   phone: string;
+  /** Tên hiển thị; null = chưa đặt. */
+  displayName: string | null;
 }
 
 export type AuthErrorCode = 'invalid_input' | 'invalid_credentials' | 'locked' | 'network' | 'unknown';
@@ -75,7 +78,7 @@ async function establish(token: string): Promise<boolean> {
     const me = (await res.json()) as MeResponse;
     if (!ADMIN_APP_ROLES.includes(me.role) || me.status !== 'ACTIVE') return false;
     accessToken = token;
-    sessionUser = { sub: me.user_id, role: me.role, phone: me.phone_number };
+    sessionUser = { sub: me.user_id, role: me.role, phone: me.phone_number, displayName: me.display_name ?? null };
     return true;
   } catch {
     return false;
