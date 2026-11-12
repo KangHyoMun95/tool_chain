@@ -12,11 +12,14 @@ import { PredictionsService } from "./predictions.service.js";
 export class PredictionsController {
   constructor(private predictions: PredictionsService, private streams: StreamsService) {}
 
-  /** Prediction mới nhất của stream (portal gọi khi mở / reload trang). 404 nếu stream không tồn tại / ngoài phạm vi, hoặc chưa có prediction. */
+  /**
+   * Prediction mới nhất của stream (portal gọi khi mở / reload trang). 404 nếu stream không tồn tại / ngoài phạm vi, hoặc chưa có prediction.
+   * Ván còn RUNNING: chỉ user đã bị trừ tiền cho ván đó thấy pick, còn lại `{ locked: true, shoe, round, ... }` ("Dự đoán từ ván sau").
+   */
   @Get("current")
   async current(@CurrentUser() actor: AuthUser, @Param() params: IdParamDto) {
     await this.streams.getOne(actor.role, params.id);
-    const prediction = await this.predictions.current(params.id);
+    const prediction = await this.predictions.currentFor(actor, params.id);
     if (!prediction) throw new NotFoundException();
     return prediction;
   }
@@ -26,6 +29,13 @@ export class PredictionsController {
   async stats(@CurrentUser() actor: AuthUser, @Param() params: IdParamDto) {
     await this.streams.getOne(actor.role, params.id);
     return this.predictions.stats(params.id);
+  }
+
+  /** Chuỗi thắng tốt nhất của shoe hiện tại (trang chi tiết). Luôn 200 (`best_streak: 0` khi chưa có dự đoán). */
+  @Get("best-streak")
+  async bestStreak(@CurrentUser() actor: AuthUser, @Param() params: IdParamDto) {
+    await this.streams.getOne(actor.role, params.id);
+    return this.predictions.bestStreak(params.id);
   }
 }
 

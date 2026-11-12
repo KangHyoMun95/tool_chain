@@ -22,12 +22,11 @@
     "offline": "OFFLINE",
     "live": "LIVE",
     "winRate": "WIN SHOE HIỆN TẠI",
-    "winStreak": "CHUỖI THẮNG",
-    "recentResults": "{count} Dự Đoán Gần Nhất",
-    "noRecent": "Chưa có dự đoán nào",
+    "winStreak": "CHUỖI TỐT GẦN ĐÂY",
     "viewDetail": "Chi Tiết AI Dự Đoán",
     "empty": "Chưa có bàn nào trong loại trò chơi này.",
-    "streamer": "Streamer: {name}"
+    "streamer": "Streamer: {name}",
+    "insufficientBalance": "Không đủ điểm"
   },
   "notFound": {
     "title": "Không tìm thấy trang",
@@ -78,17 +77,19 @@
     "error": "Không tải được dữ liệu. Vui lòng thử lại.",
     "errorNetwork": "Không kết nối được máy chủ. Vui lòng thử lại.",
     "retry": "Thử lại",
-    "comingSoon": "Tính năng sắp ra mắt (Coming soon)"
+    "comingSoon": "Tính năng sắp ra mắt (Coming soon)",
+    "close": "Đóng"
   },
   "live": {
     "connection": {
       "connecting": "Đang kết nối...",
       "live": "Đang trực tiếp",
       "reconnecting": "Mất kết nối, đang thử lại...",
-      "revoked": "Phiên đã bị thu hồi"
+      "revoked": "Phiên đã bị thu hồi",
+      "insufficient": "Hết điểm"
     },
     "status": {
-      "IN_PROGRESS": "Đang tiến hành",
+      "IN_PROGRESS": "Đang Hack Kết Quả",
       "DONE": "Hoàn tất tiến trình",
       "GET_RESULT": "Nhận kết quả",
       "SUMMARY_RESULT": "Tổng kết",
@@ -111,13 +112,14 @@
     "historyError": "Không tải được lịch sử",
     "boardLabel": "Bảng kết quả B/P/T",
     "winRate": "TỶ LỆ WIN HIỆN TẠI",
-    "winStreak": "CHUỖI THẮNG LIVE",
+    "winStreak": "CHUỖI THẮNG TỐT NHẤT",
     "chartTitle": "Biểu Đồ Tỷ Lệ Win Theo Phiên",
     "chartRange": "{count} Phiên Gần Nhất",
     "chartSeries": "Tỷ lệ win AI mỗi phiên (%)",
     "chartEmpty": "Chưa có phiên nào trong quá khứ",
     "debugTitle": "Debug thời gian",
-    "debugConverted": "Giờ Việt Nam"
+    "debugConverted": "Giờ Việt Nam",
+    "nextRound": "DỰ ĐOÁN TỪ VÁN SAU"
   },
   "status": {
     "live": "LIVE",
@@ -129,7 +131,15 @@
     "balance": "Số dư",
     "deposit": "NẠP TIỀN",
     "notifications": "Thông báo",
-    "menu": "Mở menu"
+    "menu": "Mở menu",
+    "closeMenu": "Đóng menu",
+    "menuLanguage": "Chọn ngôn ngữ",
+    "logoutTitle": "Đăng xuất",
+    "logoutConfirm": "Bạn có chắc muốn đăng xuất không?",
+    "logoutYes": "Có",
+    "logoutNo": "Không",
+    "logoutFailed": "Không đăng xuất được. Vui lòng thử lại.",
+    "menuLogout": "Đăng xuất"
   },
   "sidebar": {
     "label": "Điều hướng",
@@ -151,5 +161,10 @@
     "before": "Chào mừng bạn đến với",
     "after": "- Hệ thống phân tích thuật toán chuyên nghiệp!",
     "more": "Xem chi tiết"
+  },
+  "billing": {
+    "insufficientTitle": "Không đủ điểm",
+    "insufficientDescription": "Số dư của bạn không đủ để xem dự đoán của bàn này. Vui lòng nạp thêm điểm.",
+    "kickedOut": "Bạn đã hết điểm nên không thể tiếp tục nhận dự đoán. Vui lòng nạp thêm điểm."
   }
 }

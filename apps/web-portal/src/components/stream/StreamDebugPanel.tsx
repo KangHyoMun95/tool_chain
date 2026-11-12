@@ -2,6 +2,7 @@
 
 import type { CrawlPayload } from "@toolhackchain/shared";
 import { useI18n } from "@/src/i18n/provider";
+import { SHOW_STREAM_DEBUG } from "@/src/lib/stream-debug";
 
 const FIELDS = ["deliver_time", "timestamp", "stamp_time", "round_start_time", "repaint_time"] as const;
 
@@ -19,8 +20,6 @@ function toVietnamTime(raw: string): string | null {
   if (Number.isNaN(d.getTime())) return null;
   return d.toLocaleString("vi-VN", { timeZone: "Asia/Ho_Chi_Minh", hour12: false });
 }
-
-export const SHOW_STREAM_DEBUG = process.env.NEXT_PUBLIC_SHOW_STREAM_DEBUG === "true";
 
 /** Khung debug 5 trường time của message mới nhất; chỉ hiện khi NEXT_PUBLIC_SHOW_STREAM_DEBUG=true. */
 export function StreamDebugPanel({ data }: { data: CrawlPayload | undefined }) {

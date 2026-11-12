@@ -1,8 +1,24 @@
 import type { ChosenPattern, PredictionReason } from "@toolhackchain/shared";
 import { ApiError, apiGet } from "./client";
 
-/** GET /streams/:id/predictions/current — confidence là tỉ lệ 0–1. */
-export type CurrentPredictionDto = {
+/**
+ * GET /streams/:id/predictions/current — confidence là tỉ lệ 0–1.
+ * Ván còn chạy mà user chưa bị trừ tiền cho ván đó (vào giữa ván) ⇒ locked: true, không có pick ("Dự đoán từ ván sau").
+ */
+export type CurrentPredictionDto = UnlockedPredictionDto | LockedPredictionDto;
+
+export type LockedPredictionDto = {
+  locked: true;
+  prediction_id: string;
+  game_session_id: string;
+  stream_id: string;
+  shoe: number;
+  round: number;
+  created_at: string;
+};
+
+export type UnlockedPredictionDto = {
+  locked: false;
   prediction_id: string;
   game_session_id: string;
   stream_id: string;
@@ -37,6 +53,12 @@ export type PredictionStatsDto = {
   shoes: { shoe: number; wins: number; losses: number; draws: number; win_rate: number }[];   // các shoe quá khứ (không gồm hiện tại), cũ → mới
 };
 
+/** GET /streams/:id/predictions/best-streak — chuỗi thắng dài nhất trong shoe hiện tại (trang chi tiết). */
+export type BestStreakDto = { shoe: number | null; best_streak: number };
+
+export const fetchBestStreak = (streamId: string): Promise<BestStreakDto> =>
+  apiGet<BestStreakDto>(`/streams/${encodeURIComponent(streamId)}/predictions/best-streak`);
+
 export const fetchPredictionStats = (streamId: string): Promise<PredictionStatsDto> =>
   apiGet<PredictionStatsDto>(`/streams/${encodeURIComponent(streamId)}/predictions/stats`);
 
@@ -50,8 +72,7 @@ export type StreamListStatsDto = {
   losses: number;
   draws: number;
   win_rate: number | null;
-  win_streak: number;
-  recent: boolean[];   // shoe hiện tại, cũ → mới, true = thắng
+  win_streak: number;   // chuỗi thắng dài nhất của shoe hiện tại, hoặc của shoe trước khi shoe hiện tại còn ít dữ liệu (API quyết định)
 };
 
 export const fetchCategoryStreamStats = async (categoryId: string): Promise<StreamListStatsDto[]> =>

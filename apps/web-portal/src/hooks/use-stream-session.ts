@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { buildKeyId, STREAM_STATUSES, type CrawlPayload, type RealtimePrediction, type StreamStatus } from "@toolhackchain/shared";
+import {
+  buildKeyId, STREAM_STATUSES, type CrawlPayload, type RealtimePrediction, type RealtimeRoundResult, type StreamStatus,
+} from "@toolhackchain/shared";
 import { toPrediction } from "@/src/lib/prediction-source";
 import { predictionStore } from "@/src/lib/prediction-store";
 import { useLiveItems } from "./use-live-items";
@@ -26,26 +28,20 @@ function toTotals(d: CrawlPayload | undefined): Totals | null {
   return [B, P, T].every((x) => typeof x === "number" && Number.isFinite(x)) ? { B, P, T } : null;
 }
 
-/** Realtime + lịch sử của một stream. Tick đi qua useLiveItems (lọc theo stream_id), lịch sử qua useStreamHistory. */
+/** Realtime + lịch sử của một stream. Tick (trạng thái trực tiếp), round_result (kết quả) + pick đi qua useLiveItems (kết nối tham gia, lọc theo stream_id), lịch sử qua useStreamHistory. */
 export function useStreamSession(stream: StreamRef) {
   const keyId = buildKeyId(stream.lobbyName, stream.categoryName, stream.name);
   const [result, setResult] = useState<{ shoe: number; round: number; value: string } | null>(null);
-  const seen = useRef(new Set<string>());          // (shoe, round) đã xử lý kết quả
   const warned = useRef(new Set<string>());        // status lạ đã log
   const historyApi = useRef<ReturnType<typeof useStreamHistory> | null>(null);
   const statsApi = useRef<ReturnType<typeof usePredictionStats> | null>(null);
 
-  const onTick = useCallback((t: { data: CrawlPayload }) => {
-    const d = t.data;
-    const shoe = toInt(d.stream_shoe);
-    const round = toInt(d.stream_round);
-    if (shoe === null || round === null || d.actual_result == null) return;   // kết quả = actual_result != null (không dựa vào status)
-    const k = `${shoe}:${round}`;
-    if (seen.current.has(k)) return;
-    if (seen.current.size > 500) seen.current.clear();
-    seen.current.add(k);
-    setResult({ shoe, round, value: d.actual_result });
-    historyApi.current?.addOptimistic({ shoe, round, result: d.actual_result });
+  // Kết quả / lịch sử / đúng-sai CHỈ từ round_result (hub phát một lần, chỉ đi tới). Ván bị bỏ qua (kết quả về muộn sau
+  // ván mới hơn) được refetch lịch sử lấp lại từ DB.
+  const onRoundResult = useCallback((r: RealtimeRoundResult) => {
+    const { shoe, round, result: value } = r;
+    setResult({ shoe, round, value });
+    historyApi.current?.addOptimistic({ shoe, round, result: value });
     historyApi.current?.scheduleRefetch();
     statsApi.current?.scheduleRefresh(STATS_AFTER_RESULT_MS);   // thắng / thua đã được API ghi (batch 3s)
   }, []);
@@ -55,7 +51,8 @@ export function useStreamSession(stream: StreamRef) {
     statsApi.current?.scheduleRefresh(STATS_AFTER_PREDICTION_MS);   // điểm mới cho biểu đồ độ tin cậy
   }, []);
 
-  const live = useLiveItems<CrawlPayload>([keyId], { streamId: stream.id, onTick, onPrediction });
+  // Trang chi tiết = tham gia stream (bị trừ tiền mỗi dự đoán có pick); hết điểm ⇒ connection = "insufficient".
+  const live = useLiveItems<CrawlPayload>([keyId], { streamId: stream.id, participate: true, onRoundResult, onPrediction });
   const latest = live.ticks[keyId]?.data;
   const shoe = latest ? toInt(latest.stream_shoe) : null;
   const round = latest ? toInt(latest.stream_round) : null;

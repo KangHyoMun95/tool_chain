@@ -22,12 +22,11 @@
     "offline": "OFFLINE",
     "live": "LIVE",
     "winRate": "CURRENT SHOE WIN",
-    "winStreak": "WIN STREAK",
-    "recentResults": "Last {count} predictions",
-    "noRecent": "No predictions yet",
+    "winStreak": "RECENT BEST STREAK",
     "viewDetail": "AI Prediction Details",
     "empty": "No tables in this game yet.",
-    "streamer": "Streamer: {name}"
+    "streamer": "Streamer: {name}",
+    "insufficientBalance": "Not enough points"
   },
   "notFound": {
     "title": "Page not found",
@@ -78,17 +77,19 @@
     "error": "Could not load data. Please try again.",
     "errorNetwork": "Cannot reach the server. Please try again.",
     "retry": "Retry",
-    "comingSoon": "Coming soon"
+    "comingSoon": "Coming soon",
+    "close": "Close"
   },
   "live": {
     "connection": {
       "connecting": "Connecting...",
       "live": "Live",
       "reconnecting": "Connection lost, retrying...",
-      "revoked": "Session revoked"
+      "revoked": "Session revoked",
+      "insufficient": "Out of points"
     },
     "status": {
-      "IN_PROGRESS": "In progress",
+      "IN_PROGRESS": "In progress Hacking",
       "DONE": "Round complete",
       "GET_RESULT": "Receiving result",
       "SUMMARY_RESULT": "Summary",
@@ -111,13 +112,14 @@
     "historyError": "Could not load history",
     "boardLabel": "B/P/T results board",
     "winRate": "CURRENT WIN RATE",
-    "winStreak": "LIVE WIN STREAK",
+    "winStreak": "BEST WIN STREAK",
     "chartTitle": "Win Rate per Session",
     "chartRange": "Last {count} sessions",
     "chartSeries": "AI win rate per session (%)",
     "chartEmpty": "No past sessions yet",
     "debugTitle": "Time debug",
-    "debugConverted": "Vietnam time"
+    "debugConverted": "Vietnam time",
+    "nextRound": "PREDICTION FROM NEXT ROUND"
   },
   "status": {
     "live": "LIVE",
@@ -129,7 +131,15 @@
     "balance": "Balance",
     "deposit": "DEPOSIT",
     "notifications": "Notifications",
-    "menu": "Open menu"
+    "menu": "Open menu",
+    "closeMenu": "Close menu",
+    "menuLanguage": "Language",
+    "logoutTitle": "Log out",
+    "logoutConfirm": "Are you sure you want to log out?",
+    "logoutYes": "Yes",
+    "logoutNo": "No",
+    "logoutFailed": "Could not log out. Please try again.",
+    "menuLogout": "Log out"
   },
   "sidebar": {
     "label": "Navigation",
@@ -151,5 +161,10 @@
     "before": "Welcome to",
     "after": "- the professional algorithm analytics system!",
     "more": "Details"
+  },
+  "billing": {
+    "insufficientTitle": "Not enough points",
+    "insufficientDescription": "Your balance is not enough to view predictions for this table. Please top up.",
+    "kickedOut": "You ran out of points and can no longer receive predictions. Please top up."
   }
 }
