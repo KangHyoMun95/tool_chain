@@ -130,4 +130,15 @@ export class SessionService {
     await multi.exec();
     sessionIds.forEach((sid) => this.notifyRevoked(sid));
   }
+
+  // Đổi mật khẩu: thu hồi mọi phiên của user TRỪ phiên đang dùng (các thiết bị khác phải đăng nhập lại).
+  async revokeOtherSessions(userId: string, keepSessionId: string): Promise<void> {
+    const setKey = RedisKeys.userSessions(userId);
+    const others = (await this.redis.smembers(setKey)).filter((sid) => sid !== keepSessionId);
+    if (others.length === 0) return;
+    const multi = this.redis.multi().srem(setKey, ...others);
+    for (const sid of others) multi.del(RedisKeys.session(sid), RedisKeys.refresh(sid));
+    await multi.exec();
+    others.forEach((sid) => this.notifyRevoked(sid));
+  }
 }

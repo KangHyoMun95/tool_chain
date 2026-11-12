@@ -7,6 +7,7 @@ import type { EnvVars } from "../config/env.validation.js";
 import { AuthService } from "./auth.service.js";
 import type { AuthUser } from "./auth.types.js";
 import { CurrentUser, Public } from "./decorators.js";
+import { ChangePasswordDto } from "./dto/change-password.dto.js";
 import { LoginDto } from "./dto/login.dto.js";
 
 export const REFRESH_COOKIE = "refresh_token";
@@ -62,6 +63,13 @@ export class AuthController {
   async logout(@CurrentUser() user: AuthUser, @Res({ passthrough: true }) res: Response) {
     await this.auth.logout(user.sessionId);
     res.clearCookie(REFRESH_COOKIE, this.cookieOptions());
+  }
+
+  @Post("change-password")
+  @HttpCode(204)
+  @Throttle({ default: { limit: 5, ttl: 60_000 } })
+  async changePassword(@CurrentUser() user: AuthUser, @Body() dto: ChangePasswordDto) {
+    await this.auth.changePassword(user.userId, user.sessionId, dto.current_password, dto.new_password);
   }
 
   @Get("me")

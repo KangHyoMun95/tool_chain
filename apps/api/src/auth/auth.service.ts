@@ -1,5 +1,5 @@
 // src/auth/auth.service.ts
-import { Injectable, Logger, OnModuleInit, UnauthorizedException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, OnModuleInit, UnauthorizedException } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { JwtService } from "@nestjs/jwt";
 import { InjectDataSource } from "@nestjs/typeorm";
@@ -138,6 +138,26 @@ export class AuthService implements OnModuleInit {
 
   async logout(sessionId: string): Promise<void> {
     await this.sessions.revoke(sessionId);
+  }
+
+  /**
+   * Tự đổi mật khẩu. Sai mật khẩu hiện tại ⇒ 400 (không phải 401: client sẽ hiểu 401 là hết phiên và thử refresh). Mật khẩu mới phải khác cũ.
+   * Thành công ⇒ thu hồi các phiên khác của user, giữ phiên hiện tại. Sai mật khẩu hiện tại không tính vào khóa đăng nhập (đã có Throttle theo IP ở controller).
+   */
+  async changePassword(userId: string, sessionId: string, current: string, next: string): Promise<void> {
+    const rows: { password: string; status: UserStatus }[] = await this.dataSource.query(`SELECT password, status FROM users WHERE user_id = $1`, [userId]);
+    const row = rows[0];
+    if (!row || row.status !== UserStatus.ACTIVE) throw new UnauthorizedException();
+    if (!(await argon2.verify(row.password, current).catch(() => false))) {
+      this.log.warn(`change password: wrong current password user_id=${userId}`);
+      throw new BadRequestException("Current password is incorrect");
+    }
+    if (current === next) throw new BadRequestException("New password must be different");
+
+    const hash = await argon2.hash(next, ARGON2_OPTIONS);
+    await this.dataSource.query(`UPDATE users SET password = $1 WHERE user_id = $2`, [hash, userId]);
+    await this.sessions.revokeOtherSessions(userId, sessionId);
+    this.log.log(`password changed user_id=${userId}`);
   }
 
   async me(userId: string): Promise<MeResponse> {

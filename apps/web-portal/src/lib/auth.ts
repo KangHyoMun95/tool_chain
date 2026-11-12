@@ -165,3 +165,42 @@ export async function logout(): Promise<void> {
   if (!res.ok && res.status !== 401) throw new AuthError("unknown");
   accessToken = null;
 }
+
+export type ChangePasswordErrorCode = "wrong_password" | "same_password" | "invalid_input" | "locked" | "network" | "unknown";
+
+export class ChangePasswordError extends Error {
+  constructor(readonly code: ChangePasswordErrorCode) {
+    super(code);
+  }
+}
+
+/** Độ dài tối thiểu của mật khẩu mới (khớp ChangePasswordDto / CreateUserDto ở API). */
+export const MIN_PASSWORD_LENGTH = 12;
+
+/**
+ * Tự đổi mật khẩu: POST /auth/change-password. Server thu hồi các phiên khác, phiên này giữ nguyên.
+ * 400 "incorrect" ⇒ wrong_password, 400 "different" ⇒ same_password, 400 khác ⇒ invalid_input, 429 ⇒ locked.
+ */
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  let res: Response;
+  try {
+    res = await authFetch("/auth/change-password", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+    });
+  } catch {
+    throw new ChangePasswordError("network");
+  }
+  if (res.ok) return;
+  if (res.status === 429) throw new ChangePasswordError("locked");
+  if (res.status === 400) {
+    const body: unknown = await res.json().catch(() => null);
+    const raw = (body as { message?: unknown } | null)?.message;
+    const msg = Array.isArray(raw) ? raw.join(" ") : typeof raw === "string" ? raw : "";
+    if (/incorrect/i.test(msg)) throw new ChangePasswordError("wrong_password");
+    if (/different/i.test(msg)) throw new ChangePasswordError("same_password");
+    throw new ChangePasswordError("invalid_input");
+  }
+  throw new ChangePasswordError("unknown");
+}
