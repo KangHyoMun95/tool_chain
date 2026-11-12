@@ -6,6 +6,7 @@ import { App, Dropdown, Spin, Tag } from 'antd';
 import {
   DashboardOutlined,
   DollarOutlined,
+  KeyOutlined,
   LogoutOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
@@ -17,6 +18,7 @@ import { usePathname } from 'next/navigation';
 import { ROLE, type Role } from '@/lib/auth/roles';
 import { useCurrentUser, useLogout } from '@/lib/auth/current-user';
 import { useMyProfile } from '@/lib/api/profile';
+import { ChangePasswordModal } from './change-password-modal';
 
 /** Sidebar menu per role — HOST manages Admin(Con), ADMIN manages Users. */
 function menuForRole(role: Role): MenuDataItem[] {
@@ -38,7 +40,7 @@ function menuForRole(role: Role): MenuDataItem[] {
 
 /**
  * Shared admin chrome for the (host) and (admin) route groups. The sidebar and
- * header adapt to the logged-in user's role; header shows name + role + logout.
+ * header adapt to the logged-in user's role; header shows name + role; avatar menu: change password, logout.
  */
 export function AppProLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -48,6 +50,7 @@ export function AppProLayout({ children }: { children: React.ReactNode }) {
   // Keeps a full-screen spinner up while clearing the session and navigating
   // to the login screen.
   const [loggingOut, setLoggingOut] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const { message } = App.useApp();
 
@@ -103,6 +106,12 @@ export function AppProLayout({ children }: { children: React.ReactNode }) {
             menu={{
               items: [
                 {
+                  key: 'change-password',
+                  icon: <KeyOutlined />,
+                  label: 'Đổi mật khẩu',
+                  onClick: () => setChangingPassword(true),
+                },
+                {
                   key: 'logout',
                   icon: <LogoutOutlined />,
                   label: 'Đăng xuất',
@@ -117,6 +126,7 @@ export function AppProLayout({ children }: { children: React.ReactNode }) {
       }}
     >
       <Spin spinning={loggingOut} fullscreen tip="Đang đăng xuất..." />
+      <ChangePasswordModal open={changingPassword} onOpenChange={setChangingPassword} />
       {children}
     </ProLayout>
   );
