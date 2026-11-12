@@ -36,16 +36,6 @@ export function AppHeader() {
       </Link>
 
       <div className="flex items-center gap-2 sm:gap-3.5">
-        <div className="hidden items-center gap-2 rounded-full border border-red-900/60 bg-[#121218] px-3 py-1.5 shadow-inner sm:flex">
-          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-tr from-red-600 to-rose-400 text-white shadow-neon-sm">
-            <UserIcon className="h-3.5 w-3.5" />
-          </span>
-          <span className="text-left text-xs leading-tight">
-            <span className="block text-[10px] text-gray-400">{t("shell.greeting")}</span>
-            <span className="block max-w-[9rem] truncate font-bold text-gray-100">{ready ? me.data.phone : "—"}</span>
-          </span>
-        </div>
-
         <div className="flex flex-col px-1 text-right sm:px-2">
           <span className="text-[10px] text-gray-400">{t("shell.balance")}</span>
           <span className="flex items-center justify-end gap-1 font-mono text-sm font-extrabold text-gold-light drop-shadow-[0_0_8px_rgba(251,191,36,0.5)]">
@@ -66,7 +56,22 @@ export function AppHeader() {
         </button>
       </div>
 
-      <MenuDrawer open={menuOpen} onClose={closeMenu} title={t("shell.menu")}>
+      <MenuDrawer
+        open={menuOpen}
+        onClose={closeMenu}
+        title={t("shell.menu")}
+        header={
+          <div className="flex min-w-0 items-center gap-2 rounded-full border border-red-900/60 bg-[#121218] px-3 py-1.5 shadow-inner">
+            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-red-600 to-rose-400 text-white shadow-neon-sm">
+              <UserIcon className="h-3.5 w-3.5" />
+            </span>
+            <span className="min-w-0 text-left text-xs leading-tight">
+              <span className="block text-[10px] text-gray-400">{t("shell.greeting")}</span>
+              <span className="block truncate font-bold text-gray-100">{ready ? me.data.phone : "—"}</span>
+            </span>
+          </div>
+        }
+      >
         <MenuDrawerItem icon={<GlobeIcon className="h-4 w-4" />} label={t("shell.menuLanguage")} onClick={() => openDialog("language")} />
         <MenuDrawerItem icon={<LogOutIcon className="h-4 w-4" />} label={t("shell.menuLogout")} onClick={() => openDialog("logout")} />
       </MenuDrawer>
