@@ -11,9 +11,11 @@ import {
   DeleteOutlined,
   DollarOutlined,
   EditOutlined,
+  EyeOutlined,
   PlayCircleOutlined,
   StopOutlined,
 } from '@ant-design/icons';
+import Link from 'next/link';
 import { AccountStatus } from '@/lib/legacy-types';
 import {
   useActivateUser,
@@ -83,7 +85,7 @@ export function UserTable() {
   const confirmDelete = (record: ManagedUserRow) => {
     modal.confirm({
       title: 'Xoá người dùng',
-      content: `Xoá "${record.username}"? User sẽ không đăng nhập được nữa và không thể khôi phục.`,
+      content: `Xoá "${record.username}"? User sẽ không đăng nhập được nữa, không thể khôi phục. Điểm còn lại (${record.points}) sẽ được chuyển lại cho bạn.`,
       okText: 'Xoá',
       okButtonProps: { danger: true },
       cancelText: 'Huỷ',
@@ -138,7 +140,13 @@ export function UserTable() {
       valueType: 'option',
       key: 'option',
       render: (_dom, record) => {
-        const actions: ReactNode[] = [];
+        const actions: ReactNode[] = [
+          <Tooltip key="detail" title="Chi tiết">
+            <Link href={`/admin/users/${record.id}`}>
+              <Button type="text" size="small" icon={<EyeOutlined />} />
+            </Link>
+          </Tooltip>,
+        ];
         if (record.depth === 1) {
           actions.push(
           <Tooltip key="edit" title="Sửa">
@@ -187,7 +195,7 @@ export function UserTable() {
             </Tooltip>,
           );
         }
-        if (record.depth === 1) actions.push(
+        if (record.depth === 1 && record.status !== AccountStatus.ACTIVE && !record.deleted) actions.push(
           <Tooltip key="delete" title="Xoá">
             <Button
               type="text"

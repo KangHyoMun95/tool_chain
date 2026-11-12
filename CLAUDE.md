@@ -193,7 +193,7 @@ Portal: xem **Stream detail realtime** (kết nối SSE) và **Dữ liệu web-p
 | User | — | Bị trừ điểm khi nhận prediction |
 
 - `users.refer_user_id` trỏ tới cấp trên trực tiếp. Dùng nó để Admin lọc user của mình, Host lọc admin của mình.
-- Xóa user là **xóa mềm** (`status = 'DELETED'`). Không `DELETE` vì sẽ làm mất tham chiếu của lịch sử giao dịch. Điểm còn lại giữ nguyên trong tài khoản.
+- Xóa user là **xóa mềm** (`status = 'DELETED'`). Không `DELETE` vì sẽ làm mất tham chiếu của lịch sử giao dịch. Điểm còn lại **chuyển lên cấp trên trực tiếp** lúc xóa (xem **Sửa user**).
 
 ---
 
@@ -276,7 +276,7 @@ Mọi route đều yêu cầu đăng nhập, trừ route gắn `@Public()`. Rout
 ### Phân quyền
 - `@Roles(...)` + `RolesGuard`; decorator `@Public()`, `@CurrentUser()` ở `auth/decorators.ts`.
 - Phạm vi theo `users.refer_user_id` (cấp trên trực tiếp), kiểm tra trong `PermissionService.assertCanManage()`: **ADMIN chỉ thao tác USER có `refer_user_id = admin.user_id`; HOST chỉ thao tác ADMIN có `refer_user_id = host.user_id`**. Không ai thao tác / cấp điểm cho chính mình (`assertCanGrantPoints`). Target không tồn tại hoặc ngoài phạm vi đều trả 403. Mọi API mới thao tác trên user khác PHẢI gọi hàm này.
-- Xóa (soft delete) User chỉ ADMIN được làm; HOST chỉ kích hoạt / hủy kích hoạt ADMIN.
+- Xóa (soft delete) do cha làm với con trực tiếp (HOST → ADMIN, ADMIN → USER), chỉ khi con đang `DEACTIVE` (còn `ACTIVE` ⇒ 409) và không còn cấp dưới chưa xóa (409).
 - `POST /api/users` `{ phone_number, password (>= 12 ký tự) }`: HOST tạo ADMIN, ADMIN tạo USER. Role do server suy ra từ người gọi (`PermissionService.managedRole`), `refer_user_id` luôn là người gọi; body không nhận `role` / `refer_user_id`. Phone trùng ⇒ 409. `display_name` tùy chọn (1–50 ký tự, trim, không ký tự điều khiển); `PATCH /users/:id` nhận thêm `display_name` (chuỗi = đặt, `null` = xóa), cùng luật cha → con trực tiếp.
 - **Tên hiển thị thay số điện thoại:** `display_name` chỉ để hiển thị / che số; đăng nhập, khóa tài khoản vẫn theo `phone_number`. API trả thông tin của người KHÁC cho cấp trên ở chỗ chỉ cần nhận diện (cột "Người cấp") chỉ trả tên, không trả số điện thoại; chưa đặt tên ⇒ null (UI hiện "—"). Danh sách / chi tiết cấp dưới vẫn trả `phone_number` cho cấp trên quản lý họ.
 
@@ -284,7 +284,7 @@ Mọi route đều yêu cầu đăng nhập, trừ route gắn `@Public()`. Rout
 `GET /api/sub-admins` (HOST / ADMIN; `users/sub-admins.*`): cây user dưới người gọi — con trực tiếp (`refer_user_id` = người gọi, `depth` 1) và toàn bộ con cháu (recursive CTE trên `refer_user_id`, tối đa 10 cấp, có chống vòng), không gồm chính người gọi. Phạm vi chỉ lấy từ token, không nhận id từ client. Query: `page`, `limit` (1–100), `status` (`ACTIVE|DEACTIVE|DELETED`), `role` (`ADMIN|USER`), `q` (số điện thoại hoặc `display_name` chứa chuỗi, không phân biệt hoa thường, 1–50 ký tự); sai kiểu / tham số lạ ⇒ 400. Response `{ items, total, page, limit }` dạng **cây**: `items` là con trực tiếp, mỗi item `{ user_id, phone_number, role, status, balance (chuỗi), refer_user_id, depth, created_at, children[] }` với `children` là con trực tiếp của user đó (đệ quy). `total` / `page` / `limit` tính trên con trực tiếp. Lọc `status` / `role` / `q`: giữ user khớp và mọi tổ tiên của nó (nhánh không có user khớp bị bỏ).
 
 ### Sửa user
-`PATCH /api/users/:userId` `{ phone_number?, password? }` (HOST / ADMIN, `UsersService.update`; ít nhất một trường, mật khẩu >= 12 ký tự, phone chỉ chữ số 6–20): chỉ **cha sửa con trực tiếp** (`assertCanManage`). Cháu, cha, chính mình, không tồn tại ⇒ 403; user `DELETED` ⇒ 409; phone trùng ⇒ 409. Đổi mật khẩu thu hồi mọi phiên của target. Web-admin chỉ hiện icon sửa / deactive / xóa ở dòng `depth === 1`; deactive và xóa gọi `PATCH /users/:id/status` (`DEACTIVE` / `DELETED`, xóa mềm, chỉ ADMIN); user `DEACTIVE` có nút kích hoạt lại (`ACTIVE`), user `DELETED` thì không.
+`PATCH /api/users/:userId` `{ phone_number?, password? }` (HOST / ADMIN, `UsersService.update`; ít nhất một trường, mật khẩu >= 12 ký tự, phone chỉ chữ số 6–20): chỉ **cha sửa con trực tiếp** (`assertCanManage`). Cháu, cha, chính mình, không tồn tại ⇒ 403; user `DELETED` ⇒ 409; phone trùng ⇒ 409. Đổi mật khẩu thu hồi mọi phiên của target. Web-admin chỉ hiện icon sửa / deactive / xóa ở dòng `depth === 1`; deactive và xóa gọi `PATCH /users/:id/status` (`DEACTIVE` / `DELETED`). Xóa (`UsersService.remove`, một DB transaction, khóa users theo `user_id` tăng dần, tính trong SQL): điểm còn lại của con chuyển lên cha (con `TRANSFER_OUT` created_by = cha, cha `TRANSFER_IN` created_by = con), rồi set `DELETED`; response `{ user_id, status, returned_points }`. Deactive / xóa đều thu hồi mọi phiên của target (portal gọi `/auth/me` ⇒ 401). Hàng thao tác: ACTIVE ⇒ xem / sửa / cấp điểm / deactive; DEACTIVE ⇒ xem / sửa / kích hoạt / xóa; user `DELETED` không có thao tác ghi. Cả `/host/admins` và `/admin/users` có trang chi tiết (`/host/admins/[id]`, `/admin/users/[id]`).
 
 ### API chi tiết user cấp dưới
 Cùng `users/sub-admins.*`, HOST / ADMIN, `:id` phải là UUID. Phạm vi: `:id` phải nằm trong cây dưới người gọi (con trực tiếp hoặc con cháu, tối đa 10 cấp); ngoài phạm vi hoặc không tồn tại ⇒ 403.

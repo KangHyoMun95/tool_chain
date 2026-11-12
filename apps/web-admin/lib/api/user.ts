@@ -73,10 +73,9 @@ export function useUpdateUser() {
   });
 }
 
-/** Xóa mềm (status DELETED): chỉ ADMIN, chỉ User con trực tiếp. */
 /** PATCH /users/:id/status — API chỉ cho cha đổi status của con trực tiếp. */
 export function setUserStatus(id: string, status: 'ACTIVE' | 'DEACTIVE' | 'DELETED') {
-  return apiFetch<{ user_id: string; status: string }>(`/users/${id}/status`, {
+  return apiFetch<{ user_id: string; status: string; returned_points?: string }>(`/users/${id}/status`, {
     method: 'PATCH',
     body: JSON.stringify({ status }),
   });
@@ -90,12 +89,16 @@ export function useActivateUser() {
   });
 }
 
+/** Xóa mềm (status DELETED): con trực tiếp đã deactive, không còn cấp dưới; điểm còn lại chuyển lên cấp trên (returned_points). */
 export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) =>
       setUserStatus(id, 'DELETED'),
-    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: USERS_KEY });
+      qc.invalidateQueries({ queryKey: ME_KEY });   // điểm của user bị xóa chuyển về số dư của người xóa
+    },
   });
 }
 

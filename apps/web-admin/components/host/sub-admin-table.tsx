@@ -8,6 +8,7 @@ import {
 } from '@ant-design/pro-components';
 import { App, Button, Tooltip } from 'antd';
 import {
+  DeleteOutlined,
   DollarOutlined,
   EditOutlined,
   EyeOutlined,
@@ -16,7 +17,7 @@ import {
 } from '@ant-design/icons';
 import Link from 'next/link';
 import { AccountStatus } from '@/lib/legacy-types';
-import { useActivateUser } from '@/lib/api/user';
+import { useActivateUser, useDeleteUser } from '@/lib/api/user';
 import {
   useDeactivateSubAdmin,
 } from '@/lib/api/sub-admin';
@@ -34,6 +35,7 @@ export function SubAdminTable() {
   const { message, modal } = App.useApp();
   const activate = useActivateUser();
   const deactivate = useDeactivateSubAdmin();
+  const remove = useDeleteUser();
 
   const [editing, setEditing] = useState<ManagedUserRow | null>(null);
   const [granting, setGranting] = useState<ManagedUserRow | null>(null);
@@ -61,8 +63,8 @@ export function SubAdminTable() {
 
   const confirmDeactivate = (record: ManagedUserRow) => {
     modal.confirm({
-      title: 'Deactive Admin Con',
-      content: `Vô hiệu hoá "${record.username}"? Admin Con sẽ không đăng nhập được.`,
+      title: 'Deactive người dùng',
+      content: `Vô hiệu hoá "${record.username}"? người dùng sẽ không đăng nhập được.`,
       okText: 'Deactive',
       okButtonProps: { danger: true },
       cancelText: 'Huỷ',
@@ -74,6 +76,26 @@ export function SubAdminTable() {
         } catch (err) {
           message.error(err instanceof Error ? err.message : 'Deactive thất bại');
           throw err; // keep the modal open on failure
+        }
+      },
+    });
+  };
+
+  const confirmDelete = (record: ManagedUserRow) => {
+    modal.confirm({
+      title: 'Xoá người dùng',
+      content: `Xoá "${record.username}"? Tài khoản không thể khôi phục. Điểm còn lại (${record.points}) sẽ được chuyển lại cho bạn.`,
+      okText: 'Xoá',
+      okButtonProps: { danger: true },
+      cancelText: 'Huỷ',
+      onOk: async () => {
+        try {
+          await remove.mutateAsync(record.id);
+          message.success('Đã xoá người dùng');
+          reload();
+        } catch (err) {
+          message.error(err instanceof Error ? err.message : 'Xoá thất bại');
+          throw err;
         }
       },
     });
@@ -169,6 +191,15 @@ export function SubAdminTable() {
                 size="small"
                 icon={<PlayCircleOutlined style={{ color: '#10B981' }} />}
                 onClick={() => confirmActivate(record)}
+              />
+            </Tooltip>,
+            <Tooltip key="delete" title="Xoá">
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<DeleteOutlined />}
+                onClick={() => confirmDelete(record)}
               />
             </Tooltip>,
           );

@@ -86,9 +86,8 @@ export class UsersService {
 
   async updateStatus(actor: AuthUser, targetUserId: string, status: UserStatus) {
     const target = await this.permissions.assertCanManage(actor, targetUserId);
-    // Xóa (soft delete) User là quyền của Admin; Host chỉ được kích hoạt / hủy kích hoạt Admin.
-    if (status === UserStatus.DELETED && actor.role !== "ADMIN") throw new ForbiddenException();
     if (target.status === UserStatus.DELETED) throw new ConflictException("User is deleted");
+    if (status === UserStatus.DELETED) return this.remove(actor, target.userId);
 
     await this.dataSource
       .createQueryBuilder()
@@ -100,6 +99,57 @@ export class UsersService {
     if (status !== UserStatus.ACTIVE) await this.sessions.revokeAllSessions(target.userId);
     this.log.log(`status changed actor=${actor.userId} target=${target.userId} ${target.status}->${status}`);
     return { user_id: target.userId, status };
+  }
+
+  /**
+   * Xóa mềm cấp dưới TRỰC TIẾP (HOST → ADMIN, ADMIN → USER; đã kiểm tra ở caller bằng assertCanManage). Điều kiện: target đang DEACTIVE
+   * (409 nếu còn ACTIVE) và không còn cấp dưới chưa xóa (409). Một DB transaction, khóa users theo user_id tăng dần, tính trong SQL:
+   * điểm còn lại của target chuyển lên cấp trên (target TRANSFER_OUT với created_by = actor; cấp trên TRANSFER_IN với created_by = target, nên lịch sử điểm hiện người cấp là người bị xóa), rồi set DELETED.
+   * Sau commit thu hồi mọi phiên của target (portal gọi /auth/me sẽ bị 401).
+   */
+  private async remove(actor: AuthUser, targetUserId: string) {
+    const result = await this.dataSource.transaction(async (m) => {
+      const locked = await m.query(
+        `SELECT user_id, status, refer_user_id, balance::text AS balance FROM users WHERE user_id = ANY($1::uuid[]) ORDER BY user_id FOR UPDATE`,
+        [[actor.userId, targetUserId]],
+      ) as { user_id: string; status: string; refer_user_id: string | null; balance: string }[];
+      const target = locked.find((r) => r.user_id === targetUserId);
+      if (!target || target.refer_user_id !== actor.userId) throw new ForbiddenException();
+      if (target.status === UserStatus.DELETED) throw new ConflictException("User is deleted");
+      if (target.status !== UserStatus.DEACTIVE) throw new ConflictException("Chỉ được xóa người dùng đã deactive");
+
+      const [child] = await m.query(`SELECT 1 FROM users WHERE refer_user_id = $1 AND status <> 'DELETED' LIMIT 1`, [targetUserId]) as unknown[];
+      if (child) throw new ConflictException("Người dùng còn cấp dưới chưa xóa");
+
+      const amount = target.balance;
+      if (amount !== "0") {
+        const [out] = await updateReturning<{ balance_before: string; balance_after: string }>(
+          m,
+          `UPDATE users SET balance = balance - $2::bigint WHERE user_id = $1 AND balance >= $2::bigint
+           RETURNING (balance + $2::bigint)::text AS balance_before, balance::text AS balance_after`,
+          [targetUserId, amount],
+        );
+        if (!out) throw new ConflictException("Balance changed, please retry");
+        const [inc] = await updateReturning<{ balance_before: string; balance_after: string }>(
+          m,
+          `UPDATE users SET balance = balance + $2::bigint WHERE user_id = $1
+           RETURNING (balance - $2::bigint)::text AS balance_before, balance::text AS balance_after`,
+          [actor.userId, amount],
+        );
+        await m.query(
+          `INSERT INTO transactions (user_id, transaction_type, amount, balance_before, balance_after, created_by)
+           VALUES ($1, 'TRANSFER_OUT', $3::bigint, $4::bigint, $5::bigint, $2),
+                  ($2, 'TRANSFER_IN', $3::bigint, $6::bigint, $7::bigint, $1)`,
+          [targetUserId, actor.userId, amount, out.balance_before, out.balance_after, inc.balance_before, inc.balance_after],
+        );
+      }
+      await m.query(`UPDATE users SET status = 'DELETED' WHERE user_id = $1`, [targetUserId]);
+      return { user_id: targetUserId, status: UserStatus.DELETED, returned_points: amount };
+    });
+
+    await this.sessions.revokeAllSessions(targetUserId);
+    this.log.log(`user deleted actor=${actor.userId} target=${targetUserId} returned=${result.returned_points}`);
+    return result;
   }
 
   /**
