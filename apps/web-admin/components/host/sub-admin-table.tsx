@@ -17,7 +17,7 @@ import {
 } from '@ant-design/icons';
 import Link from 'next/link';
 import { AccountStatus } from '@/lib/legacy-types';
-import { useActivateUser, useDeleteUser } from '@/lib/api/user';
+import { useActivateUser } from '@/lib/api/user';
 import {
   useDeactivateSubAdmin,
 } from '@/lib/api/sub-admin';
@@ -28,6 +28,7 @@ import {
 } from '@/lib/api/managed-users';
 import { CreateSubAdminModal } from './create-sub-admin-modal';
 import { EditSubAdminModal } from './edit-sub-admin-modal';
+import { DeleteSubAdminModal } from './delete-sub-admin-modal';
 import { GrantPointsModal } from './grant-points-modal';
 
 export function SubAdminTable() {
@@ -35,10 +36,10 @@ export function SubAdminTable() {
   const { message, modal } = App.useApp();
   const activate = useActivateUser();
   const deactivate = useDeactivateSubAdmin();
-  const remove = useDeleteUser();
 
   const [editing, setEditing] = useState<ManagedUserRow | null>(null);
   const [granting, setGranting] = useState<ManagedUserRow | null>(null);
+  const [deleting, setDeleting] = useState<ManagedUserRow | null>(null);
 
   const reload = () => actionRef.current?.reload();
 
@@ -76,26 +77,6 @@ export function SubAdminTable() {
         } catch (err) {
           message.error(err instanceof Error ? err.message : 'Deactive thất bại');
           throw err; // keep the modal open on failure
-        }
-      },
-    });
-  };
-
-  const confirmDelete = (record: ManagedUserRow) => {
-    modal.confirm({
-      title: 'Xoá người dùng',
-      content: `Xoá "${record.username}"? Tài khoản không thể khôi phục. Điểm còn lại (${record.points}) sẽ được chuyển lại cho bạn.`,
-      okText: 'Xoá',
-      okButtonProps: { danger: true },
-      cancelText: 'Huỷ',
-      onOk: async () => {
-        try {
-          await remove.mutateAsync(record.id);
-          message.success('Đã xoá người dùng');
-          reload();
-        } catch (err) {
-          message.error(err instanceof Error ? err.message : 'Xoá thất bại');
-          throw err;
         }
       },
     });
@@ -199,7 +180,7 @@ export function SubAdminTable() {
                 size="small"
                 danger
                 icon={<DeleteOutlined />}
-                onClick={() => confirmDelete(record)}
+                onClick={() => setDeleting(record)}
               />
             </Tooltip>,
           );
@@ -240,6 +221,7 @@ export function SubAdminTable() {
         onOpenChange={(o) => !o && setGranting(null)}
         onSuccess={reload}
       />
+      <DeleteSubAdminModal record={deleting} onClose={() => setDeleting(null)} onSuccess={reload} />
     </>
   );
 }

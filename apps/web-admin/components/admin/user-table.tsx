@@ -85,13 +85,13 @@ export function UserTable() {
   const confirmDelete = (record: ManagedUserRow) => {
     modal.confirm({
       title: 'Xoá người dùng',
-      content: `Xoá "${record.username}"? User sẽ không đăng nhập được nữa, không thể khôi phục. Điểm còn lại (${record.points}) sẽ được chuyển lại cho bạn.`,
+      content: `Xoá "${record.username}"? User sẽ không đăng nhập được nữa, không thể khôi phục. Điểm còn lại (${record.points}) sẽ được thu hồi về tài khoản của bạn.`,
       okText: 'Xoá',
       okButtonProps: { danger: true },
       cancelText: 'Huỷ',
       onOk: async () => {
         try {
-          await remove.mutateAsync(record.id);
+          await remove.mutateAsync({ id: record.id });
           message.success('Đã xoá người dùng');
           reload();
         } catch (err) {

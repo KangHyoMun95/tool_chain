@@ -74,10 +74,10 @@ export function useUpdateUser() {
 }
 
 /** PATCH /users/:id/status — API chỉ cho cha đổi status của con trực tiếp. */
-export function setUserStatus(id: string, status: 'ACTIVE' | 'DEACTIVE' | 'DELETED') {
+export function setUserStatus(id: string, status: 'ACTIVE' | 'DEACTIVE' | 'DELETED', transferToAdminId?: string) {
   return apiFetch<{ user_id: string; status: string; returned_points?: string }>(`/users/${id}/status`, {
     method: 'PATCH',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status, ...(transferToAdminId ? { transfer_to_admin_id: transferToAdminId } : {}) }),
   });
 }
 
@@ -89,12 +89,15 @@ export function useActivateUser() {
   });
 }
 
-/** Xóa mềm (status DELETED): con trực tiếp đã deactive, không còn cấp dưới; điểm còn lại chuyển lên cấp trên (returned_points). */
+/**
+ * Xóa mềm (status DELETED): con trực tiếp đã deactive. Điểm còn lại thu hồi về người xóa (INVOKE). HOST xóa ADMIN phải truyền
+ * `transferToAdminId` (Admin nhận bàn giao cấp dưới).
+ */
 export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) =>
-      setUserStatus(id, 'DELETED'),
+    mutationFn: ({ id, transferToAdminId }: { id: string; transferToAdminId?: string }) =>
+      setUserStatus(id, 'DELETED', transferToAdminId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: USERS_KEY });
       qc.invalidateQueries({ queryKey: ME_KEY });   // điểm của user bị xóa chuyển về số dư của người xóa

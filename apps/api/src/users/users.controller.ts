@@ -29,7 +29,7 @@ export class UsersController {
   @Roles("HOST", "ADMIN")
   @HttpCode(200)
   updateStatus(@CurrentUser() actor: AuthUser, @Param() params: UserIdParamDto, @Body() dto: UpdateUserStatusDto) {
-    return this.users.updateStatus(actor, params.userId, dto.status);
+    return this.users.updateStatus(actor, params.userId, dto.status, dto.transfer_to_admin_id);
   }
 
   @Post(":userId/points")

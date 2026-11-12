@@ -1,6 +1,6 @@
 import { Column, CreateDateColumn, Entity, PrimaryGeneratedColumn } from "typeorm";
 
-export type TransactionType = "MINT" | "TRANSFER_OUT" | "TRANSFER_IN" | "CHARGE" | "REFUND";
+export type TransactionType = "MINT" | "TRANSFER_OUT" | "TRANSFER_IN" | "CHARGE" | "REFUND" | "INVOKE";
 
 @Entity("transactions")
 export class TransactionEntity {
