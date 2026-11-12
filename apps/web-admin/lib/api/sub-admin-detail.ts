@@ -13,7 +13,7 @@ export interface PointTransactionRow {
   id: string;
   amount: string;
   granterId: string | null;
-  granterPhone: string | null;
+  granterName: string | null;
   createdAt: string;
 }
 
@@ -23,7 +23,7 @@ interface TransactionDto {
   transaction_id: string;
   amount: string;
   granter_id: string | null;
-  granter_phone: string | null;
+  granter_name: string | null;
   created_at: string;
 }
 
@@ -52,7 +52,7 @@ export async function fetchPointTransactions(id: string, page: number, limit: nu
       id: t.transaction_id,
       amount: t.amount,
       granterId: t.granter_id,
-      granterPhone: t.granter_phone,
+      granterName: t.granter_name,
       createdAt: t.created_at,
     })),
     total: res.total,

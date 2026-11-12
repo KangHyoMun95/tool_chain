@@ -22,6 +22,7 @@ export type TokenPair = { accessToken: string; expiresIn: number; refreshToken: 
 export type MeResponse = {
   user_id: string;
   phone_number: string;
+  display_name: string | null; // tên hiển thị, null = chưa đặt
   role: Role;
   status: UserStatus;
   balance: string; // bigint → string
@@ -136,6 +137,7 @@ export class AuthService implements OnModuleInit {
       .createQueryBuilder()
       .select("u.user_id", "user_id")
       .addSelect("u.phone_number", "phone_number")
+      .addSelect("u.display_name", "display_name")
       .addSelect("r.role_name", "role")
       .addSelect("u.status", "status")
       .addSelect("u.balance", "balance")

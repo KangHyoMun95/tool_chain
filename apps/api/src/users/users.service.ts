@@ -41,6 +41,7 @@ export class UsersService {
         .into(UserEntity)
         .values({
           phoneNumber: dto.phone_number,
+          displayName: dto.display_name ?? null,
           password,
           roleId: roleRow.roleId,
           referUserId: actor.userId,
@@ -50,7 +51,7 @@ export class UsersService {
 
       const userId = String(result.identifiers[0].userId);
       this.log.log(`user created actor=${actor.userId} target=${userId} role=${role}`);
-      return { user_id: userId, phone_number: dto.phone_number, role, status: UserStatus.ACTIVE, refer_user_id: actor.userId };
+      return { user_id: userId, phone_number: dto.phone_number, display_name: dto.display_name ?? null, role, status: UserStatus.ACTIVE, refer_user_id: actor.userId };
     } catch (e) {
       if (e instanceof QueryFailedError && (e.driverError as { code?: string } | undefined)?.code === UNIQUE_VIOLATION) {
         throw new ConflictException("Phone number already exists");
@@ -59,13 +60,14 @@ export class UsersService {
     }
   }
 
-  /** Đổi số điện thoại / mật khẩu của cấp dưới TRỰC TIẾP (cha → con). Cháu, cha, chính mình ⇒ 403. Đổi mật khẩu thu hồi mọi phiên của target. */
+  /** Đổi số điện thoại / tên hiển thị / mật khẩu của cấp dưới TRỰC TIẾP (cha → con). Cháu, cha, chính mình ⇒ 403. Đổi mật khẩu thu hồi mọi phiên của target. */
   async update(actor: AuthUser, targetUserId: string, dto: UpdateUserDto) {
-    if (dto.phone_number === undefined && dto.password === undefined) throw new BadRequestException("Nothing to update");
+    if (dto.phone_number === undefined && dto.password === undefined && dto.display_name === undefined) throw new BadRequestException("Nothing to update");
     const target = await this.permissions.assertCanManage(actor, targetUserId);
     if (target.status === UserStatus.DELETED) throw new ConflictException("User is deleted");
 
-    const set: { phoneNumber?: string; password?: string } = {};
+    const set: { phoneNumber?: string; password?: string; displayName?: string | null } = {};
+    if (dto.display_name !== undefined) set.displayName = dto.display_name;
     if (dto.phone_number !== undefined) set.phoneNumber = dto.phone_number;
     if (dto.password !== undefined) set.password = await argon2.hash(dto.password, ARGON2_OPTIONS);
     try {

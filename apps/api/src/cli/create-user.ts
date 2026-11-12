@@ -52,8 +52,10 @@ if (referRole && !values["refer-phone"]) fail(`--refer-phone (phone of an ACTIVE
 if (!process.env.DATABASE_URL) fail("DATABASE_URL is not set");
 
 const phone = process.env.NEW_USER_PHONE?.trim() || (await ask("Phone number: "));
+const displayName = process.env.NEW_USER_DISPLAY_NAME?.trim() || null;   // tùy chọn, 1–50 ký tự
 const password = process.env.NEW_USER_PASSWORD || (await ask("Password: ", true));
 if (phone.length < 6 || phone.length > 20) fail("phone number must be 6-20 characters");
+if (displayName !== null && displayName.length > 50) fail("display name must be at most 50 characters");
 if (password.length < MIN_PASSWORD_LENGTH) fail(`password must be at least ${MIN_PASSWORD_LENGTH} characters`);
 
 const client = new pg.Client({ connectionString: process.env.DATABASE_URL });
@@ -80,9 +82,9 @@ try {
 
   const hash = await argon2.hash(password, ARGON2_OPTIONS);
   const created = await client.query<{ user_id: string }>(
-    `INSERT INTO users (phone_number, password, role_id, refer_user_id, status)
-     VALUES ($1, $2, $3, $4, $5) RETURNING user_id`,
-    [phone, hash, roleRow.rows[0].role_id, referUserId, UserStatus.ACTIVE],
+    `INSERT INTO users (phone_number, display_name, password, role_id, refer_user_id, status)
+     VALUES ($1, $2, $3, $4, $5, $6) RETURNING user_id`,
+    [phone, displayName, hash, roleRow.rows[0].role_id, referUserId, UserStatus.ACTIVE],
   );
   await client.query("COMMIT");
   console.log(`Created ${role} user_id=${created.rows[0].user_id}`);

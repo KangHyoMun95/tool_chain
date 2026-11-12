@@ -31,7 +31,7 @@ export function CreateUserModal({ onSuccess }: { onSuccess?: () => void }) {
       modalProps={{ destroyOnClose: true }}
       onFinish={async ({ hostnameIds, ...input }) => {
         try {
-          const created = await create.mutateAsync(input);
+          const created = await create.mutateAsync({ ...input, display_name: input.display_name?.trim() || undefined });
           if (hostnameIds && hostnameIds.length) {
             await setHostnames.mutateAsync({ id: created.id, hostnameIds });
           }
@@ -44,6 +44,12 @@ export function CreateUserModal({ onSuccess }: { onSuccess?: () => void }) {
         }
       }}
     >
+      <ProFormText
+        name="display_name"
+        label="Tên hiển thị"
+        placeholder="Không bắt buộc"
+        rules={[{ max: 50, message: 'Tối đa 50 ký tự' }]}
+      />
       <ProFormText
         name="phone_number"
         label="Số điện thoại"

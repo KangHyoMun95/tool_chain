@@ -7,7 +7,7 @@ import type { Page } from "../common/catalog-list.js";
 import type { SubAdminListQueryDto } from "./dto/sub-admin-list-query.dto.js";
 
 export type SubAdminItem = {
-  user_id: string; phone_number: string; role: string; status: string;
+  user_id: string; phone_number: string; display_name: string | null; role: string; status: string;
   balance: string;   // bigint dạng chuỗi, không tính toán ở TS
   refer_user_id: string; depth: number; created_at: Date;
   children: SubAdminItem[];   // con trực tiếp của user này (đệ quy)
@@ -15,7 +15,7 @@ export type SubAdminItem = {
 export type SubAdminNode = Omit<SubAdminItem, "children">;
 export type PointTransactionItem = {
   transaction_id: string; type: string; amount: string;
-  granter_id: string | null; granter_phone: string | null; created_at: Date;
+  granter_id: string | null; granter_name: string | null; created_at: Date;   // không trả số điện thoại của người cấp
 };
 type Flat = Omit<SubAdminItem, "children">;
 
@@ -42,7 +42,7 @@ export class SubAdminsService {
          FROM users c JOIN tree t ON c.refer_user_id = t.user_id
          WHERE t.depth < $2 AND NOT c.user_id = ANY(t.path)
        )
-       SELECT u.user_id, u.phone_number, r.role_name AS role, u.status, u.balance::text AS balance,
+       SELECT u.user_id, u.phone_number, u.display_name, r.role_name AS role, u.status, u.balance::text AS balance,
               u.refer_user_id, t.depth::int AS depth, u.created_at
        FROM tree t
        JOIN users u ON u.user_id = t.user_id
@@ -58,10 +58,11 @@ export class SubAdminsService {
       (parent ? parent.children : roots).push(n);
     }
 
+    const q = dto.q?.toLowerCase();
     const matches = (n: SubAdminItem) =>
       (!dto.status || n.status === dto.status) &&
       (!dto.role || n.role === dto.role) &&
-      (!dto.q || n.phone_number.includes(dto.q));
+      (!q || n.phone_number.includes(q) || (n.display_name?.toLowerCase().includes(q) ?? false));
     const prune = (list: SubAdminItem[]): SubAdminItem[] =>
       list.filter((n) => {
         n.children = prune(n.children);
@@ -87,7 +88,7 @@ export class SubAdminsService {
          FROM users u JOIN up ON u.user_id = up.refer_user_id
          WHERE up.hops < $3
        )
-       SELECT u.user_id, u.phone_number, r.role_name AS role, u.status, u.balance::text AS balance,
+       SELECT u.user_id, u.phone_number, u.display_name, r.role_name AS role, u.status, u.balance::text AS balance,
               u.refer_user_id, up.hops::int AS depth, u.created_at
        FROM up
        JOIN users u ON u.user_id = $1
@@ -106,7 +107,7 @@ export class SubAdminsService {
     const [items, count] = await Promise.all([
       this.dataSource.query(
         `-- top-level: SELECT
-         SELECT u.user_id, u.phone_number, r.role_name AS role, u.status, u.balance::text AS balance,
+         SELECT u.user_id, u.phone_number, u.display_name, r.role_name AS role, u.status, u.balance::text AS balance,
                 u.refer_user_id, 1 AS depth, u.created_at
          FROM users u JOIN roles r ON r.role_id = u.role_id
          WHERE u.refer_user_id = $1
@@ -126,7 +127,7 @@ export class SubAdminsService {
       this.dataSource.query(
         `-- top-level: SELECT
          SELECT t.transaction_id::text AS transaction_id, t.transaction_type AS type, t.amount::text AS amount,
-                t.created_by AS granter_id, g.phone_number AS granter_phone, t.created_at
+                t.created_by AS granter_id, g.display_name AS granter_name, t.created_at
          FROM transactions t LEFT JOIN users g ON g.user_id = t.created_by
          WHERE t.user_id = $1 AND t.transaction_type IN ('MINT', 'TRANSFER_IN')
          ORDER BY t.created_at DESC, t.transaction_id DESC

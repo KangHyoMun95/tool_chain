@@ -8,7 +8,7 @@ import { ROLE, type Role } from './roles';
 export interface CurrentUser {
   sub: string;
   role: Role;
-  /** Số điện thoại đăng nhập. */
+  /** Tên hiển thị, chưa đặt thì số điện thoại đăng nhập (của chính user). */
   username: string;
 }
 
@@ -43,7 +43,7 @@ export function useCurrentUser(): { user: CurrentUser | null; isLoading: boolean
     void restoreSession().then((ok) => {
       if (!alive) return;
       const s = ok ? getSessionUser() : null;
-      setState({ user: s ? { sub: s.sub, role: s.role, username: s.phone } : null, isLoading: false });
+      setState({ user: s ? { sub: s.sub, role: s.role, username: s.displayName ?? s.phone } : null, isLoading: false });
     });
     return () => {
       alive = false;

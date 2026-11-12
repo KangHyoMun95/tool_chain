@@ -16,6 +16,7 @@ export interface SubAdminRow {
   id: string;
   username: string;
   phoneNumber?: string | null;
+  displayName?: string | null;
   role: Role;
   status: AccountStatus;
   points: string | number;
@@ -25,11 +26,13 @@ export interface SubAdminRow {
 }
 
 export interface CreateSubAdminInput {
+  display_name?: string;
   phone_number: string;
   password: string;
 }
 
 export interface UpdateSubAdminInput {
+  displayName?: string | null;
   password?: string;
   phoneNumber?: string;
 }
@@ -61,10 +64,10 @@ export function useCreateSubAdmin() {
 export function useUpdateSubAdmin() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, password, phoneNumber }: UpdateSubAdminInput & { id: string }) =>
+    mutationFn: ({ id, password, phoneNumber, displayName }: UpdateSubAdminInput & { id: string }) =>
       apiFetch<{ user_id: string }>(`/users/${id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ password: password || undefined, phone_number: phoneNumber || undefined }),
+        body: JSON.stringify({ password: password || undefined, phone_number: phoneNumber || undefined, display_name: displayName }),
       }),
     onSuccess: () => qc.invalidateQueries({ queryKey: SUB_ADMINS_KEY }),
   });

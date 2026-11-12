@@ -26,6 +26,7 @@ export function SubAdminDetail({ id }: { id: string }) {
   const { data: subAdmin, isLoading } = useSubAdmin(id);
 
   const userColumns: ProColumns<UserRow>[] = [
+    { title: 'Tên', dataIndex: 'displayName', ellipsis: true, render: (_d, r) => r.displayName || '—' },
     { title: 'Số điện thoại', dataIndex: 'phoneNumber', ellipsis: true },
     { title: 'Trạng thái', dataIndex: 'status', valueEnum: STATUS_VALUE_ENUM },
     { title: 'Điểm', dataIndex: 'points', valueType: 'digit' },
@@ -40,7 +41,7 @@ export function SubAdminDetail({ id }: { id: string }) {
       width: 120,
       render: (_dom, r) => <Tag color="green">+{r.amount}</Tag>,
     },
-    { title: 'Người cấp', dataIndex: 'granterPhone', ellipsis: true, render: (_d, r) => r.granterPhone || '—' },
+    { title: 'Người cấp', dataIndex: 'granterName', ellipsis: true, render: (_d, r) => r.granterName || '—' },
   ];
 
   return (
@@ -53,6 +54,7 @@ export function SubAdminDetail({ id }: { id: string }) {
             column={2}
             dataSource={subAdmin}
             columns={[
+              { title: 'Tên', dataIndex: 'displayName', render: (_d, r) => r.displayName || '—' },
               { title: 'Số điện thoại', dataIndex: 'phoneNumber', render: (_d, r) => r.phoneNumber || '—' },
               { title: 'Trạng thái', dataIndex: 'status', valueEnum: STATUS_VALUE_ENUM },
               { title: 'Điểm hiện có', dataIndex: 'points', valueType: 'digit' },
