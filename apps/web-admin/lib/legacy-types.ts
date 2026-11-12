@@ -25,7 +25,8 @@ export interface DashboardResponse {
   totalUsers: number;
   activeUsers: number;
   inactive7Days: number;
-  totalUnusedPoints: number;
+  /** bigint dạng chuỗi (API cộng trong SQL). */
+  totalUnusedPoints: string;
   createdPerDay: DashboardDailyPoint[];
   pointsUsedPerDay: DashboardDailyPoint[];
 }

@@ -6,7 +6,6 @@ import { App, Dropdown, Spin, Tag } from 'antd';
 import {
   DashboardOutlined,
   DollarOutlined,
-  GlobalOutlined,
   LogoutOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
@@ -30,7 +29,6 @@ function menuForRole(role: Role): MenuDataItem[] {
     return [
       { path: '/admin/dashboard', name: 'Dashboard', icon: <DashboardOutlined /> },
       { path: '/admin/users', name: 'Quản lý người dùng', icon: <UserOutlined /> },
-      { path: '/admin/hostnames', name: 'Quản lý trang chủ', icon: <GlobalOutlined /> },
     ];
   }
   return [];

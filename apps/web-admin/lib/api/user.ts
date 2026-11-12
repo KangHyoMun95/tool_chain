@@ -17,7 +17,6 @@ export interface UserRow {
   username: string;
   phoneNumber?: string | null;
   displayName?: string | null;
-  hostnames: { id: string; name: string; url: string }[];
   role: Role;
   status: AccountStatus;
   points: string | number;
@@ -126,14 +125,3 @@ export function useGrantUserPoints() {
   });
 }
 
-export function useSetUserHostnames() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, hostnameIds }: { id: string; hostnameIds: string[] }) =>
-      apiFetch<UserRow>(`/users/${id}/hostnames`, {
-        method: 'PUT',
-        body: JSON.stringify({ hostnameIds }),
-      }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: USERS_KEY }),
-  });
-}

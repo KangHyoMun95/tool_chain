@@ -1,27 +1,16 @@
 'use client';
 
-import { ModalForm, ProFormSelect, ProFormText } from '@ant-design/pro-components';
+import { ModalForm, ProFormText } from '@ant-design/pro-components';
 import { App, Button } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import { useHostnames } from '@/lib/api/hostname';
-import {
-  useCreateUser,
-  useSetUserHostnames,
-  type CreateUserInput,
-} from '@/lib/api/user';
-
-interface FormValues extends CreateUserInput {
-  hostnameIds?: string[];
-}
+import { useCreateUser, type CreateUserInput } from '@/lib/api/user';
 
 export function CreateUserModal({ onSuccess }: { onSuccess?: () => void }) {
   const { message } = App.useApp();
   const create = useCreateUser();
-  const setHostnames = useSetUserHostnames();
-  const { data: hostnames } = useHostnames();
 
   return (
-    <ModalForm<FormValues>
+    <ModalForm<CreateUserInput>
       title="Tạo người dùng"
       trigger={
         <Button type="primary" icon={<PlusOutlined />}>
@@ -29,12 +18,9 @@ export function CreateUserModal({ onSuccess }: { onSuccess?: () => void }) {
         </Button>
       }
       modalProps={{ destroyOnClose: true }}
-      onFinish={async ({ hostnameIds, ...input }) => {
+      onFinish={async (input) => {
         try {
-          const created = await create.mutateAsync({ ...input, display_name: input.display_name?.trim() || undefined });
-          if (hostnameIds && hostnameIds.length) {
-            await setHostnames.mutateAsync({ id: created.id, hostnameIds });
-          }
+          await create.mutateAsync({ ...input, display_name: input.display_name?.trim() || undefined });
           message.success('Đã tạo người dùng');
           onSuccess?.();
           return true;
@@ -62,13 +48,6 @@ export function CreateUserModal({ onSuccess }: { onSuccess?: () => void }) {
         name="password"
         label="Mật khẩu"
         rules={[{ required: true, message: 'Nhập mật khẩu' }, { min: 12, message: 'Tối thiểu 12 ký tự' }]}
-      />
-      <ProFormSelect
-        name="hostnameIds"
-        label="Trang chủ"
-        mode="multiple"
-        placeholder="Chọn trang chủ gắn cho user"
-        options={(hostnames ?? []).map((h) => ({ label: h.name, value: h.id }))}
       />
     </ModalForm>
   );

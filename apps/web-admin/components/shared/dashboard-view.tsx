@@ -58,6 +58,11 @@ const dashCss = `
   .thc-pulse { animation: thcPulse 2s ease-in-out infinite; transform-origin: center; }
 `;
 
+/** Định dạng số nguyên có dấu phân cách hàng nghìn; chuỗi (bigint) chỉ xử lý dạng chuỗi, không ép sang số. */
+function fmtInt(v: number | string): string {
+  return typeof v === 'string' ? v.replace(/\B(?=(\d{3})+(?!\d))/g, '.') : v.toLocaleString('vi-VN');
+}
+
 function KpiCard({
   label,
   value,
@@ -68,7 +73,7 @@ function KpiCard({
   loading,
 }: {
   label: string;
-  value?: number;
+  value?: number | string;
   icon: ReactNode;
   accent: Accent;
   badge?: ReactNode;
@@ -120,7 +125,7 @@ function KpiCard({
                 letterSpacing: '-0.02em',
               }}
             >
-              {(value ?? 0).toLocaleString('vi-VN')}
+              {fmtInt(value ?? 0)}
             </span>
             {badge}
           </div>
@@ -250,7 +255,7 @@ export function DashboardView() {
             value={data?.totalUsers}
             icon={<TeamOutlined />}
             accent={ACCENTS.cyan}
-            caption="Toàn hệ thống ToolHackChain"
+            caption="Cấp dưới của bạn (không tính đã xóa)"
             loading={isLoading}
           />
         </Col>
@@ -261,7 +266,7 @@ export function DashboardView() {
             icon={<UserOutlined />}
             accent={ACCENTS.teal}
             badge={<Pill accent={ACCENTS.teal}>{activePct}% tổng số</Pill>}
-            caption="Phiên tương tác trực tuyến"
+            caption="Tài khoản đang ở trạng thái ACTIVE"
             loading={isLoading}
           />
         </Col>
@@ -271,7 +276,7 @@ export function DashboardView() {
             value={data?.inactive7Days}
             icon={<ClockCircleOutlined />}
             accent={ACCENTS.amber}
-            caption="Nguy cơ rời bỏ dịch vụ"
+            caption="Tài khoản ACTIVE, tính từ lần đăng nhập gần nhất"
             loading={isLoading}
           />
         </Col>
@@ -282,7 +287,7 @@ export function DashboardView() {
             icon={<TrophyOutlined />}
             accent={ACCENTS.purple}
             badge={<Pill accent={ACCENTS.purple}>pts</Pill>}
-            caption="Điểm khả dụng của người dùng"
+            caption="Tổng số dư của cấp dưới"
             loading={isLoading}
           />
         </Col>
@@ -290,7 +295,7 @@ export function DashboardView() {
         <Col xs={24} lg={12}>
           <ChartCard
             title={`Số ${noun} tạo mới (7 ngày)`}
-            subtitle="Biểu đồ dao động lượng tài khoản đăng ký mới"
+            subtitle="Số tài khoản cấp dưới được tạo mỗi ngày"
             badge={<Pill accent={ACCENTS.cyan}>Đỉnh: +{peakCreated.value}</Pill>}
             footLeft={
               <span>
@@ -300,7 +305,7 @@ export function DashboardView() {
                 </strong>
               </span>
             }
-            footRight={<span style={{ color: '#10B981' }}>Đã đồng bộ</span>}
+            footRight={<span>Theo ngày GMT+7</span>}
           >
             {isLoading || !data ? (
               <Skeleton active />
@@ -312,10 +317,10 @@ export function DashboardView() {
         <Col xs={24} lg={12}>
           <ChartCard
             title="Điểm đã sử dụng (7 ngày)"
-            subtitle="Quy đổi điểm thưởng và giao dịch sử dụng"
+            subtitle="Điểm bị trừ khi nhận dự đoán, đã trừ phần hoàn lại"
             badge={<Pill accent={ACCENTS.purple}>Tổng dùng: {usedTotal} pts</Pill>}
             footLeft={<span>Chi tiêu điểm theo ngày</span>}
-            footRight={<span style={{ color: ACCENTS.purple.color }}>Đã kiểm toán</span>}
+            footRight={<span>Theo ngày GMT+7</span>}
           >
             {isLoading || !data ? (
               <Skeleton active />

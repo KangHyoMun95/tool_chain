@@ -44,7 +44,6 @@ export const toRow = (u: ManagedUserDto): ManagedUserRow => ({
   points: u.balance,
   hostId: u.refer_user_id,
   managedBySubAdminId: u.refer_user_id,
-  hostnames: [],
   depth: u.depth,
   deleted: u.status === 'DELETED',
   createdAt: u.created_at,

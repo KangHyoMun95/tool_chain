@@ -11,5 +11,6 @@ export class UserEntity {
   @Column({ name: "refer_user_id", type: "uuid", nullable: true }) referUserId!: string | null;
   @Column({ type: "bigint", default: 0 }) balance!: string;
   @Column({ length: 20, default: UserStatus.ACTIVE }) status!: UserStatus;
+  @Column({ name: "last_login_at", type: "timestamptz", nullable: true }) lastLoginAt!: Date | null;
   @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
 }
