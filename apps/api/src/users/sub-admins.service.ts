@@ -1,5 +1,5 @@
 // src/users/sub-admins.service.ts
-import { Injectable } from "@nestjs/common";
+import { ForbiddenException, Injectable } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import type { AuthUser } from "../auth/auth.types.js";
@@ -11,6 +11,11 @@ export type SubAdminItem = {
   balance: string;   // bigint dạng chuỗi, không tính toán ở TS
   refer_user_id: string; depth: number; created_at: Date;
   children: SubAdminItem[];   // con trực tiếp của user này (đệ quy)
+};
+export type SubAdminNode = Omit<SubAdminItem, "children">;
+export type PointTransactionItem = {
+  transaction_id: string; type: string; amount: string;
+  granter_id: string | null; granter_phone: string | null; created_at: Date;
 };
 type Flat = Omit<SubAdminItem, "children">;
 
@@ -66,5 +71,73 @@ export class SubAdminsService {
 
     const start = (dto.page - 1) * dto.limit;
     return { items: visible.slice(start, start + dto.limit), total: visible.length, page: dto.page, limit: dto.limit };
+  }
+
+  /**
+   * Thông tin một user nằm trong cây dưới người gọi (con trực tiếp hoặc con cháu, tối đa MAX_DEPTH cấp).
+   * Ngoài phạm vi hoặc không tồn tại ⇒ 403 (cùng thông báo, không lộ user có tồn tại hay không).
+   */
+  async detail(actor: AuthUser, targetId: string): Promise<SubAdminNode> {
+    const rows: (SubAdminNode & { found: boolean })[] = await this.dataSource.query(
+      `-- top-level: SELECT
+       WITH RECURSIVE up AS (
+         SELECT user_id, refer_user_id, 1 AS hops FROM users WHERE user_id = $1
+         UNION ALL
+         SELECT u.user_id, u.refer_user_id, up.hops + 1
+         FROM users u JOIN up ON u.user_id = up.refer_user_id
+         WHERE up.hops < $3
+       )
+       SELECT u.user_id, u.phone_number, r.role_name AS role, u.status, u.balance::text AS balance,
+              u.refer_user_id, up.hops::int AS depth, u.created_at
+       FROM up
+       JOIN users u ON u.user_id = $1
+       JOIN roles r ON r.role_id = u.role_id
+       WHERE up.refer_user_id = $2
+       LIMIT 1`,
+      [targetId, actor.userId, MAX_DEPTH],
+    );
+    if (rows.length === 0) throw new ForbiddenException("Không có quyền xem user này");
+    return rows[0];
+  }
+
+  /** Con trực tiếp của một user trong cây của người gọi, mới nhất trước, có phân trang. */
+  async usersOf(actor: AuthUser, targetId: string, page: number, limit: number): Promise<Page<SubAdminNode>> {
+    await this.detail(actor, targetId);
+    const [items, count] = await Promise.all([
+      this.dataSource.query(
+        `-- top-level: SELECT
+         SELECT u.user_id, u.phone_number, r.role_name AS role, u.status, u.balance::text AS balance,
+                u.refer_user_id, 1 AS depth, u.created_at
+         FROM users u JOIN roles r ON r.role_id = u.role_id
+         WHERE u.refer_user_id = $1
+         ORDER BY u.created_at DESC, u.user_id
+         LIMIT $2 OFFSET $3`,
+        [targetId, limit, (page - 1) * limit],
+      ),
+      this.dataSource.query(`SELECT count(*)::int AS n FROM users WHERE refer_user_id = $1`, [targetId]),
+    ]);
+    return { items, total: count[0].n, page, limit };
+  }
+
+  /** Lịch sử điểm user nhận được (MINT / TRANSFER_IN) kèm người cấp, mới nhất trước. Dùng index (user_id, created_at DESC). */
+  async pointTransactions(actor: AuthUser, targetId: string, page: number, limit: number): Promise<Page<PointTransactionItem>> {
+    await this.detail(actor, targetId);
+    const [items, count] = await Promise.all([
+      this.dataSource.query(
+        `-- top-level: SELECT
+         SELECT t.transaction_id::text AS transaction_id, t.transaction_type AS type, t.amount::text AS amount,
+                t.created_by AS granter_id, g.phone_number AS granter_phone, t.created_at
+         FROM transactions t LEFT JOIN users g ON g.user_id = t.created_by
+         WHERE t.user_id = $1 AND t.transaction_type IN ('MINT', 'TRANSFER_IN')
+         ORDER BY t.created_at DESC, t.transaction_id DESC
+         LIMIT $2 OFFSET $3`,
+        [targetId, limit, (page - 1) * limit],
+      ),
+      this.dataSource.query(
+        `SELECT count(*)::int AS n FROM transactions WHERE user_id = $1 AND transaction_type IN ('MINT', 'TRANSFER_IN')`,
+        [targetId],
+      ),
+    ]);
+    return { items, total: count[0].n, page, limit };
   }
 }

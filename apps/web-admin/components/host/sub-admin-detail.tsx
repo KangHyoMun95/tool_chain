@@ -6,13 +6,12 @@ import {
   ProTable,
   type ProColumns,
 } from '@ant-design/pro-components';
-import { Skeleton, Space, Tag } from 'antd';
-import { useQueryClient } from '@tanstack/react-query';
+import { Skeleton, Tag } from 'antd';
 import { AccountStatus } from '@/lib/legacy-types';
 import type { SubAdminRow } from '@/lib/api/sub-admin';
 import {
-  loadPointTransactions,
-  loadSubAdminUsers,
+  fetchPointTransactions,
+  fetchSubAdminUsers,
   useSubAdmin,
   type PointTransactionRow,
   type UserRow,
@@ -24,29 +23,12 @@ const STATUS_VALUE_ENUM = {
 };
 
 export function SubAdminDetail({ id }: { id: string }) {
-  const queryClient = useQueryClient();
   const { data: subAdmin, isLoading } = useSubAdmin(id);
 
   const userColumns: ProColumns<UserRow>[] = [
-    { title: 'Tên', dataIndex: 'username', ellipsis: true },
+    { title: 'Số điện thoại', dataIndex: 'phoneNumber', ellipsis: true },
     { title: 'Trạng thái', dataIndex: 'status', valueEnum: STATUS_VALUE_ENUM },
     { title: 'Điểm', dataIndex: 'points', valueType: 'digit' },
-    {
-      title: 'Trang chủ',
-      dataIndex: 'hostnames',
-      render: (_dom, r) =>
-        r.hostnames?.length ? (
-          <Space size={[0, 4]} wrap>
-            {r.hostnames.map((h) => (
-              <Tag key={h.id} color="geekblue">
-                {h.name}
-              </Tag>
-            ))}
-          </Space>
-        ) : (
-          '—'
-        ),
-    },
     { title: 'Ngày tạo', dataIndex: 'createdAt', valueType: 'dateTime' },
   ];
 
@@ -56,14 +38,9 @@ export function SubAdminDetail({ id }: { id: string }) {
       title: 'Số điểm',
       dataIndex: 'amount',
       width: 120,
-      render: (_dom, r) => (
-        <Tag color={r.amount >= 0 ? 'green' : 'red'}>
-          {r.amount >= 0 ? `+${r.amount}` : r.amount}
-        </Tag>
-      ),
+      render: (_dom, r) => <Tag color="green">+{r.amount}</Tag>,
     },
-    { title: 'Người cấp (Admin id)', dataIndex: 'fromAdminId', ellipsis: true, copyable: true },
-    { title: 'Lý do', dataIndex: 'reason', ellipsis: true, render: (_d, r) => r.reason || '—' },
+    { title: 'Người cấp', dataIndex: 'granterPhone', ellipsis: true, render: (_d, r) => r.granterPhone || '—' },
   ];
 
   return (
@@ -76,8 +53,6 @@ export function SubAdminDetail({ id }: { id: string }) {
             column={2}
             dataSource={subAdmin}
             columns={[
-              { title: 'ID', dataIndex: 'id', copyable: true },
-              { title: 'Tên đăng nhập', dataIndex: 'username' },
               { title: 'Số điện thoại', dataIndex: 'phoneNumber', render: (_d, r) => r.phoneNumber || '—' },
               { title: 'Trạng thái', dataIndex: 'status', valueEnum: STATUS_VALUE_ENUM },
               { title: 'Điểm hiện có', dataIndex: 'points', valueType: 'digit' },
@@ -94,9 +69,9 @@ export function SubAdminDetail({ id }: { id: string }) {
           options={false}
           columns={userColumns}
           pagination={{ pageSize: 10 }}
-          request={async () => {
-            const rows = await loadSubAdminUsers(queryClient, id);
-            return { data: rows, total: rows.length, success: true };
+          request={async (params) => {
+            const { rows, total } = await fetchSubAdminUsers(id, params.current ?? 1, params.pageSize ?? 10);
+            return { data: rows, total, success: true };
           }}
         />
       </ProCard>
@@ -108,9 +83,9 @@ export function SubAdminDetail({ id }: { id: string }) {
           options={false}
           columns={txColumns}
           pagination={{ pageSize: 10 }}
-          request={async () => {
-            const rows = await loadPointTransactions(queryClient, id);
-            return { data: rows, total: rows.length, success: true };
+          request={async (params) => {
+            const { rows, total } = await fetchPointTransactions(id, params.current ?? 1, params.pageSize ?? 10);
+            return { data: rows, total, success: true };
           }}
         />
       </ProCard>

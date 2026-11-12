@@ -12,7 +12,7 @@ interface ManagedUserDto {
   refer_user_id: string;
   depth: number;
   created_at: string;
-  children: ManagedUserDto[];
+  children?: ManagedUserDto[];
 }
 
 interface ManagedUserPage {
@@ -33,7 +33,7 @@ export interface ManagedUserQuery {
   role?: 'ADMIN' | 'USER';
 }
 
-const toRow = (u: ManagedUserDto): ManagedUserRow => ({
+export const toRow = (u: ManagedUserDto): ManagedUserRow => ({
   id: u.user_id,
   username: u.phone_number,
   phoneNumber: u.phone_number,
@@ -47,7 +47,7 @@ const toRow = (u: ManagedUserDto): ManagedUserRow => ({
   deleted: u.status === 'DELETED',
   createdAt: u.created_at,
   updatedAt: u.created_at,
-  ...(u.children.length ? { children: u.children.map(toRow) } : {}),
+  ...(u.children?.length ? { children: u.children.map(toRow) } : {}),
 });
 
 /** Cây user dưới người đăng nhập: con trực tiếp ở gốc (phân trang ở server), con cháu nằm trong `children`. */
