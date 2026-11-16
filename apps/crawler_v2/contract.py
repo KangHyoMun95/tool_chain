@@ -1,4 +1,4 @@
-# apps/crawl-agent/contract.py
+# apps/crawler_v2/contract.py
 # Phải khớp packages/shared/src/realtime.ts (sửa một bên thì sửa bên kia trong cùng commit).
 from typing import Optional, TypedDict, Union
 
