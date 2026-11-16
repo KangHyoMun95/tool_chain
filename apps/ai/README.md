@@ -12,6 +12,7 @@ Service Python đọc kết quả từng ván, đếm pattern theo stream và tr
 cd apps/ai
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
 cp .env.example .env                 # điền REDIS_URL, DATABASE_URL(_READONLY)
+# Cần config/categories/*.json (ở gốc repo, xem CLAUDE.md mục "File định nghĩa category"): thiếu / sai ⇒ mọi lệnh thoát mã 1 và in tất cả lỗi
 
 python main.py serve                 # service (mặc định)
 python main.py backtest [--source file|db] [--refresh]
@@ -28,6 +29,7 @@ Docker: service `ai` trong `docker-compose.yml` (build từ thư mục này, ch�
 | `REDIS_URL` | Redis của hệ thống (bắt buộc) |
 | `DATABASE_URL_READONLY` | DB URL của user chỉ có SELECT (ưu tiên); trống thì dùng `DATABASE_URL` |
 | `DATABASE_URL` | DB URL dự phòng |
+| `CATEGORY_CONFIG_DIR` | Thư mục `config/categories` (bỏ trống: tìm ở thư mục chạy hoặc ở gốc repo; docker: `/app/config/categories`) |
 | `AI_CONSUMER_NAME` | Tên consumer cố định (mặc định hostname). Không chạy hai instance trùng tên, không dùng `--scale` |
 | `AI_ARTIFICIAL_DELAY_MS` | Chỉ để thử: trì hoãn mỗi dự đoán N ms (kiểm tra hạn chót DONE ở API) |
 | `LOG_LEVEL` | Mặc định `INFO` |
@@ -53,7 +55,7 @@ Service chỉ cần `SELECT` trên `game_sessions` (`status`, `result`, `road_sh
 
 ## Backtest — đọc kết quả thế nào
 
-`python main.py backtest` dùng chung hàm `choose_pick` với service, mỗi ván chỉ dùng dữ liệu trước nó, và so với baseline "chọn kết quả nhiều hơn trong lịch sử stream". In kèm độ phủ (số ván có dự đoán / tổng số ván). Ván ra `T` không tính đúng/sai.
+`python main.py backtest` dùng chung hàm `choose_pick` với service, mỗi ván chỉ dùng dữ liệu trước nó, và so với baseline "chọn ký hiệu `predictable` xuất hiện nhiều nhất (duy nhất) trong lịch sử stream". In kèm độ phủ (số ván có dự đoán / tổng số ván). Ván có kết quả thuộc `draw` của category (baccarat: T) không tính đúng/sai. Ký hiệu `predictable` / `ignore_in_pattern` / `draw` lấy theo category của từng stream (cần cột `lobby_name`, `category_name`: file `data/sessions.parquet` cũ thiếu cột này thì tự lấy lại từ DB); stream của category không có file bị bỏ qua (log ERROR).
 
 - File `data/sessions.parquet` cũ thiếu `road_shoe`: backtest dùng cách chia chuỗi theo khoảng cách thời gian / `road_count` giảm và in cảnh báo. Dùng `--source db` (hoặc `--refresh`) để có chia theo shoe thật.
 - Lần đo gần nhất trên file hiện có (5437 ván, 27 stream): pattern-v1 ≈ 50.0% đúng, baseline ≈ 50.3%, trong khi `% hiển thị` trung bình ≈ 74%. Nghĩa là trên dữ liệu đó mô hình chưa có khả năng dự đoán và `confidence` không phản ánh tỉ lệ đúng thực tế. Đo lại trên dữ liệu shoe thật trước khi dựa vào `confidence`.

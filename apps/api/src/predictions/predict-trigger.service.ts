@@ -154,7 +154,7 @@ export class PredictTriggerService implements OnApplicationBootstrap, OnModuleDe
         this.logOnce(`nostream:${keyId}`, "info", `Chưa có stream_id của ${keyId} trong cache id, chưa ghi kết quả shoe ${shoe}, round ${round}`);
       } else {
         const msg: AiResult = {
-          schema_version: AI_SCHEMA_VERSION, game_session_id: gsid, stream_id: streamId,
+          schema_version: AI_SCHEMA_VERSION, game_session_id: gsid, stream_id: streamId, key_id: keyId,
           shoe, round, result, received_at: new Date().toISOString(),
         };
         await this.conn.recordResult(

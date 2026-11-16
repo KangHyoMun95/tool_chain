@@ -60,6 +60,7 @@ class AiResult(_Msg):
     """API -> AI: ván vừa có kết quả (chỉ XADD lần đầu có kết quả của ván)."""
     game_session_id: str
     stream_id: str
+    key_id: str                   # để AI tra cấu hình category (ignore_in_pattern / predictable)
     shoe: int
     round: int
     result: Outcome

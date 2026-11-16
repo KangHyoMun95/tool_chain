@@ -116,7 +116,9 @@ services:
     depends_on:
       - api
   ai:
-    build: ./apps/ai
+    build:
+      context: .                       # gốc repo: cần COPY config/categories (file định nghĩa category)
+      dockerfile: apps/ai/Dockerfile
     image: tool-chain-ai
     container_name: tool-chain-ai
     restart: unless-stopped

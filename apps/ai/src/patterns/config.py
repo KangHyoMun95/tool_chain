@@ -5,9 +5,8 @@ import pandas as pd
 # Pattern matching
 MIN_LEN = 3          # độ dài trượt ngắn nhất
 MAX_LEN = 10         # độ dài trượt dài nhất
-MIN_COUNT = 3        # số lần xuất hiện tối thiểu để đuôi được xét chọn (total = count_B + count_P)
+MIN_COUNT = 3        # số lần xuất hiện tối thiểu để đuôi được xét chọn (total = tổng số lần của các ký hiệu predictable)
 MAX_GAP = pd.Timedelta(minutes=10)   # chỉ dùng khi dữ liệu thiếu road_shoe (backtest nguồn file cũ)
-IGNORE = {"T"}       # kết quả bị bỏ khỏi chuỗi
 WINDOW = 10                          # số kết quả trước dùng để đoán kết quả tiếp theo
 RESET_ON_ROAD_DROP = True            # road_count giảm = bắt đầu đoạn mới (chỉ khi thiếu road_shoe)
 MODEL_PATH = "models/model.joblib"

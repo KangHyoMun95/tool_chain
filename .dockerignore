@@ -11,3 +11,11 @@
 .idea
 db
 **/test
+# apps/ai (build context là gốc repo, thay cho apps/ai/.dockerignore cũ)
+apps/ai/.venv
+apps/ai/.idea
+apps/ai/imgs
+apps/ai/models
+apps/ai/src/patterns/data
+**/__pycache__
+**/*.pyc
