@@ -67,7 +67,7 @@ Số luôn `tabular-nums` (đã đặt ở body) để không nhảy khi cập n
   3. Đang lấy dự đoán: radar + "ĐANG PHÂN TÍCH" / "ĐANG QUÉT DỮ LIỆU BÀN...".
   4. Có dự đoán: nhãn trạng thái ván, "DỰ ĐOÁN", chữ B/P to (trắng + glow), tỉ lệ tin cậy.
   5. Có kết quả: nền tô theo màu — thắng xanh lá, thua đỏ đậm, hòa xám — kèm nhãn THẮNG / THUA / HÒA. (Nền mặc định của giao diện đã là đỏ nên "thua" dùng nền đặc đậm hơn + nhãn.)
-- **Bảng hạt cầu**: 6 hàng × 10 cột (60 ô, điền theo cột), B đỏ / P xanh dương / T xanh lá; hàng pill `B: n · P: n · T: n` bên dưới lấy từ `total_B/P/T` realtime. Phía trên: tên streamer (vàng) và cờ emoji theo quốc gia.
+- **Bảng hạt cầu**: 6 hàng × 10 cột (60 ô, điền theo cột); hạt = màu + ký hiệu lấy từ cấu hình category (`config/categories/*.json`, baccarat: B `#DC2626` / P `#2563EB` / T `#16A34A`; ký hiệu khác tự đổi theo cấu hình, không còn token màu `bead` cố định); hàng pill `<nhãn>: n` gồm các ký hiệu trong `totals` của cấu hình, số lấy từ `tick.totals` realtime, tick không có `totals` thì ẩn. Phía trên: tên streamer (vàng) và cờ emoji theo quốc gia.
 - **Lịch sử ván**: tiêu đề "Lịch sử ván", 10 ô (5×2) `Phiên shoe-round`, `dự đoán → kết quả`, nhãn THẮNG (xanh) / THUA (đỏ) / HÒA (xám).
 - **Biểu đồ độ tin cậy**: đường `#FF1E42` 3px + drop-shadow đỏ, chấm trắng viền đỏ (dữ liệu giả lập).
 - **Radar**: component `Radar` (SVG động).

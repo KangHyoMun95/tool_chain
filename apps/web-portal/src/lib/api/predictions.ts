@@ -1,4 +1,4 @@
-import type { ChosenPattern, PredictionReason } from "@toolhackchain/shared";
+import type { ChosenPattern, PredictionReason, ResultConfig } from "@toolhackchain/shared";
 import { ApiError, apiGet } from "./client";
 
 /**
@@ -42,7 +42,7 @@ export async function fetchCurrentPrediction(streamId: string): Promise<CurrentP
   }
 }
 
-/** GET /streams/:id/predictions/stats — win_rate là tỉ lệ 0–1. Hòa (T) không tính thắng / thua. wins/losses/draws/win_rate chỉ của shoe hiện tại. */
+/** GET /streams/:id/predictions/stats — win_rate là tỉ lệ 0–1. Kết quả thuộc draw của category (hòa) không tính thắng / thua. wins/losses/draws/win_rate chỉ của shoe hiện tại. */
 export type PredictionStatsDto = {
   shoe: number | null;
   wins: number;
@@ -75,5 +75,8 @@ export type StreamListStatsDto = {
   win_streak: number;   // chuỗi thắng dài nhất của shoe hiện tại, hoặc của shoe trước khi shoe hiện tại còn ít dữ liệu (API quyết định)
 };
 
+/** Phản hồi đầy đủ của stream-stats: items + cấu hình kết quả của category (portal hiện chưa dùng result_config ở danh sách bàn). */
+export type CategoryStreamStatsDto = { items: StreamListStatsDto[]; result_config: ResultConfig | null };
+
 export const fetchCategoryStreamStats = async (categoryId: string): Promise<StreamListStatsDto[]> =>
-  (await apiGet<{ items: StreamListStatsDto[] }>(`/categories/${encodeURIComponent(categoryId)}/stream-stats`)).items;
+  (await apiGet<CategoryStreamStatsDto>(`/categories/${encodeURIComponent(categoryId)}/stream-stats`)).items;

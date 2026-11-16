@@ -73,10 +73,10 @@ function StreamDetail({ stream }: { stream: Stream }) {
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-12">
         <div className="flex flex-col gap-3 lg:col-span-5">
           <div className={LEFT} style={stagger(0, 0, 100)}>
-            <PredictionPanel streamId={id} connection={live.connection} shoe={live.shoe} round={live.round} status={live.latest?.status ?? null} statusLabel={statusLabel} result={live.result} />
+            <PredictionPanel streamId={id} connection={live.connection} shoe={live.shoe} round={live.round} status={live.latest?.status ?? null} statusLabel={statusLabel} result={live.result} config={stream.resultConfig} />
           </div>
           <div className={LEFT} style={stagger(0, 0, 200)}>
-            <StreamerBoard name={live.streamerName ?? fallback.name} country={live.country ?? fallback.country} rows={live.history.rows} totals={live.totals} />
+            <StreamerBoard name={live.streamerName ?? fallback.name} country={live.country ?? fallback.country} rows={live.history.rows} totals={live.totals} config={stream.resultConfig} />
           </div>
           <div className={`grid grid-cols-2 gap-3 ${LEFT}`} style={stagger(0, 0, 300)}>
             <HudCard className="flex flex-col justify-between p-3 text-center">
@@ -104,7 +104,7 @@ function StreamDetail({ stream }: { stream: Stream }) {
             <ConfidenceChart points={confidence} />
           </div>
           <div className={RIGHT} style={stagger(0, 0, 250)}>
-            <SessionHistory streamId={id} rows={live.history.rows} error={live.history.error} />
+            <SessionHistory streamId={id} rows={live.history.rows} error={live.history.error} config={stream.resultConfig} />
           </div>
         </div>
       </div>
