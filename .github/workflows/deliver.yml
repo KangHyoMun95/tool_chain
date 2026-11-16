@@ -1,0 +1,89 @@
+# .github/workflows/deliver.yml
+# Mỗi khi push tag v* lên repo nội bộ -> gộp snapshot của tag thành 1 commit
+# "Delivery Bot" và push sang repo giao khách. Không mang theo lịch sử git.
+
+name: Deliver to client
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:           # chạy tay từ tab Actions để giao lại 1 tag có sẵn
+    inputs:
+      version:
+        description: "Tag cần giao (vd: v1.0.0)"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deliver               # không cho 2 lần giao chạy song song
+  cancel-in-progress: false
+
+jobs:
+  deliver:
+    runs-on: ubuntu-latest
+    env:
+      VERSION: ${{ inputs.version || github.ref_name }}
+      DELIVERY_REPO: ${{ vars.DELIVERY_OWNER }}/${{ vars.DELIVERY_REPO_NAME }}   # vd: acme-delivery/project
+      DELIVERY_BRANCH: ${{ vars.DELIVERY_BRANCH || 'main' }}
+      LEAK_PATTERN: ${{ vars.LEAK_PATTERN || '@gmail\.com' }}
+      BOT_NAME: Delivery Bot
+      BOT_EMAIL: bot@delivery.invalid
+      TZ: UTC                                           # commit không lộ múi giờ
+
+    steps:
+      - name: Checkout repo nội bộ (kèm tags)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Kiểm tra tag tồn tại
+        run: git rev-parse --verify "refs/tags/${VERSION}"
+
+      - name: Lấy token từ GitHub App (thay cho deploy key)
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.DELIVERY_APP_CLIENT_ID }}
+          private-key: ${{ secrets.DELIVERY_APP_PRIVATE_KEY }}
+          owner: ${{ vars.DELIVERY_OWNER }}
+          repositories: ${{ vars.DELIVERY_REPO_NAME }}
+
+      - name: Clone repo giao khách
+        env:
+          TOKEN: ${{ steps.app-token.outputs.token }}
+        run: git clone "https://x-access-token:${TOKEN}@github.com/${DELIVERY_REPO}.git" out
+
+      - name: Thay toàn bộ nội dung bằng snapshot của tag
+        run: |
+          find out -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
+          # git archive tự bỏ các file đánh dấu export-ignore trong .gitattributes
+          git archive "${VERSION}" | tar -x -C out
+          echo "Số file sẽ giao: $(find out -type f -not -path 'out/.git/*' | wc -l)"
+
+      - name: Quét dấu vết danh tính
+        run: |
+          if grep -rnIiP "$LEAK_PATTERN" out --exclude-dir=.git \
+               --exclude='*-lock.yaml' --exclude='*.lock' --exclude='package-lock.json'; then
+            echo "::error::Phát hiện dấu vết danh tính (xem các dòng ở trên). Dừng giao."
+            exit 1
+          fi
+          echo "Không phát hiện dấu vết."
+
+      - name: Commit & push bằng danh tính trung lập
+        working-directory: out
+        run: |
+          git config user.name  "$BOT_NAME"
+          git config user.email "$BOT_EMAIL"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Không có thay đổi so với bản đã giao. Bỏ qua."
+            exit 0
+          fi
+          git commit -q -m "Release ${VERSION}"
+          git tag -a "${VERSION}" -m "Release ${VERSION}"
+          git push origin "HEAD:${DELIVERY_BRANCH}"
+          git push origin "refs/tags/${VERSION}"
+          echo "### ✅ Đã giao ${VERSION} sang ${DELIVERY_REPO}" >> "$GITHUB_STEP_SUMMARY"
+          git log --format='- %h %an <%ae> %ad %s' -1 >> "$GITHUB_STEP_SUMMARY"
