@@ -8,6 +8,7 @@ import logging
 import os
 import signal
 import socket
+import time
 from datetime import datetime, timezone
 
 import redis
@@ -15,6 +16,7 @@ import redis.asyncio as aioredis
 
 from sqlalchemy import Engine, text
 
+from .category_config import CategoryConfig, CategoryRegistry, load_registry
 from .config import HISTORY_DB_WINDOW_HOURS, MAX_CONCURRENT_PREDICTIONS, MISSING_PREVIOUS_DELAY_S, MISSING_PREVIOUS_RETRIES
 from .contract import (
     AI_COUNTER_GROUP, AI_PREDICTOR_GROUP, AI_RESULT_STREAM, MODEL_VERSION, PREDICT_REQUEST_STREAM,
@@ -28,6 +30,7 @@ from .redis_io import consume, ensure_group
 
 log = logging.getLogger("pattern")
 LATE_STATUSES = {"DONE", "GET_RESULT", "SUMMARY_RESULT"}   # quá hạn dự đoán
+NO_CONFIG_LOG_INTERVAL_S = 60
 
 # Bù history khi HASH recent thiếu round (Redis restart / mất key): chỉ ĐỌC, đúng (stream_id, road_shoe), round < round hiện tại.
 _HISTORY_QUERY = text("""
@@ -38,9 +41,11 @@ _HISTORY_QUERY = text("""
 
 
 class AiService:
-    def __init__(self, r: aioredis.Redis, db: Engine):
+    def __init__(self, r: aioredis.Redis, db: Engine, registry: CategoryRegistry):
         self.r = r
         self.db = db
+        self.registry = registry
+        self._last_error: dict[str, float] = {}
         self.counts = RedisCounts(r)
         self.delay_s = int(os.environ.get("AI_ARTIFICIAL_DELAY_MS", "0")) / 1000   # giả lập AI chậm để thử hạn chót
 
@@ -53,12 +58,24 @@ class AiService:
             rows = c.execute(_HISTORY_QUERY, {"stream_id": stream_id, "shoe": shoe, "round": round_, "hours": HISTORY_DB_WINDOW_HOURS})
             return {int(r.road_count): str(r.result) for r in rows}
 
-    async def _history(self, msg: PredictRequest) -> tuple[str, bool, str]:
+    def _config(self, key_id: str, what: str) -> CategoryConfig | None:
+        """Cấu hình category của stream; không có ⇒ log ERROR (tối đa 1 dòng / phút / category) và trả None (không dự đoán, không đếm)."""
+        cfg = self.registry.by_key_id(key_id)
+        if cfg is None:
+            parts = key_id.split("|")
+            k = "|".join(parts[:2])
+            now = time.monotonic()
+            if now - self._last_error.get(k, -1e9) >= NO_CONFIG_LOG_INTERVAL_S:
+                self._last_error[k] = now
+                log.error("Category %r không có file định nghĩa trong config/categories: bỏ qua %s (key_id %s)", k, what, key_id)
+        return cfg
+
+    async def _history(self, msg: PredictRequest, cfg: CategoryConfig) -> tuple[str, bool, str]:
         """(history, missing_previous, nguồn). Giữ vòng chờ round - 1; HASH vẫn thiếu round nào trong 1..round-1 ⇒ bù từ DB."""
         recent: dict[int, str] = {}
         for attempt in range(MISSING_PREVIOUS_RETRIES + 1):
             recent = await self._recent(msg.stream_id, msg.shoe)
-            _, missing = history_before(recent, msg.round)
+            _, missing = history_before(recent, msg.round, cfg.ignore_in_pattern)
             if not missing or attempt == MISSING_PREVIOUS_RETRIES:
                 break
             await asyncio.sleep(MISSING_PREVIOUS_DELAY_S)
@@ -73,26 +90,35 @@ class AiService:
             except Exception as e:   # DB lỗi: vẫn dự đoán bằng phần có trong Redis
                 log.warning("Không đọc được history từ DB cho %s shoe %d round %d: %s", msg.key_id, msg.shoe, msg.round, e)
                 source = "redis (db lỗi)"
-        history, missing = history_before(recent, msg.round)
+        history, missing = history_before(recent, msg.round, cfg.ignore_in_pattern)
         return history, missing, source
 
     async def on_ai_result(self, msg: AiResult) -> None:
-        before, missing = history_before(await self._recent(msg.stream_id, msg.shoe), msg.round)
+        cfg = self._config(msg.key_id, "đếm kết quả")
+        if cfg is None:
+            return
+        if msg.result not in cfg.results:
+            log.error("ai:results: result %r không thuộc results của %s (key_id %s), bỏ qua", msg.result, cfg.key, msg.key_id)
+            return
+        before, missing = history_before(await self._recent(msg.stream_id, msg.shoe), msg.round, cfg.ignore_in_pattern)
         if missing:
             log.warning("ai:results thiếu round %d của stream %s shoe %d khi đếm round %d (bản dựng lại lúc khởi động sẽ sửa)",
                         msg.round - 1, msg.stream_id, msg.shoe, msg.round)
-        counted = await self.counts.add_result(msg.stream_id, msg.shoe, msg.game_session_id, before, msg.result)
-        log.debug("đếm %s shoe %d round %d result=%s: %s", msg.stream_id, msg.shoe, msg.round, msg.result, "mới" if counted else "đã đếm / T")
+        counted = await self.counts.add_result(msg.stream_id, msg.shoe, msg.game_session_id, before, msg.result, cfg.predictable)
+        log.debug("đếm %s shoe %d round %d result=%s: %s", msg.stream_id, msg.shoe, msg.round, msg.result, "mới" if counted else "đã đếm / không predictable")
 
     async def on_request(self, msg: PredictRequest) -> None:
+        cfg = self._config(msg.key_id, "dự đoán")
+        if cfg is None:
+            return
         status = await self.r.get(round_status_key(msg.game_session_id))
         if status in LATE_STATUSES:
             log.info("Bỏ qua yêu cầu %s shoe %d round %d: ván đã %s", msg.key_id, msg.shoe, msg.round, status)
             return
 
-        history, missing, source = await self._history(msg)
-        table = await self.counts.lookup(msg.stream_id, suffix_patterns(history))
-        pick = choose_pick(history, lambda _patterns: table)
+        history, missing, source = await self._history(msg, cfg)
+        table = await self.counts.lookup(msg.stream_id, suffix_patterns(history), cfg.predictable)
+        pick = choose_pick(history, lambda _patterns: table, cfg.predictable)
         log.info("Dự đoán %s shoe %d round %d history=%s%s\n%s", msg.key_id, msg.shoe, msg.round, source,
                  " (THIẾU round trước)" if missing else "", format_detail(pick))
 
@@ -107,7 +133,8 @@ class AiService:
         await self.r.xadd(PREDICT_RESULT_STREAM, {"payload": result.model_dump_json()}, maxlen=STREAM_MAXLEN, approximate=True)
 
 
-async def run() -> None:
+async def run(registry: CategoryRegistry | None = None) -> None:
+    registry = registry or load_registry()
     url = os.environ["REDIS_URL"]
     consumer = os.environ.get("AI_CONSUMER_NAME") or socket.gethostname()   # cố định qua các lần restart
     r = aioredis.from_url(url, decode_responses=True)
@@ -122,11 +149,11 @@ async def run() -> None:
     db = engine()
     sync_r = redis.from_url(url, decode_responses=True)
     try:
-        await asyncio.to_thread(rebuild, sync_r, db)
+        await asyncio.to_thread(rebuild, sync_r, db, registry)
     finally:
         sync_r.close()
 
-    svc = AiService(r, db)
+    svc = AiService(r, db, registry)
     log.info("AI service sẵn sàng (consumer=%s, model=%s)", consumer, MODEL_VERSION)
     await asyncio.gather(
         consume(r, AI_RESULT_STREAM, AI_COUNTER_GROUP, consumer, AiResult, svc.on_ai_result, stop),

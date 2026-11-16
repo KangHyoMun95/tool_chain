@@ -42,6 +42,7 @@ export type AiResult = {
   schema_version: 1;
   game_session_id: string;
   stream_id: string;
+  key_id: string;                    // để AI tra cấu hình category (ignore_in_pattern / predictable)
   shoe: number;
   round: number;
   result: Outcome;
