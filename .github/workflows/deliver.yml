@@ -59,14 +59,23 @@ jobs:
         run: |
           find out -mindepth 1 -maxdepth 1 ! -name .git -exec rm -rf {} +
           # git archive tự bỏ các file đánh dấu export-ignore trong .gitattributes
-          git archive "${VERSION}" | tar -x -C out
+          git archive "refs/tags/${VERSION}" | tar -x -C out
           echo "Số file sẽ giao: $(find out -type f -not -path 'out/.git/*' | wc -l)"
 
       - name: Quét dấu vết danh tính
         run: |
-          if grep -rnIiP "$LEAK_PATTERN" out --exclude-dir=.git \
-               --exclude='*-lock.yaml' --exclude='*.lock' --exclude='package-lock.json'; then
+          # grep: 0 = có match, 1 = không match, 2 = lỗi (regex sai, lỗi đọc file...)
+          # Chỉ cho đi tiếp khi chắc chắn là 1, mọi trường hợp khác đều dừng (fail-closed).
+          set +e
+          grep -rnIiP "$LEAK_PATTERN" out --exclude-dir=.git \
+               --exclude='*-lock.yaml' --exclude='*.lock' --exclude='package-lock.json'
+          rc=$?
+          set -e
+          if [ "$rc" -eq 0 ]; then
             echo "::error::Phát hiện dấu vết danh tính (xem các dòng ở trên). Dừng giao."
+            exit 1
+          elif [ "$rc" -ne 1 ]; then
+            echo "::error::Bước quét bị lỗi (rc=$rc), kiểm tra lại biến LEAK_PATTERN. Dừng giao."
             exit 1
           fi
           echo "Không phát hiện dấu vết."
