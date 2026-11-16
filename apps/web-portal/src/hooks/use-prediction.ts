@@ -13,7 +13,7 @@ export type PredictionPhase = "waiting" | "analyzing" | "ready" | "missing";
  * - ready: có dự đoán (prediction.pick = null nghĩa là AI chưa đủ dữ liệu).
  * - missing: (nguồn live) ván đã qua IN_PROGRESS mà vẫn chưa có dự đoán, tức là về muộn và bị bỏ.
  */
-export function usePrediction(streamId: string, shoe: number | null, round: number | null, status: string | null) {
+export function usePrediction(streamId: string, shoe: number | null, round: number | null, status: string | null, predictable?: readonly string[]) {
   const key = shoe !== null && round !== null ? `${shoe}:${round}` : null;
   const [state, setState] = useState<{ key: string; prediction: Prediction | null } | null>(null);
   const startedRef = useRef<string | null>(null);
@@ -39,7 +39,7 @@ export function usePrediction(streamId: string, shoe: number | null, round: numb
     const ctrl = new AbortController();
     requestRef.current = { key, ctrl };
     setState({ key, prediction: null });
-    predictionSource.getPrediction(streamId, shoe, round, ctrl.signal).then(
+    predictionSource.getPrediction(streamId, shoe, round, ctrl.signal, predictable).then(
       (prediction) => { if (alive.current) setState((s) => (s?.key === key ? { key, prediction } : s)); },
       (err) => {
         if (ctrl.signal.aborted) return;
@@ -47,7 +47,7 @@ export function usePrediction(streamId: string, shoe: number | null, round: numb
         if (startedRef.current === key) startedRef.current = null;
       },
     );
-  }, [streamId, key, shoe, round, status]);
+  }, [streamId, key, shoe, round, status, predictable]);
 
   if (key === null || state?.key !== key) return { phase: "waiting" as PredictionPhase, prediction: null };
   if (state.prediction) return { phase: "ready" as PredictionPhase, prediction: state.prediction };

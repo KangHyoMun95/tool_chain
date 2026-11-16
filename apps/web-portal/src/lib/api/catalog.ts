@@ -1,4 +1,5 @@
 // Sảnh / loại game / bàn từ API (GET /lobbies, /categories, /streams). Chỉ đọc; tạo mới nằm ở luồng ingestion.
+import type { ResultConfig } from "@toolhackchain/shared";
 import { apiGet } from "./client";
 
 export type Lobby = { id: string; name: string; initial: string; categoryCount: number; streamCount: number };
@@ -6,6 +7,8 @@ export type Category = { id: string; lobbyId: string; lobbyName: string; name: s
 export type Stream = {
   id: string; categoryId: string; categoryName: string; lobbyId: string; lobbyName: string;
   name: string; streamerId: string | null;
+  /** Cấu hình kết quả của category (hạt, nhãn, màu, draw, totals); chỉ có ở GET /streams/:id, null nếu category chưa có file định nghĩa. */
+  resultConfig: ResultConfig | null;
 };
 
 type Page<T> = { items: T[]; total: number; page: number; limit: number };
@@ -14,6 +17,7 @@ type ApiCategory = { category_id: string; category_name: string; lobby_id: strin
 type ApiStream = {
   stream_id: string; stream_name: string; category_id: string; category_name: string;
   lobby_id: string; lobby_name: string; streamer_id: string | null;
+  result_config?: ResultConfig | null;   // chỉ có ở GET /streams/:id
 };
 
 const PAGE_SIZE = 100; // tối đa API cho phép
@@ -34,6 +38,7 @@ const toCategory = (c: ApiCategory): Category => ({
 const toStream = (s: ApiStream): Stream => ({
   id: s.stream_id, categoryId: s.category_id, categoryName: s.category_name,
   lobbyId: s.lobby_id, lobbyName: s.lobby_name, name: s.stream_name, streamerId: s.streamer_id,
+  resultConfig: s.result_config ?? null,
 });
 
 /** Lấy hết các trang (mỗi trang tối đa 100 bản ghi). */

@@ -110,7 +110,7 @@
     "historyTitle": "Round history",
     "historyEmpty": "No rounds yet",
     "historyError": "Could not load history",
-    "boardLabel": "B/P/T results board",
+    "boardLabel": "Results board",
     "winRate": "CURRENT WIN RATE",
     "winStreak": "BEST WIN STREAK",
     "chartTitle": "Win Rate per Session",
