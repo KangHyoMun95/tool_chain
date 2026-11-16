@@ -88,7 +88,7 @@ export class RealtimeController {
       const snaps = await this.redis.mget(missing.map(RedisKeys.latest));
       for (let i = 0; i < snaps.length; i++) {
         const s = snaps[i];
-        if (!s || conn.closed) continue;
+        if (!s || conn.closed || !this.hub.acceptsTick(s)) continue;
         if (!conn.send(await this.hub.withStreamId(missing[i], s))) this.registry.close(conn, "PING_FAILED");
       }
     } catch (e) {

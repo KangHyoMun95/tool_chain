@@ -21,10 +21,11 @@ const toInt = (v: unknown): number | null => {
   return Number.isInteger(n) && n >= 0 ? n : null;
 };
 
-/** Số liệu total_B/P/T của message mới nhất; null = chưa đủ dữ liệu. */
+/** Số liệu totals của message mới nhất; null = chưa đủ dữ liệu. (PR4 sẽ đọc ký hiệu từ cấu hình category thay vì B/P/T cố định.) */
 function toTotals(d: CrawlPayload | undefined): Totals | null {
-  if (!d) return null;
-  const { total_B: B, total_P: P, total_T: T } = d;
+  const t = d?.totals;
+  if (!t) return null;
+  const { B, P, T } = t;
   return [B, P, T].every((x) => typeof x === "number" && Number.isFinite(x)) ? { B, P, T } : null;
 }
 

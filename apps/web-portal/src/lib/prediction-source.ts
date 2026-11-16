@@ -13,7 +13,7 @@ export type Outcome = "B" | "P" | "T";
  * pick = null khi AI không đủ dữ liệu để dự đoán (reason ≠ OK) hoặc khi locked. confidence là phần trăm 0–100.
  * locked = ván này đã có dự đoán nhưng user không được nhận (vào sau khi dự đoán được phát / không bị trừ tiền).
  */
-export type Prediction = { pick: "B" | "P" | null; confidence: number | null; reason: PredictionReason | null; locked: boolean };
+export type Prediction = { pick: string | null; confidence: number | null; reason: PredictionReason | null; locked: boolean };
 
 /** Dự đoán của ván bị khóa với user này. */
 export const LOCKED_PREDICTION: Prediction = { pick: null, confidence: null, reason: null, locked: true };
@@ -28,7 +28,7 @@ export interface PredictionSource {
 export const MOCK_LATENCY_MS = 2500;
 
 /** Dữ liệu dự đoán từ API / SSE (tỉ lệ 0–1) → Prediction (phần trăm). */
-export const toPrediction = (d: { pick: "B" | "P" | null; confidence: number | null; reason: PredictionReason }): Prediction => ({
+export const toPrediction = (d: { pick: string | null; confidence: number | null; reason: PredictionReason }): Prediction => ({
   pick: d.pick,
   confidence: d.confidence === null ? null : d.confidence * 100,
   reason: d.reason,

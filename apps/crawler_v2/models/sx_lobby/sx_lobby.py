@@ -3,6 +3,9 @@ from config import SX_LOBBY, SX_CATEGORY_1
 from models.sx_lobby.message.base_detection import BaseDetection
 from datetime import datetime, timezone, timedelta
 
+# Ký hiệu kết quả của nguồn Sexy, theo thứ tự trong winCounts (khớp results của config/categories/bacarat.json)
+RESULT_SYMBOLS = ("B", "P", "T")
+
 VN_TZ = timezone(timedelta(hours=7))
 FORMAT_DATETIME = "%Y-%m-%d %H:%M:%S"
 
@@ -37,9 +40,7 @@ class SXLobby:
     player_value: float = 0.0
     status: str = None
     actual_result: str = None
-    total_B: int = 0
-    total_P: int = 0
-    total_T: int = 0
+    totals: dict = None            # {"B": n, "P": n, "T": n}: tổng theo ký hiệu (winCounts của nguồn, thứ tự B, P, T)
 
     # More information
     i_time: int = None
@@ -68,6 +69,7 @@ class SXLobby:
         self.lobby_name = SX_LOBBY
         self.category_name = SX_CATEGORY_1
         # Trạng thái theo TỪNG ván (shoe, round). Thuộc tính bắt đầu bằng "_" không đi vào payload (xem shot_message).
+        self.totals = {}
         self._round_status: dict = {}
         self._current_round = None
 
@@ -83,8 +85,7 @@ class SXLobby:
         self.player_value = parent_cls.get_key("betCurrent") or self.player_value
         self._update_status(self._get_status(parent_cls.get_key("eventType")))
         self.actual_result = self._get_actual_result(parent_cls.get_key("winCounts"))
-        self.total_B, self.total_P, self.total_T = (self._get_win_counts(parent_cls.get_key("winCounts"))
-                                                    or [self.total_B, self.total_P, self.total_T])
+        self.totals = self._get_win_counts(parent_cls.get_key("winCounts"))
 
         # More Information
         self.i_time = parent_cls.get_key("iTime") or self.i_time
@@ -147,27 +148,24 @@ class SXLobby:
                 return None
 
     def _get_win_counts(self, w_count: list[int]):
+        """winCounts của nguồn: đúng 3 số theo thứ tự RESULT_SYMBOLS. Sai độ dài / thiếu ⇒ giữ totals cũ."""
         if w_count is None or len(w_count) != 3:
-            return [self.total_B, self.total_P, self.total_T]
-        return w_count[0], w_count[1], w_count[2]
+            return self.totals
+        return dict(zip(RESULT_SYMBOLS, w_count))
 
     def _get_actual_result(self, win_counts: list[int]):
         if win_counts is None or len(win_counts) != 3:
             return None
-        new_val_b, new_val_p, new_val_t = win_counts
-
-        if new_val_b is None or new_val_p is None or new_val_t is None:
+        if any(v is None for v in win_counts):
             return None
 
-        if (new_val_b + new_val_p + new_val_t) - (self.total_B + self.total_P + self.total_T) != 1:
+        old = [self.totals.get(s, 0) for s in RESULT_SYMBOLS]
+        if sum(win_counts) - sum(old) != 1:
             return None
 
-        if new_val_b > self.total_B:
-            return "B"
-        if new_val_p > self.total_P:
-            return "P"
-        if new_val_t > self.total_T:
-            return "T"
+        for symbol, new_val, old_val in zip(RESULT_SYMBOLS, win_counts, old):
+            if new_val > old_val:
+                return symbol
         return None
 
     def _get_big_roads(self, roads: list[dict]):

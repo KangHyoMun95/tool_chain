@@ -16,6 +16,8 @@ export class EnvVars {
   @IsOptional() @IsIn(["true", "false"]) GAME_SESSION_CANCEL_ENABLED: "true" | "false" = "false";
   // false ⇒ KHÔNG hoàn tiền (cả dự đoán sai / kết quả T lẫn ván CANCELLED): settlement đánh dấu refund_waived_at, không bao giờ hoàn nữa.
   @IsOptional() @IsIn(["true", "false"]) HAS_REFUND: "true" | "false" = "true";
+  // Thư mục file định nghĩa category (config/categories/*.json). Bỏ trống: config/categories ở thư mục chạy hoặc ở gốc repo.
+  @IsOptional() @IsString() CATEGORY_CONFIG_DIR?: string;
   // Hub (SSE): stream chỉ nhận tick cũ hơn phiên đang giữ liên tục quá khoảng này ⇒ xóa state, tick kế tiếp khởi tạo lại.
   @IsOptional() @IsInt() @Min(5_000) @Max(3_600_000) HUB_STALE_RESET_MS: number = 60_000;
   // true ⇒ Nest logger in thêm mức DEBUG (mặc định chỉ log / warn / error / fatal). Đọc trong main.ts trước khi tạo app.

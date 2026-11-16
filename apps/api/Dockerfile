@@ -12,6 +12,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter @toolhackchain/api...
 COPY packages/shared packages/shared
 COPY apps/api apps/api
+COPY config config
 RUN pnpm --filter @toolhackchain/shared build \
  && pnpm --filter @toolhackchain/api build \
  && pnpm --filter @toolhackchain/api deploy --legacy --prod /out
@@ -22,6 +23,8 @@ WORKDIR /app
 COPY --from=build --chown=node:node /out/ ./
 # pnpm deploy skips gitignored build output
 COPY --from=build --chown=node:node /repo/apps/api/dist ./dist
+# File định nghĩa category (config/categories/*.json): nạp + kiểm tra lúc khởi động, thiếu / sai thì API không chạy
+COPY --from=build --chown=node:node /repo/config ./config
 USER node
 EXPOSE 4000
 CMD ["node", "dist/main"]

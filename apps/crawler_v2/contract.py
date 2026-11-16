@@ -1,6 +1,6 @@
 # apps/crawler_v2/contract.py
 # Phải khớp packages/shared/src/realtime.ts (sửa một bên thì sửa bên kia trong cùng commit).
-from typing import Optional, TypedDict, Union
+from typing import Dict, Optional, TypedDict, Union
 
 TICK_STREAM = "ticks"
 STREAM_MAXLEN = 500_000   # giới hạn bộ nhớ Redis
@@ -13,7 +13,7 @@ class CrawlPayload(TypedDict):
     """Payload gửi liên tục, nhiều lần cho cùng một ván.
 
     Ghi DB: lobby_name, category_name, stream_name, stream_shoe, stream_round, streamer_id, actual_result.
-    Chỉ hiển thị (chỉ đi qua realtime/SSE, không ghi DB): player_count, player_value, status, total_B/P/T, streamer_name, streamer_country, các trường *_time.
+    Chỉ hiển thị (chỉ đi qua realtime/SSE, không ghi DB): player_count, player_value, status, totals, streamer_name, streamer_country, các trường *_time.
     stream_id là id text phía nguồn (không phải streams.stream_id), ingestion bỏ qua.
     """
     lobby_name: str
@@ -26,10 +26,8 @@ class CrawlPayload(TypedDict):
     player_count: int
     player_value: float
     status: str
-    actual_result: Optional[str]       # None khi ván chưa có kết quả
-    total_B: int
-    total_P: int
-    total_T: int
+    actual_result: Optional[str]       # ký hiệu kết quả (đúng 1 chữ in hoa, thuộc results của config category); None khi ván chưa có kết quả
+    totals: Optional[Dict[str, int]]   # số liệu tổng theo ký hiệu (khớp totals của config category); thiếu / None = nguồn không có
     streamer_name: Optional[str]       # tên người live (chỉ hiển thị, không ghi DB)
     streamer_country: Optional[str]    # quốc gia người live (chỉ hiển thị, không ghi DB)
     # Chuỗi thời gian từ nguồn (chỉ realtime, không ghi DB)

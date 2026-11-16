@@ -7,7 +7,7 @@ export const TICK_DEAD_STREAM = "ticks:dead";   // tick gây lỗi dữ liệu k
 
 // Payload crawler gửi liên tục (nhiều lần cho cùng một ván). Phải khớp CrawlPayload trong apps/crawler_v2/contract.py.
 // Ghi DB: lobby_name, category_name, stream_name, stream_shoe, stream_round, streamer_id, actual_result.
-// Chỉ hiển thị (chỉ đi qua realtime/SSE, KHÔNG ghi DB): player_count, player_value, status, total_B/P/T, streamer_name, streamer_country, các trường *_time.
+// Chỉ hiển thị (chỉ đi qua realtime/SSE, KHÔNG ghi DB): player_count, player_value, status, totals, streamer_name, streamer_country, các trường *_time.
 // stream_id là id text phía nguồn (không phải streams.stream_id) → ingestion bỏ qua.
 export type CrawlPayload = {
   lobby_name: string;
@@ -20,10 +20,8 @@ export type CrawlPayload = {
   player_count: number;
   player_value: number;
   status: string;
-  actual_result: string | null;      // null khi ván chưa có kết quả
-  total_B: number;
-  total_P: number;
-  total_T: number;
+  actual_result: string | null;      // ký hiệu kết quả (thuộc results của config category); null khi ván chưa có kết quả
+  totals?: Record<string, number>;   // số liệu tổng theo ký hiệu (khớp totals của config category); thiếu = nguồn không có
   streamer_name?: string | null;     // tên người live (chỉ hiển thị, KHÔNG ghi DB)
   streamer_country?: string | null;  // quốc gia của người live (chỉ hiển thị, KHÔNG ghi DB)
   // Chuỗi thời gian từ nguồn (chỉ realtime, KHÔNG ghi DB); null/thiếu khi nguồn không gửi.

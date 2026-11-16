@@ -47,9 +47,8 @@ def choose_pick(history: str, lookup: CountLookup, min_count: int = MIN_COUNT) -
         total = cb + cp
         eligible = total >= min_count and cb != cp
         detail.append({
-            "k": k, "pattern": pat, "count_B": cb, "count_P": cp, "total": total,
-            "pct_B": round(cb / total, 4) if total else None,
-            "pct_P": round(cp / total, 4) if total else None,
+            "k": k, "pattern": pat, "counts": {"B": cb, "P": cp}, "total": total,
+            "pct": {"B": round(cb / total, 4) if total else None, "P": round(cp / total, 4) if total else None},
             "eligible": eligible,
         })
         if eligible:
@@ -65,7 +64,7 @@ def choose_pick(history: str, lookup: CountLookup, min_count: int = MIN_COUNT) -
     out.update(
         pick=pick,
         confidence=round(pct, 4),
-        chosen={"k": row["k"], "pattern": row["pattern"], "occurrences": total, "pct_B": row["pct_B"], "pct_P": row["pct_P"]},
+        chosen={"k": row["k"], "pattern": row["pattern"], "occurrences": total, "pct": dict(row["pct"])},
         reason="OK",
     )
     return out
@@ -74,8 +73,9 @@ def choose_pick(history: str, lookup: CountLookup, min_count: int = MIN_COUNT) -
 def format_detail(result: dict) -> str:
     lines = [f"  history={result['history_used'] or '-'}  reason={result['reason']}"]
     for row in result["detail"]:
-        pct = f"B {row['pct_B']:.1%}  P {row['pct_P']:.1%}" if row["total"] else "-"
-        lines.append(f"  k={row['k']:<2} {row['pattern']:<10} B={row['count_B']:<5} P={row['count_P']:<5} n={row['total']:<5} {pct:<22}"
+        pct = "  ".join(f"{s} {p:.1%}" for s, p in row["pct"].items()) if row["total"] else "-"
+        cnt = " ".join(f"{s}={n:<5}" for s, n in row["counts"].items())
+        lines.append(f"  k={row['k']:<2} {row['pattern']:<10} {cnt} n={row['total']:<5} {pct:<22}"
                      f"{'eligible' if row['eligible'] else ''}")
     c = result["chosen"]
     lines.append(f"  => {result['pick']} {result['confidence']:.1%} (k={c['k']}, n={c['occurrences']})" if c else "  => không dự đoán")

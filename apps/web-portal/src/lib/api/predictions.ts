@@ -24,7 +24,7 @@ export type UnlockedPredictionDto = {
   stream_id: string;
   shoe: number;
   round: number;
-  pick: "B" | "P" | null;
+  pick: string | null;
   confidence: number | null;
   chosen: ChosenPattern | null;
   reason: PredictionReason;
