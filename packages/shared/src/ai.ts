@@ -21,8 +21,9 @@ export const PREDICTION_MODEL_VERSION = "pattern-v1";
 // Namespace UUIDv5 của prediction_id = uuid5(PREDICTION_NAMESPACE, game_session_id). TUYỆT ĐỐI không đổi.
 export const PREDICTION_NAMESPACE = "d2ce63e1-76f4-498d-b5c7-67718f2a7f29";
 
-export type Outcome = "B" | "P" | "T";
-export type Pick = "B" | "P";
+// Ký hiệu kết quả / pick là MỘT chữ in hoa bất kỳ (^[A-Z]$), tập hợp lệ của từng category nằm ở config/categories/*.json (category-config.ts).
+export type Outcome = string;
+export type Pick = string;
 export type PredictionReason = "OK" | "NOT_ENOUGH_HISTORY" | "NO_ELIGIBLE_SUFFIX";
 
 /** API → AI: có ván mới cần dự đoán. */
@@ -47,31 +48,28 @@ export type AiResult = {
   received_at: string;
 };
 
-/** Một đuôi k đã xét. pct_* = null khi total = 0. */
+/** Một đuôi k đã xét. Khóa của counts / pct = các ký hiệu `predictable` của category; pct[x] = null khi total = 0. */
 export type PatternRow = {
   k: number;
-  pattern: string;
-  count_B: number;
-  count_P: number;
-  total: number;
-  pct_B: number | null;
-  pct_P: number | null;
-  eligible: boolean;                 // total >= 3 và count_B != count_P
+  pattern: string;                   // chuỗi ký hiệu nối liền (vd "BPBP")
+  counts: Record<string, number>;
+  pct: Record<string, number | null>;
+  total: number;                     // = tổng counts
+  eligible: boolean;                 // total >= 3 và kết quả nhiều nhất là duy nhất
 };
 
 export type ChosenPattern = {
   k: number;
   pattern: string;
   occurrences: number;               // = total của đuôi được chọn
-  pct_B: number;
-  pct_P: number;
+  pct: Record<string, number>;       // cùng khóa với counts của PatternRow
 };
 
 /** Cột predictions.detail (jsonb). */
 export type PredictionDetail = {
   chosen: ChosenPattern | null;
   rows: PatternRow[];                // mọi k đã xét (3..10)
-  history_used: string;              // chuỗi B/P (đã bỏ T), tối đa 10 ký tự gần nhất
+  history_used: string;              // chuỗi ký hiệu (đã bỏ ignore_in_pattern), tối đa 10 ký tự gần nhất
   missing_previous: boolean;
 };
 

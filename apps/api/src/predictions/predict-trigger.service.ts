@@ -10,13 +10,14 @@ import { hostname } from "os";
 import {
   AI_RESULT_STREAM, AI_SCHEMA_VERSION, AI_STREAM_MAXLEN, PREDICT_REQUEST_STREAM, PREDICT_TRIGGER_GROUP,
   RedisKeys, STREAM_STATUSES, TICK_STREAM,
-  type AiResult, type Outcome, type PredictRequest, type StreamStatus, type Tick,
+  type AiResult, type PredictRequest, type StreamStatus, type Tick,
 } from "@toolhackchain/shared";
 import { buildKeyId } from "../common/normalize.js";
 import { fieldsToObject, sleep, StreamEntry } from "../common/stream.util.js";
 import { toInt } from "../common/to-int.js";
 import { gameSessionId } from "../game-sessions/game-session-id.js";
 import { BoundedMap } from "../ingestion/bounded-map.js";
+import { CategoryConfigService } from "../category-config/category-config.service.js";
 import { IdCache } from "../ingestion/id-cache.service.js";
 import { MEMORY_CACHE_MAX } from "../ingestion/ingestion.constants.js";
 import { PredictRedis, withPredictCommands } from "./predict-lua.js";
@@ -24,8 +25,6 @@ import {
   PREDICT_REQUEST_MAX_AGE_MS, RECENT_TTL_SECONDS, ROUND_STATUS_TTL_SECONDS, STATUS_RANK,
   TRIGGER_BLOCK_MS, TRIGGER_LOG_INTERVAL_MS, TRIGGER_READ_COUNT, TRIGGER_RETRY_DELAY_MS,
 } from "./predictions.constants.js";
-
-const OUTCOMES: readonly string[] = ["B", "P", "T"];
 
 /** Những gì process này đã làm cho một ván, để tick lặp lại (nhiều tick / ván) không phải chạm Redis. */
 type SessionState = { status: StreamStatus | null; resultSent: boolean; requestDone: boolean };
@@ -42,7 +41,7 @@ export class PredictTriggerService implements OnApplicationBootstrap, OnModuleDe
   private sessions = new BoundedMap<string, SessionState>(MEMORY_CACHE_MAX);
   private lastLog = new BoundedMap<string, number>(MEMORY_CACHE_MAX);
 
-  constructor(private ids: IdCache) {}
+  constructor(private ids: IdCache, private categoryConfigs: CategoryConfigService) {}
 
   async onApplicationBootstrap() {
     try {
@@ -114,6 +113,13 @@ export class PredictTriggerService implements OnApplicationBootstrap, OnModuleDe
       this.logOnce(`badname:${itemId}`, "info", `Bỏ qua tick ${entryId} của ${itemId}: lobby/category/stream_name thiếu, rỗng hoặc chứa "|"`);
       return;
     }
+    // Category không có file định nghĩa, hoặc actual_result ngoài results: từ chối cả tick (không round_status,
+    // không recent / ai:results, không predict:requests), log ERROR.
+    const inspected = this.categoryConfigs.inspectTick(d);
+    if (!inspected.ok) {
+      this.categoryConfigs.reportRejected(inspected);
+      return;
+    }
     const keyId = buildKeyId(names[0], names[1], names[2]);
     const shoe = toInt(d.stream_shoe);
     const round = toInt(d.stream_round);
@@ -141,25 +147,21 @@ export class PredictTriggerService implements OnApplicationBootstrap, OnModuleDe
     }
 
     // 2) Kết quả: lưu vào recent + phát ai:results trong một script (chỉ lần đầu có kết quả của ván).
-    if (d.actual_result !== null && d.actual_result !== undefined && !st.resultSent) {
-      const result = typeof d.actual_result === "string" ? d.actual_result.trim() : "";
-      if (!OUTCOMES.includes(result)) {
-        this.logOnce(`badres:${keyId}`, "warn", `Bỏ qua kết quả "${String(d.actual_result)}" của ${keyId} (shoe ${shoe}, round ${round}): không phải B/P/T`);
+    const result = inspected.result;
+    if (result !== null && !st.resultSent) {
+      const streamId = await this.streamId(keyId);
+      if (!streamId) {
+        this.logOnce(`nostream:${keyId}`, "info", `Chưa có stream_id của ${keyId} trong cache id, chưa ghi kết quả shoe ${shoe}, round ${round}`);
       } else {
-        const streamId = await this.streamId(keyId);
-        if (!streamId) {
-          this.logOnce(`nostream:${keyId}`, "info", `Chưa có stream_id của ${keyId} trong cache id, chưa ghi kết quả shoe ${shoe}, round ${round}`);
-        } else {
-          const msg: AiResult = {
-            schema_version: AI_SCHEMA_VERSION, game_session_id: gsid, stream_id: streamId,
-            shoe, round, result: result as Outcome, received_at: new Date().toISOString(),
-          };
-          await this.conn.recordResult(
-            RedisKeys.recent(streamId, shoe), AI_RESULT_STREAM,
-            String(round), result, RECENT_TTL_SECONDS, AI_STREAM_MAXLEN, JSON.stringify(msg),
-          );
-          st.resultSent = true;
-        }
+        const msg: AiResult = {
+          schema_version: AI_SCHEMA_VERSION, game_session_id: gsid, stream_id: streamId,
+          shoe, round, result, received_at: new Date().toISOString(),
+        };
+        await this.conn.recordResult(
+          RedisKeys.recent(streamId, shoe), AI_RESULT_STREAM,
+          String(round), result, RECENT_TTL_SECONDS, AI_STREAM_MAXLEN, JSON.stringify(msg),
+        );
+        st.resultSent = true;
       }
     }
 

@@ -2,11 +2,12 @@
 import { Injectable } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import type { DataSource } from "typeorm";
-import { CatalogStatus, GameSessionStatus, type ChosenPattern, type PredictResult, type PredictionDetail, type PredictionEvent, type PredictionReason, type Role } from "@toolhackchain/shared";
+import { CatalogStatus, GameSessionStatus, type ChosenPattern, type PredictResult, type PredictionDetail, type PredictionEvent, type PredictionReason, type ResultConfig, type Role } from "@toolhackchain/shared";
 import type { AuthUser } from "../auth/auth.types.js";
 import { GameSessionEntity, PredictionEntity } from "../database/entities/index.js";
 import { GameSessionsService } from "../game-sessions/game-sessions.service.js";
 import { BillingService, type ChargeOutcome } from "../billing/billing.service.js";
+import { CategoryConfigService } from "../category-config/category-config.service.js";
 import { LIST_STREAK_MIN, LIST_STREAK_MIN_ROUNDS, LIVE_WITHIN_MS, STATS_SHOES, STATS_STREAK_WINDOW } from "./predictions.constants.js";
 
 export type CurrentPrediction = {
@@ -15,7 +16,7 @@ export type CurrentPrediction = {
   stream_id: string;
   shoe: number;
   round: number;
-  pick: "B" | "P" | null;
+  pick: string | null;
   confidence: number | null;      // 0–1
   chosen: ChosenPattern | null;
   reason: PredictionReason;
@@ -36,7 +37,7 @@ export type PredictionStats = {
   shoe: number | null;             // shoe hiện tại = shoe của dự đoán mới nhất của stream; null khi chưa có dự đoán nào
   wins: number;                    // các số dưới đây chỉ tính trong shoe hiện tại
   losses: number;
-  draws: number;                   // kết quả T: không tính thắng / thua
+  draws: number;                   // kết quả thuộc `draw` của category: không tính thắng / thua
   win_rate: number | null;         // wins / (wins + losses), 0–1; null khi shoe hiện tại chưa có ván nào để tính
   win_streak: number;              // số dự đoán thắng liên tiếp tính từ ván mới nhất (bỏ qua ván hòa), xét trong STATS_STREAK_WINDOW dự đoán
   shoes: {                         // tỷ lệ thắng của từng shoe QUÁ KHỨ (không gồm shoe hiện tại), tối đa STATS_SHOES shoe gần nhất, cũ → mới
@@ -67,7 +68,25 @@ export class PredictionsService {
     @InjectDataSource() private ds: DataSource,
     private sessions: GameSessionsService,
     private billing: BillingService,
+    private categoryConfigs: CategoryConfigService,
   ) {}
+
+  /** Các ký hiệu "hòa" (draw) của category chứa stream; rỗng nếu category không có cấu hình (không xảy ra khi tick đã được nhận). */
+  private async drawOfStream(streamId: string): Promise<string[]> {
+    const rows: { lobby_name: string; category_name: string }[] = await this.ds.query(
+      `SELECT l.lobby_name, c.category_name FROM streams s
+       JOIN categories c ON c.category_id = s.category_id JOIN lobbies l ON l.lobby_id = c.lobby_id
+       WHERE s.stream_id = $1`, [streamId]);
+    return rows[0] ? this.categoryConfigs.get(rows[0].lobby_name, rows[0].category_name)?.draw ?? [] : [];
+  }
+
+  /** Cấu hình kết quả (nhãn, màu, draw, totals) của category; null khi không có file. */
+  async resultConfigOfCategory(categoryId: string): Promise<ResultConfig | null> {
+    const rows: { lobby_name: string; category_name: string }[] = await this.ds.query(
+      `SELECT l.lobby_name, c.category_name FROM categories c JOIN lobbies l ON l.lobby_id = c.lobby_id WHERE c.category_id = $1`, [categoryId]);
+    return rows[0] ? this.categoryConfigs.resultConfig(rows[0].lobby_name, rows[0].category_name) : null;
+  }
+
 
   /**
    * Một transaction: đảm bảo game_sessions tồn tại (khóa ngoại; ván có thể còn nằm trong batch của ingestion),
@@ -150,7 +169,7 @@ export class PredictionsService {
   /** Dữ liệu event SSE của một prediction đã lưu (giao lại khi xử lý lại message). null nếu không có. */
   async eventData(predictionId: string): Promise<PredictionEvent | null> {
     const rows: {
-      game_session_id: string; stream_id: string; shoe: number; round: number; pick: "B" | "P" | null;
+      game_session_id: string; stream_id: string; shoe: number; round: number; pick: string | null;
       confidence: string | null; detail: PredictionDetail; reason: PredictionReason; created_at: Date;
     }[] = await this.ds.query(
       `SELECT p.game_session_id, p.stream_id, gs.road_shoe AS shoe, gs.road_count AS round, p.predict_result AS pick,
@@ -167,7 +186,7 @@ export class PredictionsService {
   }
 
   /**
-   * Thống kê dự đoán của một stream. Thắng = pick trùng result; kết quả T là hòa (chưa tính đúng / sai, như UI);
+   * Thống kê dự đoán của một stream. Thắng = pick trùng result; kết quả thuộc `draw` của category là hòa (chưa tính đúng / sai, như UI);
    * ván không có pick (AI không dự đoán) hoặc chưa FINISHED không được tính.
    * Tỷ lệ thắng hiện tại chỉ của shoe hiện tại; biểu đồ là tỷ lệ thắng của từng shoe gần nhất.
    */
@@ -179,18 +198,19 @@ export class PredictionsService {
        ORDER BY p.created_at DESC LIMIT 1`,
       [streamId]);
     const currentShoe = cur[0] ? Number(cur[0].shoe) : null;
+    const draw = await this.drawOfStream(streamId);
 
     // Mỗi dòng một shoe, sắp theo dự đoán đã chấm mới nhất của shoe đó (mới → cũ).
     const rows: { shoe: string; wins: string; losses: string; draws: string }[] = await this.ds.query(
       `SELECT gs.road_shoe AS shoe,
-              count(*) FILTER (WHERE gs.result <> 'T' AND p.predict_result = gs.result) AS wins,
-              count(*) FILTER (WHERE gs.result <> 'T' AND p.predict_result <> gs.result) AS losses,
-              count(*) FILTER (WHERE gs.result = 'T') AS draws
+              count(*) FILTER (WHERE gs.result <> ALL($3::text[]) AND p.predict_result = gs.result) AS wins,
+              count(*) FILTER (WHERE gs.result <> ALL($3::text[]) AND p.predict_result <> gs.result) AS losses,
+              count(*) FILTER (WHERE gs.result = ANY($3::text[])) AS draws
        FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
        WHERE p.stream_id = $1 AND p.predict_result IS NOT NULL AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
        GROUP BY gs.road_shoe
        ORDER BY max(p.created_at) DESC LIMIT $2`,
-      [streamId, STATS_SHOES + 1]);   // mới → cũ
+      [streamId, STATS_SHOES + 1, draw]);   // mới → cũ
     const perShoe = rows.map((r) => {
       const wins = Number(r.wins), losses = Number(r.losses);
       return { shoe: Number(r.shoe), wins, losses, draws: Number(r.draws), win_rate: wins + losses > 0 ? wins / (wins + losses) : null };
@@ -205,7 +225,7 @@ export class PredictionsService {
       [streamId, STATS_STREAK_WINDOW]);   // mới → cũ
     let streak = 0;
     for (const r of recent) {
-      if (r.result === "T") continue;
+      if (draw.includes(r.result)) continue;
       if (r.pick !== r.result) break;
       streak++;
     }
@@ -235,7 +255,7 @@ export class PredictionsService {
          AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
        ORDER BY p.created_at`,   // cũ → mới
       [streamId, cur[0].shoe]);
-    return { shoe: Number(cur[0].shoe), best_streak: longestWinStreak(rows) };
+    return { shoe: Number(cur[0].shoe), best_streak: longestWinStreak(rows, await this.drawOfStream(streamId)) };
   }
 
   /**
@@ -245,7 +265,9 @@ export class PredictionsService {
    */
   async listStats(role: Role, categoryId: string): Promise<StreamListStats[]> {
     const visible = role === "USER" ? "AND s.status = $2 AND c.status = $2 AND l.status = $2" : "";
+    const draw = (await this.resultConfigOfCategory(categoryId))?.draw ?? [];
     const params: unknown[] = role === "USER" ? [categoryId, CatalogStatus.ACTIVE] : [categoryId];
+    const drawParam = `$${params.length + 1}`;
     const vis = `SELECT s.stream_id FROM streams s
                  JOIN categories c ON c.category_id = s.category_id JOIN lobbies l ON l.lobby_id = c.lobby_id
                  WHERE s.category_id = $1 ${visible}`;
@@ -269,14 +291,14 @@ export class PredictionsService {
     const curQ: Promise<{ stream_id: string; shoe: string; wins: string; losses: string; draws: string }[]> = this.ds.query(
       `WITH ${curShoe}
        SELECT cur.stream_id, cur.shoe,
-              count(*) FILTER (WHERE gs.result <> 'T' AND p.predict_result = gs.result) AS wins,
-              count(*) FILTER (WHERE gs.result <> 'T' AND p.predict_result <> gs.result) AS losses,
-              count(*) FILTER (WHERE gs.result = 'T') AS draws
+              count(*) FILTER (WHERE gs.result <> ALL(${drawParam}::text[]) AND p.predict_result = gs.result) AS wins,
+              count(*) FILTER (WHERE gs.result <> ALL(${drawParam}::text[]) AND p.predict_result <> gs.result) AS losses,
+              count(*) FILTER (WHERE gs.result = ANY(${drawParam}::text[])) AS draws
        FROM cur
        LEFT JOIN game_sessions gs ON gs.stream_id = cur.stream_id AND gs.road_shoe = cur.shoe
                                   AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
        LEFT JOIN predictions p ON p.game_session_id = gs.game_session_id AND p.predict_result IS NOT NULL
-       GROUP BY cur.stream_id, cur.shoe`, params);
+       GROUP BY cur.stream_id, cur.shoe`, [...params, draw]);
 
     // Dự đoán đã chấm của shoe hiện tại (rk = 1: shoe của dự đoán mới nhất) và shoe trước (rk = 2: shoe khác có dự đoán mới nhất
     // kế tiếp), theo thứ tự thời gian, để tính chuỗi thắng dài nhất của từng shoe.
@@ -316,17 +338,17 @@ export class PredictionsService {
         live: l ? Number(l.age_ms) <= LIVE_WITHIN_MS : false,
         wins, losses, draws,
         win_rate: wins + losses > 0 ? wins / (wins + losses) : null,
-        win_streak: listStreak(byShoe.get(`${id}|1`) ?? [], byShoe.get(`${id}|2`)),
+        win_streak: listStreak(byShoe.get(`${id}|1`) ?? [], byShoe.get(`${id}|2`), draw),
       };
     });
   }
 }
 
-/** Chuỗi thắng dài nhất trong một shoe (dự đoán đã chấm, cũ → mới): T bỏ qua, thua thì đứt chuỗi. */
-function longestWinStreak(rows: { pick: string; result: string }[]): number {
+/** Chuỗi thắng dài nhất trong một shoe (dự đoán đã chấm, cũ → mới): kết quả thuộc `draw` bỏ qua, thua thì đứt chuỗi. */
+function longestWinStreak(rows: { pick: string; result: string }[], draw: readonly string[]): number {
   let best = 0, run = 0;
   for (const r of rows) {
-    if (r.result === "T") continue;
+    if (draw.includes(r.result)) continue;
     run = r.pick === r.result ? run + 1 : 0;
     if (run > best) best = run;
   }
@@ -337,8 +359,8 @@ function longestWinStreak(rows: { pick: string; result: string }[]): number {
  * Chuỗi ở danh sách bàn: chuỗi dài nhất của shoe hiện tại (N); nếu nó < LIST_STREAK_MIN hoặc N có < LIST_STREAK_MIN_ROUNDS
  * lượt đã chấm (kể cả hòa) thì lấy chuỗi dài nhất của shoe trước (N−1). Chưa có shoe trước ⇒ giữ của N.
  */
-function listStreak(current: { pick: string; result: string }[], previous: { pick: string; result: string }[] | undefined): number {
-  const n = longestWinStreak(current);
-  if ((n < LIST_STREAK_MIN || current.length < LIST_STREAK_MIN_ROUNDS) && previous) return longestWinStreak(previous);
+function listStreak(current: { pick: string; result: string }[], previous: { pick: string; result: string }[] | undefined, draw: readonly string[]): number {
+  const n = longestWinStreak(current, draw);
+  if ((n < LIST_STREAK_MIN || current.length < LIST_STREAK_MIN_ROUNDS) && previous) return longestWinStreak(previous, draw);
   return n;
 }

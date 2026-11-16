@@ -19,6 +19,7 @@ import { IngestionModule } from "./ingestion/ingestion.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
 import { PredictionsModule } from "./predictions/predictions.module.js";
 import { entities } from "./database/entities/index.js";
+import { CategoryConfigModule } from "./category-config/category-config.module.js";
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
 
@@ -51,6 +52,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
       installExtensions: false,   // id uuid dùng gen_random_uuid() của Postgres; không để TypeORM tự cài extension
     }),
     RedisModule,
+    CategoryConfigModule,   // nạp + kiểm tra config/categories/*.json lúc khởi động (sai ⇒ app dừng)
     ThrottlerModule.forRootAsync({
       inject: [REDIS],
       useFactory: (redis: Redis) => ({

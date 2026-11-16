@@ -1,0 +1,13 @@
+{
+  "lobby": "casino",
+  "category": "bacarat",
+  "results": {
+    "B": { "label": { "vi": "B", "en": "B" }, "color": "#DC2626" },
+    "P": { "label": { "vi": "P", "en": "P" }, "color": "#2563EB" },
+    "T": { "label": { "vi": "T", "en": "T" }, "color": "#16A34A" }
+  },
+  "predictable": ["B", "P"],
+  "ignore_in_pattern": ["T"],
+  "draw": ["T"],
+  "totals": ["B", "P", "T"]
+}

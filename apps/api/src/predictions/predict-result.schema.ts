@@ -1,6 +1,6 @@
 // src/predictions/predict-result.schema.ts
 // Kiểm tra payload của predict:results theo contract (packages/shared/src/ai.ts). Sai => null (caller log ERROR + XACK).
-import type { ChosenPattern, PatternRow, PredictResult, PredictionReason } from "@toolhackchain/shared";
+import type { CategoryConfig, ChosenPattern, PatternRow, PredictResult, PredictionReason } from "@toolhackchain/shared";
 import { AI_SCHEMA_VERSION } from "@toolhackchain/shared";
 import { toInt } from "../common/to-int.js";
 
@@ -14,34 +14,51 @@ const isStr = (v: unknown, max: number): v is string => typeof v === "string" &&
 const isRatio = (v: unknown): v is number => typeof v === "number" && v >= 0 && v <= 1;
 const isRatioOrNull = (v: unknown): boolean => v === null || isRatio(v);
 
-function row(v: unknown): PatternRow | null {
+const sameKeys = (o: Record<string, unknown>, keys: readonly string[]): boolean => {
+  const k = Object.keys(o);
+  return k.length === keys.length && keys.every((x) => Object.hasOwn(o, x));
+};
+
+function row(v: unknown, cfg: CategoryConfig): PatternRow | null {
   if (!isObj(v)) return null;
-  const k = toInt(v.k), b = toInt(v.count_B), p = toInt(v.count_P), total = toInt(v.total);
-  if (k === null || b === null || p === null || total === null || total !== b + p) return null;
-  if (typeof v.pattern !== "string" || !/^[BP]{1,10}$/.test(v.pattern) || typeof v.eligible !== "boolean") return null;
-  if (!isRatioOrNull(v.pct_B) || !isRatioOrNull(v.pct_P)) return null;
-  return v as PatternRow;
+  const k = toInt(v.k), total = toInt(v.total);
+  if (k === null || total === null || typeof v.eligible !== "boolean") return null;
+  if (typeof v.pattern !== "string" || !/^[A-Z]{1,10}$/.test(v.pattern) || ![...v.pattern].every((c) => Object.hasOwn(cfg.results, c))) return null;
+  if (!isObj(v.counts) || !sameKeys(v.counts, cfg.predictable) || !isObj(v.pct) || !sameKeys(v.pct, cfg.predictable)) return null;
+  let sum = 0;
+  for (const s of cfg.predictable) {
+    const n = toInt(v.counts[s]);
+    if (n === null || n < 0 || !isRatioOrNull(v.pct[s])) return null;
+    sum += n;
+  }
+  return sum === total ? (v as unknown as PatternRow) : null;
 }
 
-function chosen(v: unknown): ChosenPattern | null {
+function chosen(v: unknown, cfg: CategoryConfig): ChosenPattern | null {
   if (!isObj(v)) return null;
-  if (toInt(v.k) === null || toInt(v.occurrences) === null || typeof v.pattern !== "string" || !isRatio(v.pct_B) || !isRatio(v.pct_P)) return null;
-  return v as ChosenPattern;
+  if (toInt(v.k) === null || toInt(v.occurrences) === null || typeof v.pattern !== "string") return null;
+  if (!isObj(v.pct) || !sameKeys(v.pct, cfg.predictable) || !cfg.predictable.every((s) => isRatio(v.pct && (v.pct as Record<string, unknown>)[s]))) return null;
+  return v as unknown as ChosenPattern;
 }
 
-export function parsePredictResult(raw: unknown): PredictResult | null {
+/** `configOf(key_id)`: cấu hình category của stream (không có ⇒ message bị coi là sai contract). */
+export function parsePredictResult(raw: unknown, configOf: (keyId: string) => CategoryConfig | undefined): PredictResult | null {
   if (!isObj(raw) || raw.schema_version !== AI_SCHEMA_VERSION) return null;
   if (!isUuid(raw.prediction_id) || !isUuid(raw.game_session_id) || !isUuid(raw.stream_id)) return null;
   if (!isStr(raw.key_id, 600) || toInt(raw.shoe) === null || toInt(raw.round) === null) return null;
+  const cfg = configOf(raw.key_id);
+  if (!cfg) return null;
   if (!REASONS.includes(raw.reason as string) || typeof raw.missing_previous !== "boolean") return null;
-  if (typeof raw.history_used !== "string" || !/^[BP]{0,10}$/.test(raw.history_used)) return null;
+  if (typeof raw.history_used !== "string" || !/^[A-Z]{0,10}$/.test(raw.history_used)
+      || ![...raw.history_used].every((c) => Object.hasOwn(cfg.results, c) && !cfg.ignore_in_pattern.includes(c))) return null;
   if (!isStr(raw.model_version, 50) || !isStr(raw.created_at, 40)) return null;
-  if (!Array.isArray(raw.detail) || raw.detail.length > MAX_ROWS || !raw.detail.every((r) => row(r) !== null)) return null;
+  if (!Array.isArray(raw.detail) || raw.detail.length > MAX_ROWS || !raw.detail.every((r) => row(r, cfg) !== null)) return null;
 
   // pick, confidence, chosen và reason phải nhất quán: có dự đoán khi và chỉ khi reason = OK (DB cũng ép bằng CHECK).
+  // pick phải thuộc predictable của category (DB chỉ kiểm tra định dạng ^[A-Z]$).
   const hasPick = raw.reason === ("OK" satisfies PredictionReason);
   if (hasPick) {
-    if ((raw.pick !== "B" && raw.pick !== "P") || !isRatio(raw.confidence) || chosen(raw.chosen) === null) return null;
+    if (typeof raw.pick !== "string" || !cfg.predictable.includes(raw.pick) || !isRatio(raw.confidence) || chosen(raw.chosen, cfg) === null) return null;
   } else if (raw.pick !== null || raw.confidence !== null || raw.chosen !== null) {
     return null;
   }

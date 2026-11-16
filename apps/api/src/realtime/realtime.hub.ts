@@ -15,6 +15,7 @@ import {
   type Position, type RealtimeRoundResult, type ShoeContext,
 } from "@toolhackchain/shared";
 import { fieldsToObject, sleep, StreamEntry } from "../common/stream.util.js";
+import { CategoryConfigService } from "../category-config/category-config.service.js";
 import type { EnvVars } from "../config/env.validation.js";
 import { IdCache } from "../ingestion/id-cache.service.js";
 import { HUB_STATE_MAX } from "./realtime.constants.js";
@@ -30,8 +31,6 @@ type StreamState = {
   staleSince: number | null;      // từ lúc này chỉ nhận tick cũ hơn (null = tick gần nhất được chấp nhận)
 };
 
-const OUTCOMES: readonly string[] = ["B", "P", "T"];
-
 @Injectable()
 export class RealtimeHub implements OnApplicationBootstrap, OnModuleDestroy {
   private readonly log = new Logger(RealtimeHub.name);
@@ -42,7 +41,7 @@ export class RealtimeHub implements OnApplicationBootstrap, OnModuleDestroy {
   private states = new Map<string, StreamState>();
   private readonly staleResetMs: number;
 
-  constructor(private ids: IdCache, config: ConfigService<EnvVars, true>) {
+  constructor(private ids: IdCache, private categoryConfigs: CategoryConfigService, config: ConfigService<EnvVars, true>) {
     this.staleResetMs = config.get("HUB_STALE_RESET_MS", { infer: true });
   }
 
@@ -73,10 +72,16 @@ export class RealtimeHub implements OnApplicationBootstrap, OnModuleDestroy {
   private async handleTick(itemId: string, tickJson: string): Promise<void> {
     let tick: { ts?: unknown; data?: Record<string, unknown> };
     try { tick = JSON.parse(tickJson); } catch { tick = {}; }
+    // Category không có file định nghĩa, hoặc actual_result ngoài results: từ chối tick (không cập nhật state, không đẩy SSE), log ERROR.
+    const inspected = this.categoryConfigs.inspectTick(tick?.data);
+    if (!inspected.ok) {
+      this.categoryConfigs.reportRejected(inspected);
+      return;
+    }
     const pos = payloadPosition(tick?.data);
     const fns = this.listeners.get(itemId);
 
-    // Không đọc được shoe/round (vd trang demo /live): chuyển tiếp như cũ, không lọc, không round_result.
+    // Không đọc được shoe/round: chuyển tiếp như cũ, không lọc, không round_result.
     if (!pos) {
       if (fns?.size) this.emit(fns, await this.withStreamId(itemId, tickJson));
       return;
@@ -112,10 +117,9 @@ export class RealtimeHub implements OnApplicationBootstrap, OnModuleDestroy {
     this.touch(itemId, st);
 
     // 2) Rồi mới xét kết quả (kể cả khi tick bị bỏ: tick muộn có thể mang kết quả của ván trước chưa phát).
-    const raw = tick.data?.actual_result;
-    const result = typeof raw === "string" ? raw.trim() : null;
+    const result = inspected.result;
     let roundResult: Omit<RealtimeRoundResult, "stream_id"> | null = null;
-    if (result !== null && OUTCOMES.includes(result) && (st.result === null || comparePosition(pos, st.result, st.ctx) > 0)) {
+    if (result !== null && (st.result === null || comparePosition(pos, st.result, st.ctx) > 0)) {
       st.result = pos;
       roundResult = {
         type: "round_result", item_id: itemId, shoe: pos.shoe, round: pos.round, result,
@@ -148,6 +152,11 @@ export class RealtimeHub implements OnApplicationBootstrap, OnModuleDestroy {
   async snapshot(itemId: string): Promise<string | null> {
     const st = this.states.get(itemId);
     return st ? this.tickEvent(st.lastTick, await this.streamIdOf(itemId)) : null;
+  }
+
+  /** true nếu tick (JSON gốc) thuộc category có file định nghĩa và actual_result hợp lệ: lọc snapshot latest:{key_id} của crawler. */
+  acceptsTick(tickJson: string): boolean {
+    try { return this.categoryConfigs.inspectTick((JSON.parse(tickJson) as { data?: unknown })?.data).ok; } catch { return false; }
   }
 
   private async streamIdOf(itemId: string): Promise<string | null> {
