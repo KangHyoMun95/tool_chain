@@ -51,7 +51,7 @@ tool_chain/
 │   │       ├── predictions/               # luồng dự đoán: trigger (ticks → predict:requests / ai:results), consumer predict:results → DB + SSE, GET current
 │   │       ├── ticks/                     # bản cũ, giữ để so sánh, KHÔNG đăng ký trong AppModule
 │   │       └── realtime/                  # SSE: ticket một lần, ConnectionRegistry (participant trong RAM + stream_connections), hub tick public
-│   ├── crawl-agent/         # Python — crawler, publish event vào Redis
+│   ├── crawler_v2/          # Python — crawler (API + WSS), publish event vào Redis; WS_TARGETS ở main.py, mỗi WSS một handler
 │   ├── ai/                  # Python — service AI predict (src/patterns = service; src/ai = thử nghiệm, KHÔNG dùng), chỉ ĐỌC DB
 │   ├── web-admin/           # Next.js — CHỈ UI (Host/Admin)
 │   └── web-portal/          # Next.js — CHỈ UI (User)
@@ -67,13 +67,17 @@ tool_chain/
 ### Ranh giới trách nhiệm
 - **`web-admin`, `web-portal`**: chỉ có UI. Không đặt business logic, không tính tiền, không lọc quyền ở client.
 - **`api`**: nơi duy nhất được đổi `balance`, tạo transaction và quyết định ai nhận event nào.
-- **`crawl-agent`**: chỉ thu thập và publish. Không ghi DB trực tiếp.
+- **`crawler_v2`**: chỉ thu thập và publish. Không ghi DB trực tiếp. Cấu trúc:
+  - `main.py`: `WS_TARGETS = [(tên, host WSS, handler, idle_timeout)]`; **mỗi WSS một handler** (`message_handler.py` cho tgmeq: decode → `SXLobby` → `publish`). Thêm WSS = thêm một dòng vào `WS_TARGETS` + một handler, chuẩn hóa message về đúng `CrawlPayload`. Bật / tắt từng WSS bằng env `WS_ENABLED_<TÊN IN HOA>` (mặc định `true`).
+  - **Mỗi WSS là một task độc lập** (`run_isolated`): lỗi quá ngưỡng (`TooManyFailures`) hoặc lỗi bất ngờ thì **chỉ WSS đó** khởi động lại (backoff 5s → 300s, reset khi đã chạy ổn > 10 phút), không ảnh hưởng WSS khác. Tài khoản / session / `TokenProvider` dùng chung cho mọi WSS.
+  - **Lỗi cấp phiên / tài khoản** (`BotCheckError`, `SessionError` = vượt giới hạn login browser hoặc cookie vừa login vẫn bị từ chối): cả process chờ `RESTART_DELAY` (mặc định 600s, tránh dồn dập khi bị check bot) rồi **thoát mã 1**, Docker (`restart: unless-stopped`) chạy lại. Docker stop / SIGINT thoát mã 0.
+  - Chưa kiểm tra giới hạn kết nối / tài khoản của server: nhiều WSS cùng một tài khoản có thể đá nhau.
 - **`ai`**: chỉ ĐỌC DB (`game_sessions`, để dựng lại bảng đếm) và ghi Redis của riêng nó + stream `predict:results`. **Không** ghi bảng nghiệp vụ nào trong DB, không đổi `balance`, không ghi `prediction_subscriptions` hay `transactions`. AI trả kết quả về `api` qua Redis Stream; `api` lưu DB và đẩy SSE (billing sau này cũng nằm ở `api`). `api` là nơi duy nhất sinh `key_id`, `game_session_id` và ghi DB.
 - **Lưu ý độ trễ:** AI **không** chờ DB: `api` phát `predict:requests` ngay khi thấy tick `IN_PROGRESS` đầu tiên của ván và đưa kết quả các ván trước qua `ai:results` / `recent:*` (Redis), nên không phụ thuộc batch ghi DB (tối đa 3s). DB chỉ dùng để dựng lại bảng đếm lúc AI khởi động.
 - Auth: xem mục **Auth & bảo mật** bên dưới.
 
 ### Contract dùng chung
-`apps/crawl-agent/contract.py` và `packages/shared/src/realtime.ts` mô tả **cùng một schema event**. Sửa một bên thì **bắt buộc** sửa bên kia trong cùng một commit.
+`apps/crawler_v2/contract.py` và `packages/shared/src/realtime.ts` mô tả **cùng một schema event**. Sửa một bên thì **bắt buộc** sửa bên kia trong cùng một commit.
 
 Tương tự `packages/shared/src/ai.ts` và `apps/ai/src/patterns/contract.py` mô tả **cùng một schema** cho 3 stream dự đoán (`predict:requests`, `ai:results`, `predict:results`, `schema_version: 1`, mỗi entry một field `payload` là JSON), kèm namespace UUIDv5 của `prediction_id`. Cùng quy tắc: sửa một bên thì sửa bên kia trong cùng commit.
 
@@ -83,7 +87,7 @@ Tương tự `packages/shared/src/ai.ts` và `apps/ai/src/patterns/contract.py` 
 
 ### Luồng 1 — Kết quả từ crawler (đã có)
 ```
-crawl-agent ──publish──► Redis Stream ──► api consumer
+crawler_v2 ──publish──► Redis Stream ──► api consumer
                                              ├─► realtime.hub  → SSE xuống web-portal (lọc theo key_id; tick / round_result CHỈ ĐI TỚI)
                                              └─► tick-persister → ghi DB theo batch (MAX_BATCH dòng hoặc MAX_WAIT_MS, xem ingestion/ingestion.constants.ts)
 ```
@@ -369,9 +373,9 @@ pnpm --filter @toolhackchain/api lint                            # oxlint
 # AI (Python, xem apps/ai/README.md)
 cd apps/ai && python main.py serve        # hoặc backtest | verify | predict
 
-# Crawler (Python, cần Brave + CDP port 9222, xem apps/crawl-agent/README.md)
-pip install -r apps/crawl-agent/requirements.txt
-bash apps/crawl-agent/run_server.sh
+# Crawler (Python; chạy bằng docker compose service crawl-agent-v2, cấu hình: apps/crawler_v2/.env.example)
+pip install -r apps/crawler_v2/requirements.txt
+cd apps/crawler_v2 && python main.py       # tầng 3 (login browser) cần Brave + Xvfb, xem start_brave.sh
 ```
 
 ## Quy ước khi làm việc

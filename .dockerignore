@@ -10,5 +10,4 @@
 .claude
 .idea
 db
-apps/crawl-agent
 **/test
