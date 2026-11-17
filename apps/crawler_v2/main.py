@@ -66,12 +66,22 @@ def build_client(store: SessionStore) -> SexyTokenClient:
     return c
 
 
+class BrowserGate:
+    """Dùng chung cho mọi TokenProvider: tại một thời điểm chỉ MỘT tài khoản login bằng trình duyệt (tầng 3), vì chỉ có
+    một cổng CDP / một Xvfb. `profile` = profile Brave của tài khoản đang login (để tắt đúng Brave khi process thoát)."""
+
+    def __init__(self):
+        self.lock = asyncio.Lock()
+        self.profile: str | None = None
+
+
 class TokenProvider:
     """Gọi mỗi lần (re)connect WS. Tự nâng tầng khi tầng dưới thất bại, lưu session khi có thay đổi."""
 
     def __init__(self, client: SexyTokenClient, store: SessionStore, username: str, password: str,
-                 profile_dir: str | None = None):
-        """Mỗi category một TokenProvider (tài khoản + profile Brave riêng)."""
+                 profile_dir: str | None = None, gate: BrowserGate | None = None):
+        """Mỗi category một TokenProvider (tài khoản + profile Brave riêng); `gate` dùng chung giữa các provider."""
+        self.gate = gate or BrowserGate()
         self.c = client
         self.store = store
         self.username = username
@@ -88,6 +98,14 @@ class TokenProvider:
             self._last_saved = snap
 
     async def _browser_login(self):
+        async with self.gate.lock:                           # tuần tự giữa các tài khoản
+            self.gate.profile = self.profile_dir
+            try:
+                await self._browser_login_locked()
+            finally:
+                self.gate.profile = None
+
+    async def _browser_login_locked(self):
         now = time.time()
         self._browser_logins = [t for t in self._browser_logins if now - t < 3600]
         if len(self._browser_logins) >= MAX_BROWSER_LOGINS_PER_HOUR:
@@ -226,12 +244,13 @@ async def supervisor() -> int:
     (run_isolated). Lỗi của MỘT category không đi tới đây: run_isolated tự khởi động lại category đó.
     Cấu hình sai: load_categories ném ConfigError (thoát như lỗi khởi động bất kỳ)."""
     cats = load_categories(REGISTRY)
+    gate = BrowserGate()
 
     def factory(c: CategoryConfig):
         spec = REGISTRY[c.handler]
         store = SessionStore(session_path_for(c.username))
         client = build_client(store)
-        provider = TokenProvider(client, store, c.username, c.password, profile_dir_for(c.username))
+        provider = TokenProvider(client, store, c.username, c.password, profile_dir_for(c.username), gate)
         handler = spec.get()
 
         async def enter_hall():                      # giống browser: sau mỗi lần WS connect -> vào sảnh (gameGroupId của category)
@@ -264,18 +283,18 @@ async def supervisor() -> int:
         for t in tasks:
             t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
-        _stop_brave_if_running()
+        _stop_brave_if_running(gate.profile)
     logger.info(f"Chờ {RESTART_DELAY}s rồi thoát (exit 1) để Docker chạy lại")
     await asyncio.sleep(RESTART_DELAY)
     return code
 
 
-def _stop_brave_if_running():
-    """Thoát giữa lúc đang login browser (tầng 3) -> tắt Brave/Xvfb cho sạch."""
+def _stop_brave_if_running(profile_dir: str | None = None):
+    """Thoát giữa lúc đang login browser (tầng 3) -> tắt Brave/Xvfb cho sạch (đúng profile của tài khoản đang login)."""
     try:
         import brave
         if brave.cdp_ready():
-            brave.stop()
+            brave.stop(profile_dir)
     except Exception as e:
         logger.warning(f"Tắt Brave lỗi: {e}")
 
