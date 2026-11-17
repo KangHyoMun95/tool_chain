@@ -262,3 +262,10 @@ export const LogOutIcon = (props: IconProps) => (
     <path d="M21 12H9" />
   </Icon>
 );
+
+/** Logo Telegram (đặc, dùng currentColor) — không dùng khung `Icon` vì là hình tô đầy, không phải nét. */
+export const TelegramIcon = (props: IconProps) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" {...props}>
+    <path d="M21.94 4.36a1.2 1.2 0 0 0-1.23-.2L2.9 11.03c-.86.34-.85 1.57.02 1.89l4.56 1.7 1.76 5.55c.2.64.99.86 1.5.42l2.54-2.18 4.6 3.4c.6.44 1.45.12 1.6-.6l3.06-15.2a1.2 1.2 0 0 0-.6-1.45zM9.4 14.2l8.2-5.05c.15-.09.28.12.15.24l-6.3 5.9-.25 2.7-1.8-3.79z" />
+  </svg>
+);

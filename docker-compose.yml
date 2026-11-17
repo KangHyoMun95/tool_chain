@@ -98,6 +98,9 @@ services:
     image: tool-chain-web-portal
     container_name: tool-chain-web-portal
     restart: unless-stopped
+    environment:
+      # Link Telegram ở trang đăng nhập / đăng ký; đọc lúc chạy, để trống thì ẩn. Đổi giá trị chỉ cần restart.
+      TELE_CONTRACT: ${TELE_CONTRACT:-}
     ports:
       - "${PORTAL_PORT:-5001}:3001"
     depends_on:
