@@ -157,6 +157,24 @@
     "passwordCancel": "Cancel",
     "passwordClose": "Close"
   },
+  "support": {
+    "title": "Customer support",
+    "fabLabel": "Support",
+    "cardTitle": "Need help?",
+    "cardBody": "Our support team replies on Telegram. Message us for a quick answer.",
+    "telegramCta": "Chat on Telegram",
+    "close": "Close",
+    "pageIntro": "Problems with your account, points or predictions? Contact us directly on Telegram.",
+    "faqTitle": "Frequently asked questions",
+    "faq": {
+      "q1": "How do I get more points?",
+      "a1": "Contact support on Telegram; we will guide you and ask your upline to grant points.",
+      "q2": "Do I get points back for a wrong prediction?",
+      "a2": "According to the current policy. Please ask support for details.",
+      "q3": "I forgot my password. What now?",
+      "a3": "Message support on Telegram to get help resetting it."
+    }
+  },
   "sidebar": {
     "label": "Navigation",
     "home": "Home",

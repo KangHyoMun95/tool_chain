@@ -38,7 +38,7 @@ function SidebarSkeleton({ label }: { label: string }) {
  * - Bấm "Trang chủ" / mục lobby: chuyển trang ngay, menu không có hiệu ứng (shell dùng chung nên menu đứng yên).
  * - Bấm thẻ category (sang trang không có sidebar): menu rút đi từ phải qua trái, lần lượt từ dưới lên.
  */
-export function Sidebar() {
+export function Sidebar({ supportEnabled = false }: { supportEnabled?: boolean }) {
   const { t } = useI18n();
   const comingSoon = useComingSoon();
   const { leavingMenu } = useShellExit();
@@ -60,7 +60,10 @@ export function Sidebar() {
     { key: "stats", icon: <BarChartIcon className="h-5 w-5 shrink-0 text-red-400" />, label: t("sidebar.stats"), active: false },
     { key: "vip", icon: <StarIcon className="h-5 w-5 shrink-0 text-gold-light" />, label: t("sidebar.vip"), active: false },
     { key: "news", icon: <NewspaperIcon className="h-5 w-5 shrink-0 text-red-400" />, label: t("sidebar.news"), active: false },
-    { key: "support", icon: <LifeBuoyIcon className="h-5 w-5 shrink-0 text-rose-500" />, label: t("sidebar.support"), active: false },
+    // CSKH chỉ hiện khi có link Telegram hợp lệ (TELE_CONTRACT); không có ⇒ ẩn hẳn mục này.
+    ...(supportEnabled
+      ? [{ key: "support", icon: <LifeBuoyIcon className="h-5 w-5 shrink-0 text-rose-500" />, label: t("sidebar.support"), active: pathname === "/support", href: "/support" }]
+      : []),
   ];
 
   return (

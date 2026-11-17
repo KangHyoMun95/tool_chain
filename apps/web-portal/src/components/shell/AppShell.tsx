@@ -12,10 +12,12 @@ type Props = {
   children: ReactNode;
   /** Hiện sidebar (trang chủ / lobby); mục đang xem lấy theo đường dẫn. */
   sidebar?: boolean;
+  /** Có link CSKH hợp lệ (TELE_CONTRACT) ⇒ sidebar hiện mục CSKH. */
+  supportEnabled?: boolean;
 };
 
 /** Khung chung của các trang cần đăng nhập: header + (sidebar) + nội dung. Cung cấp trạng thái thoát trang cho các khối con. */
-export function AppShell({ children, sidebar }: Props) {
+export function AppShell({ children, sidebar, supportEnabled = false }: Props) {
   const exit = useExitNavigation();
 
   return (
@@ -25,7 +27,7 @@ export function AppShell({ children, sidebar }: Props) {
           <AppHeader />
           {sidebar ? (
             <div className="flex flex-1 flex-col gap-3.5 lg:flex-row">
-              <Sidebar />
+              <Sidebar supportEnabled={supportEnabled} />
               <main className="flex min-w-0 flex-1 flex-col gap-3.5">{children}</main>
             </div>
           ) : (
