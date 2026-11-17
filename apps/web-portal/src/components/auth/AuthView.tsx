@@ -8,6 +8,7 @@ import { cn } from "@/src/lib/cn";
 import { ActivityIcon, CrosshairIcon, ShieldCheckIcon } from "../icons";
 import { useAuth } from "./AuthProvider";
 import { LoginForm } from "./LoginForm";
+import { ContactTelegram } from "./ContactTelegram";
 import { RegisterForm } from "./RegisterForm";
 
 type Mode = "login" | "register";
@@ -21,7 +22,7 @@ const BADGES = [
 // "inert" (React 18 chưa có kiểu): panel đang ẩn không nhận Tab / đọc màn hình.
 const INERT = { inert: "" } as Record<string, string>;
 
-export function AuthView() {
+export function AuthView({ telegramUrl = null }: { telegramUrl?: string | null }) {
   const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("login");
   const { status } = useAuth();
@@ -57,6 +58,7 @@ export function AuthView() {
           {switchAction}
         </button>
       </p>
+      <ContactTelegram url={telegramUrl} />
     </div>
   );
 
