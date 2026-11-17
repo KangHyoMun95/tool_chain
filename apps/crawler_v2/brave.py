@@ -107,29 +107,31 @@ def cdp_ready() -> bool:
         return False
 
 
-def _run(script: Path, timeout: int = 30) -> subprocess.CompletedProcess:
+def _run(script: Path, timeout: int = 30, profile_dir: str | None = None) -> subprocess.CompletedProcess:
     if not script.exists():
         raise FileNotFoundError(f"Không thấy {script}")
-    r = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=timeout)
+    env = {**os.environ, "BRAVE_PROFILE_DIR": profile_dir} if profile_dir else None   # None = giữ nguyên hành vi cũ
+    r = subprocess.run(["bash", str(script)], capture_output=True, text=True, timeout=timeout, env=env)
     out = (r.stdout + r.stderr).strip()
     log.info("[brave] %s -> exit %s: %s", script.name, r.returncode, out.replace("\n", " | "))
     return r
 
 
-def start() -> bool:
+def start(profile_dir: str | None = None) -> bool:
     """Đảm bảo Brave automation đang chạy và CDP sẵn sàng (bật Xvfb trước nếu cần).
+    profile_dir: thư mục user-data riêng (nhiều tài khoản); None = profile mặc định ~/.brave-automation (như cũ).
     Trả về True nếu hàm này mở Brave, False nếu Brave đã chạy từ trước."""
     if cdp_ready():
         log.info("[brave] CDP đã sẵn sàng, dùng Brave đang chạy")
         return False
 
     _start_display()
-    r = _run(START_SCRIPT)
+    r = _run(START_SCRIPT, profile_dir=profile_dir)
     if r.returncode == 1:
         # Process còn nhưng CDP không phản hồi (treo / đang tắt dở) -> tắt hẳn rồi mở lại
         log.warning("[brave] Brave chạy nhưng CDP không phản hồi -> restart")
-        _run(STOP_SCRIPT)
-        r = _run(START_SCRIPT)
+        _run(STOP_SCRIPT, profile_dir=profile_dir)
+        r = _run(START_SCRIPT, profile_dir=profile_dir)
     if r.returncode != 0:
         raise RuntimeError(f"start_brave.sh lỗi (exit {r.returncode})")
 
@@ -142,9 +144,10 @@ def start() -> bool:
     raise RuntimeError(f"Sau {CDP_WAIT_SEC}s CDP {CDP_URL} vẫn chưa sẵn sàng (xem /tmp/brave.log)")
 
 
-def stop():
-    """Tắt Brave automation (graceful), rồi tắt Xvfb nếu chính module này đã bật."""
+def stop(profile_dir: str | None = None):
+    """Tắt Brave automation (graceful), rồi tắt Xvfb nếu chính module này đã bật.
+    profile_dir None = profile mặc định (như cũ)."""
     try:
-        _run(STOP_SCRIPT, timeout=30)
+        _run(STOP_SCRIPT, timeout=30, profile_dir=profile_dir)
     finally:
         _stop_display()

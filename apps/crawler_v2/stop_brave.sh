@@ -4,7 +4,7 @@
 #
 # Chạy:  bash stop_brave.sh
 
-PROFILE_DIR="$HOME/.brave-automation"
+PROFILE_DIR="${BRAVE_PROFILE_DIR:-$HOME/.brave-automation}"   # BRAVE_PROFILE_DIR: profile riêng cho từng tài khoản
 PATTERN="--user-data-dir=$PROFILE_DIR"
 
 if ! pgrep -f -- "$PATTERN" >/dev/null; then

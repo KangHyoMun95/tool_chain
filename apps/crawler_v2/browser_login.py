@@ -18,7 +18,7 @@ from urllib.parse import urlparse
 from playwright.sync_api import Page, Playwright, TimeoutError as PWTimeout, Error as PWError, sync_playwright
 
 import brave
-from config import APP_PASSWORD, APP_USER, WEBSITE_URL
+from config import WEBSITE_URL
 from exception import CycleError
 
 logger = logging.getLogger("Crawler")
@@ -145,7 +145,7 @@ def access_website(page: Page):
     logger.info(f"[3] Truy cập thành công: {page.url}")
 
 
-def login_website(page: Page):
+def login_website(page: Page, username: str, password: str):
     login = page.locator("#loginbutton")
     try:
         login.wait_for(state="visible", timeout=15_000)
@@ -162,9 +162,9 @@ def login_website(page: Page):
     except PWTimeout:
         raise CycleError("Đã bấm nhưng dialog đăng nhập không hiện ra")
 
-    human_type(dialog.locator("#accountId"), APP_USER)
+    human_type(dialog.locator("#accountId"), username)
     page.wait_for_timeout(random.randint(300, 700))
-    human_type(dialog.locator("#accountPwd"), APP_PASSWORD)
+    human_type(dialog.locator("#accountPwd"), password)
 
     try:
         page.wait_for_function("() => !document.querySelector('#signin').disabled", timeout=10_000)
@@ -202,10 +202,11 @@ def clean_after_login(context, pg, pages_before, wait_ms: int = 3_000):
 # Tầng 3
 # ---------------------------------------------------------------------------
 
-def harvest_kubet_session() -> dict:
-    """Chạy SYNC (gọi qua asyncio.to_thread). Trả về {"kubet_host", "kubet_cookies"}."""
-    logger.info("[1] Khởi động Brave automation")
-    brave.start()
+def harvest_kubet_session(username: str, password: str, profile_dir: str | None = None) -> dict:
+    """Chạy SYNC (gọi qua asyncio.to_thread). Trả về {"kubet_host", "kubet_cookies"}.
+    profile_dir: profile Brave riêng của tài khoản."""
+    logger.info("[1] Khởi động Brave automation (%s)", username)
+    brave.start(profile_dir)
     try:
         with sync_playwright() as p:
             logger.info("[2] Kết nối Brave qua CDP")
@@ -214,8 +215,8 @@ def harvest_kubet_session() -> dict:
                 access_website(pg)
                 check_bot(pg)
                 check_network_issue(pg)
-                if need_login(pg, account_text=APP_USER):
-                    login_website(pg)
+                if need_login(pg, account_text=username):
+                    login_website(pg, username, password)
                     check_bot(pg)
                 else:
                     logger.info("[3] Profile còn đăng nhập, bỏ qua bước login")
@@ -242,4 +243,4 @@ def harvest_kubet_session() -> dict:
     finally:
         if STOP_BRAVE_AFTER:
             logger.info("[5] Tắt Brave")
-            brave.stop()
+            brave.stop(profile_dir)
