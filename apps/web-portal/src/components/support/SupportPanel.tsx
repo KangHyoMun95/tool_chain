@@ -22,7 +22,7 @@ export function SupportPanel({ url }: { url: string }) {
         </span>
         <h1 className="font-display text-2xl font-black uppercase tracking-wider text-white neon-text-glow">{t("support.title")}</h1>
         <p className="max-w-md text-sm leading-relaxed text-gray-400">{t("support.pageIntro")}</p>
-        <TelegramButton url={url} className="px-8 py-3 text-base" />
+        <TelegramButton url={url} />
       </HudCard>
       <HudCard className="animate-banner-in p-4 sm:p-5" style={stagger(0, 0, 250)}>
         <h2 className="mb-3 font-display text-sm font-black uppercase tracking-widest text-gray-200">{t("support.faqTitle")}</h2>
