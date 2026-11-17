@@ -21,9 +21,9 @@ export function ContactTelegram({ url }: { url: string | null }) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label="Telegram"
-          className="btn-fx-soft inline-flex h-11 w-11 items-center justify-center rounded-full border border-neon/40 bg-neon/5 text-zinc-300 hover:border-neon hover:text-neon focus:outline-none focus-visible:ring-2 focus-visible:ring-neon-soft"
+          className="btn-fx-soft inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#2AABEE] text-white shadow-[0_0_12px_rgba(42,171,238,0.5)] hover:!bg-[#37b6f5] hover:!shadow-[0_0_18px_rgba(42,171,238,0.8)] focus-visible:ring-2 focus-visible:ring-[#8fd8f7]"
         >
-          <TelegramIcon className="h-5 w-5" />
+          <TelegramIcon className="h-4 w-4" />
         </a>
       </div>
     </div>
