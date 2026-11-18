@@ -84,7 +84,7 @@ def shot_message(message_dict: dict):
     if table_id == "1007":
         logger.info(
             "[WATCH] cls=%s shoe=%s round=%s event=%r -> status=%s winCounts=%s actual=%s message_shot=%s",
-            type(cls).__name__, cls.get_key("gameShoe", None), cls.get_key("gameRound", None), cls.get_key("eventType", None),
+            type(cls).__name__, cls.get_key("gameShoe"), cls.get_key("gameRound"), cls.get_key("eventType"),
             rd.status, rd.totals, rd.actual_result, message_shot
         )
 
