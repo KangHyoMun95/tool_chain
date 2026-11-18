@@ -252,7 +252,7 @@ class SexyTokenClient:
         r.raise_for_status()
         return r.json()
 
-    def enter_game_hall(self):
+    def enter_game_hall(self, game_group_id: str | int = -1):
         """Lặp lại đúng chuỗi XHR browser gọi sau mỗi lần WS connect (log 2026-11-07 08:06):
           lần đầu của session:  queryWebGameHallDatas(hallType=1) -> GET gamehall.jsp -> queryInitWebGameHall
           các lần reconnect:    queryInitWebGameHall(gameGroupId=-1)
@@ -265,8 +265,9 @@ class SexyTokenClient:
             self._nav("GET", f"{base}/player/gamehall.jsp?dm=1&title=1",
                       referer=f"{base}/player/webMain.jsp?dm=1&title=1")
             self._hall_session = session_id
-        j = self._xhr("/player/query/queryInitWebGameHall", "gameGroupId=-1", "gamehall.jsp")
-        log.info("queryInitWebGameHall status=%s tables=%s", j.get("status"), len(j.get("tableItems") or []))
+        j = self._xhr("/player/query/queryInitWebGameHall", f"gameGroupId={game_group_id}", "gamehall.jsp")
+        log.info("queryInitWebGameHall gameGroupId=%s status=%s tables=%s",
+                 game_group_id, j.get("status"), len(j.get("tableItems") or []))
         return j
 
     def query_server_id(self) -> str | None:

@@ -18,8 +18,8 @@ RUN apt-get update && apt-get install -y \
 RUN useradd -m bot && mkdir -p /tmp/.X11-unix && chmod 1777 /tmp/.X11-unix
 # Tạo sẵn thư mục mount với chủ sở hữu bot: named volume mới sẽ kế thừa quyền này
 # [v2] thêm output/ : chứa session.json (cookie KUBET + game) -> mount volume để restart container không phải login lại
-RUN mkdir -p /home/bot/.brave-automation /home/bot/app/debug /home/bot/app/output \
- && chown -R bot:bot /home/bot/.brave-automation /home/bot/app
+RUN mkdir -p /home/bot/.brave-automation /home/bot/.brave-profiles /home/bot/app/debug /home/bot/app/output \
+ && chown -R bot:bot /home/bot/.brave-automation /home/bot/.brave-profiles /home/bot/app
 USER bot
 WORKDIR /home/bot/app
 

@@ -21,13 +21,16 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import signal
 import sys
 import time
+from pathlib import Path
 
-from config import APP_USER
+from categories import CategoryConfig, load_categories
 from exception import BotCheckError, SessionError
 from message_handler import handle_message
+from handlers import REGISTRY
 from session_store import SessionStore
 from token_client import KubetSessionExpired, SexyTokenClient, WsToken
 from ws_runner import TooManyFailures, WsRunner
@@ -63,12 +66,27 @@ def build_client(store: SessionStore) -> SexyTokenClient:
     return c
 
 
+class BrowserGate:
+    """Dùng chung cho mọi TokenProvider: tại một thời điểm chỉ MỘT tài khoản login bằng trình duyệt (tầng 3), vì chỉ có
+    một cổng CDP / một Xvfb. `profile` = profile Brave của tài khoản đang login (để tắt đúng Brave khi process thoát)."""
+
+    def __init__(self):
+        self.lock = asyncio.Lock()
+        self.profile: str | None = None
+
+
 class TokenProvider:
     """Gọi mỗi lần (re)connect WS. Tự nâng tầng khi tầng dưới thất bại, lưu session khi có thay đổi."""
 
-    def __init__(self, client: SexyTokenClient, store: SessionStore):
+    def __init__(self, client: SexyTokenClient, store: SessionStore, username: str, password: str,
+                 profile_dir: str | None = None, gate: BrowserGate | None = None):
+        """Mỗi category một TokenProvider (tài khoản + profile Brave riêng); `gate` dùng chung giữa các provider."""
+        self.gate = gate or BrowserGate()
         self.c = client
         self.store = store
+        self.username = username
+        self.password = password
+        self.profile_dir = profile_dir
         self._browser_logins: list[float] = []
         self._last_saved: dict | None = None
         self._lock = asyncio.Lock()
@@ -80,6 +98,14 @@ class TokenProvider:
             self._last_saved = snap
 
     async def _browser_login(self):
+        async with self.gate.lock:                           # tuần tự giữa các tài khoản
+            self.gate.profile = self.profile_dir
+            try:
+                await self._browser_login_locked()
+            finally:
+                self.gate.profile = None
+
+    async def _browser_login_locked(self):
         now = time.time()
         self._browser_logins = [t for t in self._browser_logins if now - t < 3600]
         if len(self._browser_logins) >= MAX_BROWSER_LOGINS_PER_HOUR:
@@ -88,7 +114,7 @@ class TokenProvider:
 
         logger.warning("[tầng 3] Cookie KUBET hết hạn -> dùng browser")
         from browser_login import harvest_kubet_session      # import muộn: chỉ load Playwright khi cần
-        sess = await asyncio.to_thread(harvest_kubet_session)
+        sess = await asyncio.to_thread(harvest_kubet_session, self.username, self.password, self.profile_dir)
         self.c.set_kubet_cookies(sess["kubet_host"], sess["kubet_cookies"])
         if sess.get("browser_identity"):
             self.c.set_browser_identity(sess["browser_identity"])
@@ -98,12 +124,12 @@ class TokenProvider:
     async def __call__(self) -> WsToken:
         async with self._lock:
             try:
-                tok = await asyncio.to_thread(self.c.ensure_token, APP_USER)     # tầng 1 -> 2
+                tok = await asyncio.to_thread(self.c.ensure_token, self.username)     # tầng 1 -> 2
             except KubetSessionExpired as e:
                 logger.warning("[token] %s", e)
                 await self._browser_login()                                       # tầng 3
                 try:
-                    tok = await asyncio.to_thread(self.c.ensure_token, APP_USER) # tầng 2 với cookie mới
+                    tok = await asyncio.to_thread(self.c.ensure_token, self.username) # tầng 2 với cookie mới
                 except KubetSessionExpired as e2:
                     # Cookie VỪA login bằng browser mà vẫn bị từ chối -> login lại nữa cũng vô ích
                     # (và login dồn dập dễ khoá tài khoản) -> dừng hẳn, xem file trong debug/
@@ -155,7 +181,7 @@ async def kubet_keepalive_loop(client: SexyTokenClient, provider: "TokenProvider
     while True:
         await asyncio.sleep(KUBET_KEEPALIVE_SEC)
         try:
-            alive = await asyncio.to_thread(client.kubet_keepalive, APP_USER)
+            alive = await asyncio.to_thread(client.kubet_keepalive, provider.username)
             provider._save_if_changed("kubet keepalive")      # lưu cookie mới nếu server gia hạn/đổi
             if not alive:
                 logger.warning("[keepalive] KUBET có vẻ đã hết hạn — lần login lại game tới sẽ dùng browser (tầng 3)")
@@ -192,63 +218,83 @@ async def run_isolated(name: str, make_runner):
         backoff = min(backoff * 2, RUNNER_BACKOFF_MAX)
 
 
+PROFILES_DIR = os.path.expanduser("~/.brave-profiles")          # mỗi tài khoản một profile Brave riêng (volume brave-profiles)
+SESSIONS_DIR = Path("output/sessions")                          # mỗi tài khoản một file session (volume bot-output)
+
+
+def _safe_name(username: str) -> str:
+    return re.sub(r"[^A-Za-z0-9_-]", "_", username)
+
+
+def profile_dir_for(username: str) -> str:
+    """Đuôi '.p' (tên đã bị thay mọi ký tự lạ nên không chứa '.') để pgrep -f '--user-data-dir=<dir>' trong
+    start/stop_brave.sh không khớp nhầm profile khác có tên bắt đầu giống."""
+    return os.path.join(PROFILES_DIR, _safe_name(username) + ".p")
+
+
+def session_path_for(username: str) -> Path:
+    return SESSIONS_DIR / f"{_safe_name(username)}.json"
+
+
 async def supervisor() -> int:
     """Trả về exit code cho Docker (restart: unless-stopped):
       0 = dừng theo yêu cầu (docker stop / SIGINT)
       1 = lỗi cấp phiên / tài khoản (BotCheckError, SessionError) hoặc lỗi không lường trước: chờ RESTART_DELAY rồi thoát để Docker chạy lại.
-    Lỗi của MỘT WSS không đi tới đây: run_isolated tự khởi động lại WSS đó."""
-    store = SessionStore()
-    client = build_client(store)
-    provider = TokenProvider(client, store)          # dùng chung: 1 session, 1 lock login, 1 giới hạn browser
-    async def enter_hall():                          # giống browser: sau mỗi lần WS connect -> vào sảnh
-        await asyncio.to_thread(client.enter_game_hall)
+    Mỗi category (GAME_GROUP_ID_<n>) = 1 tài khoản + 1 client + 1 session file + 1 TokenProvider + 1 WSS, task độc lập
+    (run_isolated). Lỗi của MỘT category không đi tới đây: run_isolated tự khởi động lại category đó.
+    Cấu hình sai: load_categories ném ConfigError (thoát như lỗi khởi động bất kỳ)."""
+    cats = load_categories(REGISTRY)
+    gate = BrowserGate()
 
-    def factory(name, host, handler, idle):
-        return lambda: WsRunner(client, provider, on_message=handler, ws_host=host, name=name, idle_timeout=idle,
-                                on_open=enter_hall, on_idle=enter_hall,
+    def factory(c: CategoryConfig):
+        spec = REGISTRY[c.handler]
+        store = SessionStore(session_path_for(c.username))
+        client = build_client(store)
+        provider = TokenProvider(client, store, c.username, c.password, profile_dir_for(c.username), gate)
+        handler = spec.get()
+
+        async def enter_hall():                      # giống browser: sau mỗi lần WS connect -> vào sảnh (gameGroupId của category)
+            await asyncio.to_thread(client.enter_game_hall, c.group_id)
+
+        logger.info("[config] category '%s' (%s): tài khoản=%s gameGroupId=%s handler=%s session=%s",
+                    c.category, c.lobby, c.username, c.group_id, c.handler, store.path)
+        return lambda: WsRunner(client, provider, on_message=handler, ws_host=spec.ws_host, name=c.category,
+                                idle_timeout=spec.idle_timeout, on_open=enter_hall, on_idle=enter_hall,
                                 max_fails=MAX_FAILS, fatal=(BotCheckError,))
 
-    targets = [t for t in WS_TARGETS if ws_enabled(t[0])]
-    for name, *_ in WS_TARGETS:
-        if not ws_enabled(name):
-            logger.warning("[config] WSS '%s' bị tắt (WS_ENABLED_%s)", name, name.upper())
-    tasks = {asyncio.create_task(run_isolated(name, factory(name, host, h, idle)), name=name)
-             for name, host, h, idle in targets}
-    if not tasks:
-        logger.error("[STOP] Không có WSS nào được bật (WS_ENABLED_*)")
+    tasks = {asyncio.create_task(run_isolated(c.category, factory(c)), name=c.category) for c in cats}
 
     # Giữ session KUBET: BỎ COMMENT dòng dưới nếu cookie KUBET hết hạn nhanh hơn v1
     # (xem "browser_logins" trong output/session.json — nếu vài giờ lại phải login browser 1 lần).
     # tasks.add(asyncio.create_task(kubet_keepalive_loop(client, provider), name="kubet_keepalive"))
     code = 1
     try:
-        if tasks:
-            # run_isolated không bao giờ tự kết thúc: một task xong = lỗi cấp phiên -> dừng tất cả để thoát mã 1
-            done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-            for t in done:
-                e = t.exception()
-                if isinstance(e, BotCheckError):
-                    logger.error(f"[STOP] [{t.get_name()}] Bị check bot: {e}. Thoát mã 1 sau {RESTART_DELAY}s.")
-                elif isinstance(e, SessionError):
-                    logger.error(f"[STOP] {e}. Thoát mã 1 sau {RESTART_DELAY}s để tránh khoá tài khoản.")
-                elif e:
-                    logger.error(f"[STOP] [{t.get_name()}] lỗi không lường trước", exc_info=e)
+        # run_isolated không bao giờ tự kết thúc: một task xong = lỗi cấp phiên -> dừng tất cả để thoát mã 1
+        done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for t in done:
+            e = t.exception()
+            if isinstance(e, BotCheckError):
+                logger.error(f"[STOP] [{t.get_name()}] Bị check bot: {e}. Thoát mã 1 sau {RESTART_DELAY}s.")
+            elif isinstance(e, SessionError):
+                logger.error(f"[STOP] [{t.get_name()}] {e}. Thoát mã 1 sau {RESTART_DELAY}s để tránh khoá tài khoản.")
+            elif e:
+                logger.error(f"[STOP] [{t.get_name()}] lỗi không lường trước", exc_info=e)
     finally:
         for t in tasks:
             t.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)
-        _stop_brave_if_running()
+        _stop_brave_if_running(gate.profile)
     logger.info(f"Chờ {RESTART_DELAY}s rồi thoát (exit 1) để Docker chạy lại")
     await asyncio.sleep(RESTART_DELAY)
     return code
 
 
-def _stop_brave_if_running():
-    """Thoát giữa lúc đang login browser (tầng 3) -> tắt Brave/Xvfb cho sạch."""
+def _stop_brave_if_running(profile_dir: str | None = None):
+    """Thoát giữa lúc đang login browser (tầng 3) -> tắt Brave/Xvfb cho sạch (đúng profile của tài khoản đang login)."""
     try:
         import brave
         if brave.cdp_ready():
-            brave.stop()
+            brave.stop(profile_dir)
     except Exception as e:
         logger.warning(f"Tắt Brave lỗi: {e}")
 

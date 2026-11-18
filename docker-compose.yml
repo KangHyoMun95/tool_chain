@@ -152,8 +152,6 @@ services:
       TZ: Asia/Ho_Chi_Minh
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379
       VNC: "${VNC:-0}"
-      SX_LOBBY: ${SX_LOBBY:-}
-      SX_CATEGORY_1: ${SX_CATEGORY_1:-}
       # Mỗi WSS bật / tắt riêng (WS_TARGETS ở main.py). Lỗi cấp phiên (check bot...) ⇒ chờ RESTART_DELAY giây rồi thoát mã 1, Docker chạy lại.
       WS_ENABLED_TGMEQ: ${WS_ENABLED_TGMEQ:-true}
       RESTART_DELAY: ${RESTART_DELAY:-600}
@@ -161,6 +159,7 @@ services:
     # - "127.0.0.1:5900:5900"
     volumes:
       - brave-profile:/home/bot/.brave-automation   # profile Brave (như v1)
+      - brave-profiles:/home/bot/.brave-profiles    # profile Brave riêng từng tài khoản
       - bot-output:/home/bot/app/output             # [v2] session.json: restart không phải login lại
       - ./debug:/home/bot/app/debug
     depends_on:
@@ -177,4 +176,5 @@ volumes:
   redis-data:
     driver: local
   brave-profile:
+  brave-profiles:
   bot-output:
