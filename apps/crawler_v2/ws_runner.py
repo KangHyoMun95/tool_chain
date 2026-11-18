@@ -123,9 +123,11 @@ class WsRunner:
             last_binary = None        # thời điểm nhận frame DỮ LIỆU gần nhất (không tính Heartbeat/Connecting)
             b1_at = None              # thời điểm đã chạy B1 trong đợt im lặng hiện tại
             max_gap = 0.0             # khoảng cách lớn nhất giữa 2 frame dữ liệu (trong cửa sổ thống kê)
+            closed_by = None          # lý do crawler tự đóng WS (None = không phải crawler đóng)
+            last_msg_at = opened      # chỉ để log: lúc nhận message (mọi loại) gần nhất
 
             async def heartbeat():
-                nonlocal missed
+                nonlocal missed, closed_by
                 while not stop.is_set():
                     await asyncio.sleep(HEARTBEAT_SEC)
                     if time.time() - opened > STABLE_AFTER:
@@ -133,11 +135,16 @@ class WsRunner:
                     missed += 1
                     if missed > MAX_MISSED:
                         self.log.warning("heartCheck: %d nhịp không có message -> reconnect", missed - 1)
+                        self.log.warning("WS đóng bởi CRAWLER (heartCheck): lỡ %d nhịp heartbeat (ngưỡng MAX_MISSED=%d, mỗi nhịp %ss), "
+                                         "%.1fs kể từ message cuối, sống %.1fs",
+                                         missed - 1, MAX_MISSED, HEARTBEAT_SEC, time.time() - last_msg_at, time.time() - opened)
+                        closed_by = "heartCheck"
                         await ws.close(1000, "heartCheck")
                         return
                     await ws.send(encode({"router": "heartbeat"}))
 
             async def server_poll():
+                nonlocal closed_by
                 while not stop.is_set():
                     await asyncio.sleep(SERVER_POLL_SEC)
                     try:
@@ -147,6 +154,9 @@ class WsRunner:
                         continue
                     if self.server_id and sid and sid != self.server_id:
                         self.log.warning("systemRolling %s -> %s -> reconnect", self.server_id, sid)
+                        self.log.warning("WS đóng bởi CRAWLER (systemRolling): server id đổi %s -> %s, sống %.1fs",
+                                         self.server_id, sid, time.time() - opened)
+                        closed_by = "systemRolling"
                         self.server_id = sid
                         await ws.close(1000, "systemRolling")
                         return
@@ -159,7 +169,7 @@ class WsRunner:
                     self.log.warning("B1 on_idle lỗi: %s: %s", type(e).__name__, e)
 
             async def idle_watch():
-                nonlocal reason, b1_at
+                nonlocal reason, b1_at, closed_by
                 x = self.idle_timeout
                 while not stop.is_set():
                     await asyncio.sleep(0.1)
@@ -181,6 +191,9 @@ class WsRunner:
                     reason = "idle"                         # ---- B2: reconnect
                     self.log.warning("B2: %.1fs không có dữ liệu%s -> re-call getToken + reconnect",
                                      idle, " (B1 không cứu được)" if b1_at else "")
+                    self.log.warning("WS đóng bởi CRAWLER (idle): %.1fs không có dữ liệu (limit %.1fs, B1 %s), sống %.1fs",
+                                     idle, limit, "đã chạy" if b1_at else "chưa chạy", now - opened)
+                    closed_by = "idle"
                     await ws.close(1000, "idle")
                     return
 
@@ -208,6 +221,7 @@ class WsRunner:
             try:
                 async for raw in ws:
                     missed = 0                              # JS: onmessage -> p = 0
+                    last_msg_at = time.time()
                     self.msg_count += 1
                     if first:
                         first = False
@@ -228,9 +242,23 @@ class WsRunner:
                         self.on_message(raw)
                     except Exception as e:                  # lỗi xử lý data không được làm rớt WS
                         self.log.exception("on_message lỗi: %s", e)
+            except Exception as e:
+                self.log.warning("WS đóng do lỗi khi đọc: %s: %s (close_code=%s close_reason=%r), sống %.1fs",
+                                 type(e).__name__, e, ws.close_code, ws.close_reason, time.time() - opened)
+                raise
             finally:
+                if closed_by:
+                    self.log.warning("WS đóng: crawler tự đóng (%s), close_code=%s close_reason=%r, sống %.1fs",
+                                     closed_by, ws.close_code, ws.close_reason, time.time() - opened)
+                else:
+                    rcvd = getattr(ws, "close_rcvd", None)
+                    self.log.warning("WS đóng: phía SERVER/mạng đóng, close_code=%s close_reason=%r (close frame nhận: %s), sống %.1fs",
+                                     ws.close_code, ws.close_reason, rcvd, time.time() - opened)
                 stop.set()
                 for t in tasks:
+                    if t.done() and not t.cancelled() and t.exception():
+                        self.log.warning("task %s kết thúc bằng lỗi: %s: %s", t.get_coro().__name__,
+                                         type(t.exception()).__name__, t.exception())
                     t.cancel()
         return time.time() - opened, reason
 
