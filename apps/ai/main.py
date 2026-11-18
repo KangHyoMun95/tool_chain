@@ -24,18 +24,27 @@ def main() -> int:
 
     logging.basicConfig(level=os.environ.get("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
     cmd = args.cmd or "serve"
+
+    # Mọi lệnh đều cần cấu hình category (config/categories/*.json): sai / thiếu ⇒ KHÔNG chạy, in tất cả lỗi.
+    from src.patterns.category_config import CategoryConfigError, load_registry
+    try:
+        registry = load_registry()
+    except CategoryConfigError as e:
+        print(e, file=sys.stderr)
+        return 1
+
     if cmd == "serve":
         from src.patterns.service import run
-        asyncio.run(run())
+        asyncio.run(run(registry))
     elif cmd == "backtest":
         from src.patterns.pattern_backtest import main as backtest
-        backtest(source=args.source, refresh=args.refresh)
+        backtest(registry, source=args.source, refresh=args.refresh)
     elif cmd == "verify":
         from src.patterns.verify import main as verify
-        return verify()
+        return verify(registry)
     else:
         from src.patterns.pattern_predict import main as predict
-        predict(source=args.source)
+        predict(registry, source=args.source)
     return 0
 
 

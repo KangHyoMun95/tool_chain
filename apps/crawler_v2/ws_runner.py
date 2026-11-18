@@ -20,6 +20,7 @@ import re
 import msgpack
 import websockets
 
+from exception import SessionError
 from token_client import SexyTokenClient, WsToken
 
 HEARTBEAT_SEC = 5      # u.start(): setInterval 5E3
@@ -49,7 +50,7 @@ def encode(obj: dict) -> bytes:
 
 
 class TooManyFailures(Exception):
-    pass
+    """Runner này lỗi liên tiếp quá max_fails. CHỈ liên quan tới runner đó: main.py khởi động lại riêng nó (có backoff)."""
 
 
 class WsRunner:
@@ -78,8 +79,8 @@ class WsRunner:
         on_idle       : hàm async cho bước B1 (lỗi chỉ log, vẫn chuyển sang B2 nếu không có dữ liệu).
         on_open       : hàm async chạy NỀN ngay sau frame đầu tiên (Connecting) của mỗi kết nối
                         (vd vào sảnh: queryInitWebGameHall). Lỗi trong on_open chỉ log, không làm rớt WS.
-        max_fails     : lỗi liên tiếp quá ngưỡng -> ném TooManyFailures.
-        fatal         : các exception phải dừng ngay, không retry (vd BotCheckError).
+        max_fails     : lỗi liên tiếp quá ngưỡng -> ném TooManyFailures (main.py khởi động lại riêng runner này).
+        fatal         : các exception phải dừng ngay, không retry (vd BotCheckError). SessionError luôn dừng ngay.
         """
         self.c = client
         self.token_provider = token_provider
@@ -248,8 +249,8 @@ class WsRunner:
                 self.log.info("WS đóng sau %.0fs -> reconnect", lived)
                 if lived < STABLE_AFTER:
                     self.fails += 1
-            except (asyncio.CancelledError, TooManyFailures):
-                raise                                       # TooManyFailures (từ token_provider): dừng ngay, không retry
+            except (asyncio.CancelledError, SessionError):
+                raise                                       # SessionError (từ token_provider): lỗi phiên dùng chung, dừng ngay, không retry
             except Exception as e:
                 if self.fatal and isinstance(e, self.fatal):
                     raise

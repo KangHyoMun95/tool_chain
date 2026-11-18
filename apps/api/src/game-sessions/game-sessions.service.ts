@@ -30,7 +30,7 @@ export class GameSessionsService {
     const [{ count }]: { count: string }[] = await this.ds.query(`SELECT count(*) AS count FROM game_sessions WHERE ${where}`, args);
     const rows: {
       game_session_id: string; shoe: number; round: number; result: string | null; status: string; created_at: Date;
-      pick: "B" | "P" | null; confidence: string | null;
+      pick: string | null; confidence: string | null;
     }[] = await this.ds.query(
       `SELECT g.game_session_id, g.road_shoe AS shoe, g.road_count AS round, g.result, g.status, g.created_at,
               p.predict_result AS pick, p.confidence_score AS confidence

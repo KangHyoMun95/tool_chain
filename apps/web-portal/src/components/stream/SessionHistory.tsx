@@ -5,15 +5,23 @@ import { useI18n } from "@/src/i18n/provider";
 import type { HistoryRow } from "@/src/hooks/use-stream-history";
 import { cn } from "@/src/lib/cn";
 import { predictionSource } from "@/src/lib/prediction-source";
+import { glow, resultTone, symbolView, type ResultConfig } from "@/src/lib/result-config";
 import { HudCard } from "../ui/HudCard";
 
 const SHOWN = 10;   // 5 cột x 2 hàng
 
-type Props = { streamId: string; rows: HistoryRow[]; error: boolean };   // rows: round giảm dần
+/** Ký hiệu tô màu theo cấu hình category; chưa biết (null) ⇒ "—" trắng. */
+function SymbolText({ config, symbol, locale }: { config: ResultConfig | null; symbol: string | null; locale: Parameters<typeof symbolView>[2] }) {
+  if (symbol === null) return <>—</>;
+  const v = symbolView(config, symbol, locale);
+  return <span style={v.known ? { color: v.color, textShadow: glow(v.color, 6, 0.8) } : undefined}>{symbol}</span>;
+}
 
-/** 10 ván gần nhất của shoe hiện tại: `dự đoán → kết quả` + THẮNG / THUA / HÒA. */
-export function SessionHistory({ streamId, rows, error }: Props) {
-  const { t } = useI18n();
+type Props = { streamId: string; rows: HistoryRow[]; error: boolean; config: ResultConfig | null };   // rows: round giảm dần
+
+/** 10 ván gần nhất của shoe hiện tại: `dự đoán → kết quả` (màu theo cấu hình category) + THẮNG / THUA / HÒA. */
+export function SessionHistory({ streamId, rows, error, config }: Props) {
+  const { t, locale } = useI18n();
 
   return (
     <HudCard className="flex flex-col gap-3 overflow-hidden p-3.5">
@@ -27,8 +35,8 @@ export function SessionHistory({ streamId, rows, error }: Props) {
         {rows.slice(0, SHOWN).map((r) => {
           // Dự đoán lưu trong DB (từ API lịch sử); ván vừa kết thúc chưa kịp refetch thì lấy từ phiên (SSE / current).
           // Chưa biết hoặc AI không dự đoán => "—", không đúng / sai.
-          const pick = r.pick !== undefined ? r.pick : (predictionSource.peek(streamId, r.shoe, r.round)?.pick ?? null);
-          const tone = r.result === "T" ? "draw" : pick === null || r.result === null ? "none" : pick === r.result ? "win" : "loss";
+          const pick = r.pick !== undefined ? r.pick : (predictionSource.peek(streamId, r.shoe, r.round, config?.predictable)?.pick ?? null);
+          const tone = resultTone(config, pick, r.result);
           return (
             <div
               key={`${r.shoe}:${r.round}`}
@@ -40,7 +48,9 @@ export function SessionHistory({ streamId, rows, error }: Props) {
               )}
             >
               <span className="font-mono text-[9px] font-medium text-gray-400">{t("live.session", { shoe: r.shoe, round: r.round })}</span>
-              <span className="font-mono text-xs font-black tracking-wider text-white">{pick ?? "—"} → {r.result ?? "—"}</span>
+              <span className="font-mono text-xs font-black tracking-wider text-white">
+                <SymbolText config={config} symbol={pick} locale={locale} /> → <SymbolText config={config} symbol={r.result} locale={locale} />
+              </span>
               <span
                 className={cn(
                   "flex w-full items-center justify-center gap-0.5 rounded py-0.5 font-mono text-[9px] font-extrabold uppercase",

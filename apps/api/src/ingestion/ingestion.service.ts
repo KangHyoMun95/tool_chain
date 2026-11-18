@@ -15,6 +15,7 @@ import { BoundedMap } from "./bounded-map.js";
 import { IdCache } from "./id-cache.service.js";
 import { ShoeObserver } from "./shoe-observer.js";
 import { SettleQueue } from "../billing/settle-queue.service.js";
+import { CategoryConfigService } from "../category-config/category-config.service.js";
 import { pgErrorCode } from "./dead-letter.js";
 import { INVALID_LOG_INTERVAL_MS, MAX_NAME_LENGTH, MAX_RESULT_LENGTH, MEMORY_CACHE_MAX } from "./ingestion.constants.js";
 
@@ -53,6 +54,7 @@ export class IngestionService {
     private streamInfo: StreamInformationService,
     private gameSessions: GameSessionsService,
     private settle: SettleQueue,
+    private categoryConfigs: CategoryConfigService,
   ) {}
 
   /** Ghi một batch tick trong một DB transaction. Ném lỗi nếu ghi thất bại (caller giữ buffer, không XACK). */
@@ -100,6 +102,13 @@ export class IngestionService {
       names.push(v);
     }
     const [lobby, category, stream] = names;
+
+    // Category phải có file định nghĩa và actual_result phải thuộc results của nó: không thì từ chối cả tick (không ghi DB), log ERROR.
+    const inspected = this.categoryConfigs.inspectTick(d);
+    if (!inspected.ok) {
+      this.categoryConfigs.reportRejected(inspected);
+      return null;
+    }
 
     // stream_shoe và stream_round đều là số nguyên, bắt buộc: sai thì bỏ cả tick (realtime là luồng khác, không bị ảnh hưởng)
     const shoe = toInt(d.stream_shoe);

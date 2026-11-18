@@ -47,6 +47,10 @@ export class CategoryStreamStatsController {
   @Get()
   async list(@CurrentUser() actor: AuthUser, @Param() params: IdParamDto) {
     await this.categories.getOne(actor.role, params.id);   // 404 khi category không tồn tại / ngoài phạm vi
-    return { items: await this.predictions.listStats(actor.role, params.id) };
+    const [items, result_config] = await Promise.all([
+      this.predictions.listStats(actor.role, params.id),
+      this.predictions.resultConfigOfCategory(params.id),   // hạt / nhãn / màu của category (null khi không có file định nghĩa)
+    ]);
+    return { items, result_config };
   }
 }

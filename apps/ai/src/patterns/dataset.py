@@ -13,19 +13,25 @@ log = logging.getLogger("pattern")
 CACHE = Path(__file__).parent / "data" / "sessions.parquet"
 
 QUERY = text("""
-    SELECT game_session_id, stream_id, road_shoe, road_count, created_at, result
-    FROM game_sessions
-    WHERE result IS NOT NULL
-      AND created_at >= :since
-      AND status = 'FINISHED'
-    ORDER BY stream_id, road_shoe, road_count
+    SELECT gs.game_session_id, gs.stream_id, gs.road_shoe, gs.road_count, gs.created_at, gs.result, l.lobby_name, c.category_name
+    FROM game_sessions gs
+    JOIN streams s ON s.stream_id = gs.stream_id
+    JOIN categories c ON c.category_id = s.category_id
+    JOIN lobbies l ON l.lobby_id = c.lobby_id
+    WHERE gs.result IS NOT NULL
+      AND gs.created_at >= :since
+      AND gs.status = 'FINISHED'
+    ORDER BY gs.stream_id, gs.road_shoe, gs.road_count
 """)
 
 
 def load_sessions(since: str = "2026-01-01", refresh: bool = False, source: str = "file") -> pd.DataFrame:
     """source='file': đọc parquet (không có thì lấy từ DB và lưu); 'db': luôn lấy từ DB (không ghi file)."""
     if source == "file" and CACHE.exists() and not refresh:
-        return pd.read_parquet(CACHE)
+        df = pd.read_parquet(CACHE)
+        if {"lobby_name", "category_name"} <= set(df.columns):
+            return df
+        log.warning("File cache %s thiếu cột lobby_name / category_name (bản cũ): lấy lại từ DB", CACHE)
     df = pd.read_sql(QUERY, engine(), params={"since": since})
     if source == "file":
         CACHE.parent.mkdir(exist_ok=True)

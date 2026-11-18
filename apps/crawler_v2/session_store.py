@@ -47,3 +47,4 @@ class SessionStore:
         hist = self.data.setdefault("browser_logins", [])
         hist.append(time.strftime("%Y-%m-%d %H:%M:%S"))
         self.data["browser_logins"] = hist[-50:]
+

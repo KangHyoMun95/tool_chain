@@ -2,9 +2,11 @@
 # Chạy một lần (không cần Redis): đọc DB, in dự đoán pattern-v1 cho ván kế tiếp của từng stream đang hoạt động.
 import json
 import logging
+import pandas as pd
 from datetime import datetime, timezone
 
-from .config import IGNORE, MAX_GAP, MAX_LEN, MIN_LEN
+from .category_config import CategoryConfig, CategoryRegistry
+from .config import MAX_GAP, MAX_LEN, MIN_LEN
 from .dataset import add_segments, load_sessions
 from .pattern import PatternStats, choose_pick, format_detail
 
@@ -16,25 +18,37 @@ def load_all(refresh: bool = True, source: str = "db"):
     return add_segments(load_sessions(refresh=refresh, source=source))
 
 
-def load_clean(refresh: bool = True, source: str = "db"):
-    df = load_all(refresh=refresh, source=source)           # tách đoạn TRƯỚC khi bỏ T
-    df = df[~df["result"].isin(IGNORE)]
-    assert df["result"].str.len().eq(1).all(), "result phải là 1 ký tự (B/P...)"
-    return df
+def config_of(registry: CategoryRegistry, sdf) -> CategoryConfig | None:
+    return registry.get(str(sdf["lobby_name"].iloc[0]), str(sdf["category_name"].iloc[0]))
 
 
-def build_stats(df) -> dict[str, PatternStats]:
+def load_clean(registry: CategoryRegistry, refresh: bool = True, source: str = "db"):
+    """Mọi ván FINISHED của stream có cấu hình category, đã bỏ ký hiệu `ignore_in_pattern` (tách đoạn TRƯỚC khi bỏ)."""
+    df = load_all(refresh=refresh, source=source)
+    keep = []
+    for sid, sdf in df.groupby("stream_id", sort=False):
+        cfg = config_of(registry, sdf)
+        if cfg is None:
+            log.error("Bỏ qua stream %s: category %r / %r không có file định nghĩa trong config/categories",
+                      sid, sdf["lobby_name"].iloc[0], sdf["category_name"].iloc[0])
+            continue
+        keep.append(sdf[sdf["result"].isin(cfg.results) & ~sdf["result"].isin(cfg.ignore_in_pattern)])
+    return pd.concat(keep) if keep else df.iloc[0:0]
+
+
+def build_stats(df, registry: CategoryRegistry) -> dict[str, PatternStats]:
     """Bảng đếm RIÊNG từng stream (gộp mọi shoe của stream đó, không nối qua ranh giới shoe)."""
     stats: dict[str, PatternStats] = {}
     for (sid, _), seg in df.groupby(["stream_id", "segment"], sort=False):
-        stats.setdefault(str(sid), PatternStats()).add_sequence("".join(seg["result"]))
+        cfg = config_of(registry, seg)
+        stats.setdefault(str(sid), PatternStats(cfg.predictable)).add_sequence("".join(seg["result"]))
     return stats
 
 
-def main(source: str = "db") -> None:
-    df = load_clean(refresh=source == "file", source=source)
-    stats = build_stats(df)
-    log.info("%d stream, %d kết quả B/P", len(stats), len(df))
+def main(registry: CategoryRegistry, source: str = "db") -> None:
+    df = load_clean(registry, refresh=source == "file", source=source)
+    stats = build_stats(df, registry)
+    log.info("%d stream, %d kết quả (đã bỏ ignore_in_pattern)", len(stats), len(df))
 
     now = datetime.now(timezone.utc)
     for sid, sdf in df.groupby("stream_id"):
@@ -46,6 +60,6 @@ def main(source: str = "db") -> None:
         recent = "".join(last_seg["result"].tail(MAX_LEN))
         if len(recent) < MIN_LEN:
             continue
-        pick = choose_pick(recent, stats[str(sid)].lookup)
+        pick = choose_pick(recent, stats[str(sid)].lookup, config_of(registry, sdf).predictable)
         log.info("stream %s\n%s", sid, format_detail(pick))
         log.info("json %s", json.dumps({"stream_id": str(sid), "generated_at": now.isoformat(), **pick}, ensure_ascii=False))

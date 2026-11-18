@@ -8,27 +8,26 @@ import type { PredictionReason } from "@toolhackchain/shared";
 import { fetchCurrentPrediction } from "./api/predictions";
 import { predictionStore } from "./prediction-store";
 
-export type Outcome = "B" | "P" | "T";
 /**
  * pick = null khi AI không đủ dữ liệu để dự đoán (reason ≠ OK) hoặc khi locked. confidence là phần trăm 0–100.
  * locked = ván này đã có dự đoán nhưng user không được nhận (vào sau khi dự đoán được phát / không bị trừ tiền).
  */
-export type Prediction = { pick: "B" | "P" | null; confidence: number | null; reason: PredictionReason | null; locked: boolean };
+export type Prediction = { pick: string | null; confidence: number | null; reason: PredictionReason | null; locked: boolean };
 
 /** Dự đoán của ván bị khóa với user này. */
 export const LOCKED_PREDICTION: Prediction = { pick: null, confidence: null, reason: null, locked: true };
 
 export interface PredictionSource {
-  /** Resolve khi có dự đoán của (stream, shoe, round); reject khi `signal` bị hủy. */
-  getPrediction(streamId: string, shoe: number, round: number, signal?: AbortSignal): Promise<Prediction>;
+  /** Resolve khi có dự đoán của (stream, shoe, round); reject khi `signal` bị hủy. `predictable`: ký hiệu AI được chọn (chỉ nguồn mock dùng để giả lập). */
+  getPrediction(streamId: string, shoe: number, round: number, signal?: AbortSignal, predictable?: readonly string[]): Promise<Prediction>;
   /** Dự đoán đã biết (đồng bộ, không gọi mạng); undefined nếu chưa có. */
-  peek(streamId: string, shoe: number, round: number): Prediction | undefined;
+  peek(streamId: string, shoe: number, round: number, predictable?: readonly string[]): Prediction | undefined;
 }
 
 export const MOCK_LATENCY_MS = 2500;
 
 /** Dữ liệu dự đoán từ API / SSE (tỉ lệ 0–1) → Prediction (phần trăm). */
-export const toPrediction = (d: { pick: "B" | "P" | null; confidence: number | null; reason: PredictionReason }): Prediction => ({
+export const toPrediction = (d: { pick: string | null; confidence: number | null; reason: PredictionReason }): Prediction => ({
   pick: d.pick,
   confidence: d.confidence === null ? null : d.confidence * 100,
   reason: d.reason,
@@ -42,14 +41,16 @@ function hash(text: string): number {
 }
 
 /** Giá trị XÁC ĐỊNH từ (stream, shoe, round): cùng ván luôn cùng dự đoán, kể cả khi tải lại trang. */
-function mockValue(streamId: string, shoe: number, round: number): Prediction {
+function mockValue(streamId: string, shoe: number, round: number, predictable?: readonly string[]): Prediction {
   const h = hash(`${streamId}|${shoe}|${round}`);
-  return { pick: h % 2 === 0 ? "B" : "P", confidence: 80 + ((h >>> 8) % 150) / 10, reason: "OK", locked: false };   // 80.0 – 94.9
+  // Không biết ký hiệu predictable (category chưa có cấu hình) ⇒ AI "chưa đủ dữ liệu".
+  if (!predictable || predictable.length === 0) return { pick: null, confidence: null, reason: "NOT_ENOUGH_HISTORY", locked: false };
+  return { pick: predictable[h % predictable.length], confidence: 80 + ((h >>> 8) % 150) / 10, reason: "OK", locked: false };   // 80.0 – 94.9
 }
 
 export const mockPredictionSource: PredictionSource = {
-  getPrediction: (streamId, shoe, round) =>
-    new Promise((resolve) => setTimeout(() => resolve(mockValue(streamId, shoe, round)), MOCK_LATENCY_MS)),
+  getPrediction: (streamId, shoe, round, _signal, predictable) =>
+    new Promise((resolve) => setTimeout(() => resolve(mockValue(streamId, shoe, round, predictable)), MOCK_LATENCY_MS)),
   peek: mockValue,
 };
 

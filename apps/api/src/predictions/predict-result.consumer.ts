@@ -10,6 +10,7 @@ import {
   type PredictionEvent, type PredictResult, type RealtimePrediction,
 } from "@toolhackchain/shared";
 import { fieldsToObject, sleep, StreamEntry } from "../common/stream.util.js";
+import { CategoryConfigService } from "../category-config/category-config.service.js";
 import { isDataError, pgErrorCode } from "../ingestion/dead-letter.js";
 import { ConnectionRegistry } from "../realtime/connection-registry.js";
 import { PredictionDeliveryService } from "./prediction-delivery.service.js";
@@ -37,6 +38,7 @@ export class PredictResultConsumer implements OnApplicationBootstrap, OnModuleDe
     private predictions: PredictionsService,
     private registry: ConnectionRegistry,
     private delivery: PredictionDeliveryService,
+    private categoryConfigs: CategoryConfigService,
   ) {}
 
   async onApplicationBootstrap() {
@@ -105,7 +107,7 @@ export class PredictResultConsumer implements OnApplicationBootstrap, OnModuleDe
   /** Lỗi tạm thời (DB / Redis sập) ném ra để loop thử lại; message hỏng hoặc quá hạn chỉ bị bỏ qua (caller vẫn XACK). */
   private async handle(fields: string[]): Promise<void> {
     let msg: PredictResult | null = null;
-    try { msg = parsePredictResult(JSON.parse(fieldsToObject(fields).payload)); } catch { /* msg = null */ }
+    try { msg = parsePredictResult(JSON.parse(fieldsToObject(fields).payload), (k) => this.categoryConfigs.getByKeyId(k)); } catch { /* msg = null */ }
     if (!msg) { this.log.error("predict:results: bỏ qua message không đúng contract"); return; }
     if (msg.prediction_id !== predictionId(msg.game_session_id)) {
       this.log.error(`predict:results: prediction_id không khớp game_session_id ${msg.game_session_id}, bỏ qua`);

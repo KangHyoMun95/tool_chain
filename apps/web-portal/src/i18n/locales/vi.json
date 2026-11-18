@@ -68,6 +68,7 @@
     "noAccount": "Chưa có tài khoản?",
     "registerNow": "Đăng ký ngay",
     "haveAccount": "Đã có tài khoản?",
+    "or": "OR",
     "loginNow": "Đăng nhập ngay",
     "sslNotice": "HỆ THỐNG MÃ HÓA SSL 256-BIT AN TOÀN",
     "copyright": "TOOL HACK AI © {year}. All Rights Reserved."
@@ -110,7 +111,7 @@
     "historyTitle": "Lịch sử ván",
     "historyEmpty": "Chưa có ván nào",
     "historyError": "Không tải được lịch sử",
-    "boardLabel": "Bảng kết quả B/P/T",
+    "boardLabel": "Bảng kết quả",
     "winRate": "TỶ LỆ WIN HIỆN TẠI",
     "winStreak": "CHUỖI THẮNG TỐT NHẤT",
     "chartTitle": "Biểu Đồ Tỷ Lệ Win Theo Phiên",
@@ -155,6 +156,24 @@
     "passwordSubmit": "Đổi mật khẩu",
     "passwordCancel": "Hủy",
     "passwordClose": "Đóng"
+  },
+  "support": {
+    "title": "Chăm sóc khách hàng",
+    "fabLabel": "Hỗ trợ",
+    "cardTitle": "Cần hỗ trợ?",
+    "cardBody": "Đội ngũ CSKH phản hồi qua Telegram. Nhắn cho chúng tôi để được giải đáp nhanh.",
+    "telegramCta": "Chat qua Telegram",
+    "close": "Đóng",
+    "pageIntro": "Gặp vấn đề về tài khoản, điểm hay dự đoán? Liên hệ trực tiếp với chúng tôi qua Telegram.",
+    "faqTitle": "Câu hỏi thường gặp",
+    "faq": {
+      "q1": "Làm sao để nạp thêm điểm?",
+      "a1": "Liên hệ CSKH qua Telegram, đội ngũ sẽ hướng dẫn và nhờ cấp trên của bạn cấp điểm.",
+      "q2": "Dự đoán sai có được hoàn điểm không?",
+      "a2": "Theo chính sách hiện hành. Chi tiết vui lòng hỏi CSKH.",
+      "q3": "Tôi quên mật khẩu thì làm sao?",
+      "a3": "Nhắn CSKH qua Telegram để được hỗ trợ đặt lại mật khẩu."
+    }
   },
   "sidebar": {
     "label": "Điều hướng",

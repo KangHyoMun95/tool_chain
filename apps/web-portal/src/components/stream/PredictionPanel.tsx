@@ -4,6 +4,7 @@ import type { LiveStatus } from "@/src/hooks/use-live-items";
 import { usePrediction } from "@/src/hooks/use-prediction";
 import { useI18n } from "@/src/i18n/provider";
 import { cn } from "@/src/lib/cn";
+import { glow, resultTone, symbolView, type ResultConfig } from "@/src/lib/result-config";
 import { HudCard } from "../ui/HudCard";
 import { Radar } from "../ui/Radar";
 import { DecorImage } from "./DecorImage";
@@ -17,6 +18,7 @@ type Props = {
   status: string | null;   // status thô của message mới nhất
   statusLabel: string;
   result: string | null;   // actual_result của ván hiện tại; null = chưa có
+  config: ResultConfig | null;   // cấu hình kết quả của category (màu pick, draw)
 };
 
 const TONE_CLASS = { loss: "hud-result-loss", draw: "hud-result-draw" } as const;
@@ -38,16 +40,16 @@ function StatusBar({ label, dim = false, pulse = false }: { label: string; dim?:
  * Khung dự đoán: Offline → chờ IN_PROGRESS (radar) → đang lấy dự đoán (radar) → có dự đoán → có kết quả
  * (nền thua đỏ đậm / hòa xám).
  */
-export function PredictionPanel({ streamId, connection, shoe, round, status, statusLabel, result }: Props) {
-  const { t } = useI18n();
-  const { phase, prediction } = usePrediction(streamId, shoe, round, status);
+export function PredictionPanel({ streamId, connection, shoe, round, status, statusLabel, result, config }: Props) {
+  const { t, locale } = useI18n();
+  const { phase, prediction } = usePrediction(streamId, shoe, round, status, config?.predictable);
   const online = connection === "live";
-  // pick = null (AI chưa đủ dữ liệu): không có đúng / sai, chỉ hiện hòa khi kết quả là T. Bị khóa (vào giữa ván): không tô màu.
-  const tone = online && prediction && !prediction.locked && result !== null
-    ? (result === "T" ? "draw" : prediction.pick === null ? null : prediction.pick === result ? "win" : "loss")
-    : null;
-  // Ảnh kết quả giữa màn hình: win / loss cần có pick để so; draw (kết quả T) hiện cả khi AI không có pick, như màu nền hòa của khung.
+  // pick = null (AI chưa đủ dữ liệu): không có đúng / sai, chỉ hiện hòa khi kết quả thuộc draw của category. Bị khóa (vào giữa ván): không tô màu.
+  const rt = online && prediction && !prediction.locked && result !== null ? resultTone(config, prediction.pick, result) : "none";
+  const tone = rt === "none" ? null : rt;
+  // Ảnh kết quả giữa màn hình: win / loss cần có pick để so; draw hiện cả khi AI không có pick, như màu nền hòa của khung.
   const overlayTone = tone === "draw" ? tone : tone && prediction?.pick ? tone : null;
+  const pickColor = prediction?.pick ? symbolView(config, prediction.pick, locale).color : null;
 
   return (
     <>
@@ -97,7 +99,10 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
             >
               <DecorImage src="/images/predict_and_rate.gif" className="absolute inset-0 h-full w-full select-none object-contain" />
               <div className="absolute left-[50.2%] top-[42.8%] flex -translate-x-1/2 -translate-y-1/2 items-center justify-center">
-                <span className={cn("font-display font-black leading-none", "predict-pulse", prediction.pick === "P" ? "text-blue-400 drop-shadow-[0_0_14px_rgba(59,130,246,0.95)]" : prediction.pick === "B" ? "text-red-500 drop-shadow-[0_0_14px_rgba(255,30,66,0.95)]" : "text-gray-300")} style={{ fontSize: prediction.pick === null ? "9cqw" : "13cqw" }}>
+                <span
+                  className={cn("font-display font-black leading-none", "predict-pulse", !pickColor && "text-gray-300")}
+                  style={{ fontSize: prediction.pick === null ? "9cqw" : "13cqw", ...(pickColor ? { color: pickColor, textShadow: glow(pickColor, 14, 0.95) } : {}) }}
+                >
                   {prediction.pick ?? "—"}
                 </span>
               </div>

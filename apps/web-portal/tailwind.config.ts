@@ -20,7 +20,6 @@ const config: Config = {
         // Chữ phụ / nhãn telemetry
         slate: { hud: '#94a3b8' },
         // Hạt B / P / T trên bảng kết quả
-        bead: { b: '#dc2626', p: '#2563eb', t: '#16a34a' },
       },
       fontFamily: {
         sans: ['var(--font-outfit)', 'system-ui', 'sans-serif'],

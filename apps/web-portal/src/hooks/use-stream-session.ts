@@ -11,7 +11,8 @@ import { usePredictionStats } from "./use-prediction-stats";
 import { useStreamHistory } from "./use-stream-history";
 
 export type StreamRef = { id: string; lobbyName: string; categoryName: string; name: string };
-export type Totals = { B: number; P: number; T: number };
+/** Số liệu tổng theo ký hiệu (tick.totals). Ký hiệu nào hiển thị do `totals` của cấu hình category quyết định. */
+export type Totals = Record<string, number>;
 
 const STATS_AFTER_RESULT_MS = 4500;       // lớn hơn chu kỳ ghi batch của API (3s), sau lần refetch lịch sử
 const STATS_AFTER_PREDICTION_MS = 500;   // API đã lưu prediction trước khi đẩy SSE
@@ -21,11 +22,13 @@ const toInt = (v: unknown): number | null => {
   return Number.isInteger(n) && n >= 0 ? n : null;
 };
 
-/** Số liệu total_B/P/T của message mới nhất; null = chưa đủ dữ liệu. */
+/** `totals` của message mới nhất (chỉ các giá trị là số hữu hạn); null = tick không có totals (ẩn khung tỉ lệ, KHÔNG tự đếm ở portal). */
 function toTotals(d: CrawlPayload | undefined): Totals | null {
-  if (!d) return null;
-  const { total_B: B, total_P: P, total_T: T } = d;
-  return [B, P, T].every((x) => typeof x === "number" && Number.isFinite(x)) ? { B, P, T } : null;
+  const t = d?.totals;
+  if (!t || typeof t !== "object") return null;
+  const out: Totals = {};
+  for (const [k, v] of Object.entries(t)) if (typeof v === "number" && Number.isFinite(v)) out[k] = v;
+  return Object.keys(out).length > 0 ? out : null;
 }
 
 /** Realtime + lịch sử của một stream. Tick (trạng thái trực tiếp), round_result (kết quả) + pick đi qua useLiveItems (kết nối tham gia, lọc theo stream_id), lịch sử qua useStreamHistory. */

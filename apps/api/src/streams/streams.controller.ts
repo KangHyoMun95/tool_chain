@@ -3,6 +3,7 @@ import { Controller, Get, Param, Query } from "@nestjs/common";
 import type { AuthUser } from "../auth/auth.types.js";
 import { CurrentUser } from "../auth/decorators.js";
 import { BillingService } from "../billing/billing.service.js";
+import { CategoryConfigService } from "../category-config/category-config.service.js";
 import { IdParamDto } from "../common/catalog-list.js";
 import { StreamListQueryDto } from "./dto/stream-list-query.dto.js";
 import { StreamsService } from "./streams.service.js";
@@ -10,7 +11,7 @@ import { StreamsService } from "./streams.service.js";
 // Chỉ đọc: tạo stream nằm ở luồng ingestion. Mọi role đã đăng nhập đều xem được.
 @Controller("streams")
 export class StreamsController {
-  constructor(private streams: StreamsService, private billing: BillingService) {}
+  constructor(private streams: StreamsService, private billing: BillingService, private categoryConfigs: CategoryConfigService) {}
 
   @Get()
   list(@CurrentUser() actor: AuthUser, @Query() query: StreamListQueryDto) {
@@ -22,6 +23,7 @@ export class StreamsController {
   async getOne(@CurrentUser() actor: AuthUser, @Param() params: IdParamDto) {
     const stream = await this.streams.getOne(actor.role, params.id);
     if (actor.role === "USER") await this.billing.assertCanParticipate(actor.userId);
-    return stream;
+    // result_config: hạt / nhãn / màu / draw / totals của category của bàn (null khi category không có file định nghĩa)
+    return { ...stream, result_config: this.categoryConfigs.resultConfig(stream.lobby_name, stream.category_name) };
   }
 }

@@ -4,9 +4,9 @@
 # Mỗi entry của stream có đúng một field `payload` = JSON của message.
 # Luồng: API -> predict:requests -> AI -> predict:results -> API; API -> ai:results -> AI (cập nhật bảng đếm).
 import uuid
-from typing import Literal, Optional
+from typing import Annotated, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, StringConstraints
 
 SCHEMA_VERSION = 1
 
@@ -22,8 +22,10 @@ MODEL_VERSION = "pattern-v1"
 # Namespace UUIDv5 của prediction_id = uuid5(PREDICTION_NAMESPACE, game_session_id). Không đổi.
 PREDICTION_NAMESPACE = uuid.UUID("d2ce63e1-76f4-498d-b5c7-67718f2a7f29")
 
-Outcome = Literal["B", "P", "T"]
-Pick = Literal["B", "P"]
+# Ký hiệu kết quả / pick: đúng MỘT chữ in hoa (^[A-Z]$); tập hợp lệ của từng category nằm ở config/categories/*.json.
+Symbol = Annotated[str, StringConstraints(pattern=r"^[A-Z]$")]
+Outcome = Symbol
+Pick = Symbol
 Reason = Literal["OK", "NOT_ENOUGH_HISTORY", "NO_ELIGIBLE_SUFFIX"]
 
 
@@ -58,6 +60,7 @@ class AiResult(_Msg):
     """API -> AI: ván vừa có kết quả (chỉ XADD lần đầu có kết quả của ván)."""
     game_session_id: str
     stream_id: str
+    key_id: str                   # để AI tra cấu hình category (ignore_in_pattern / predictable)
     shoe: int
     round: int
     result: Outcome
@@ -65,23 +68,20 @@ class AiResult(_Msg):
 
 
 class PatternRow(BaseModel):
-    """Một đuôi k đã xét. pct_* = None khi total = 0."""
+    """Một đuôi k đã xét. Khóa của counts / pct = các ký hiệu `predictable` của category; pct[x] = None khi total = 0."""
     k: int
-    pattern: str
-    count_B: int
-    count_P: int
-    total: int
-    pct_B: Optional[float]
-    pct_P: Optional[float]
-    eligible: bool                # total >= 3 và count_B != count_P
+    pattern: str                  # chuỗi ký hiệu nối liền (vd "BPBP")
+    counts: dict[str, int]
+    pct: dict[str, Optional[float]]
+    total: int                    # = tổng counts
+    eligible: bool                # total >= 3 và kết quả nhiều nhất là duy nhất
 
 
 class ChosenPattern(BaseModel):
     k: int
     pattern: str
     occurrences: int              # = total của đuôi được chọn
-    pct_B: float
-    pct_P: float
+    pct: dict[str, float]         # cùng khóa với counts của PatternRow
 
 
 class PredictResult(_Msg):
@@ -96,7 +96,7 @@ class PredictResult(_Msg):
     confidence: Optional[float]   # tỉ lệ của pick, 0-1
     chosen: Optional[ChosenPattern]
     detail: list[PatternRow]
-    history_used: str             # chuỗi B/P (đã bỏ T), tối đa 10 ký tự gần nhất
+    history_used: str             # chuỗi ký hiệu (đã bỏ ignore_in_pattern), tối đa 10 ký tự gần nhất
     missing_previous: bool
     reason: Reason
     model_version: str
