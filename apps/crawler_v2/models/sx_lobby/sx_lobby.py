@@ -7,6 +7,10 @@ from datetime import datetime, timezone, timedelta
 
 # Ký hiệu kết quả của nguồn Sexy, theo thứ tự trong winCounts (khớp results của config/categories/bacarat.json)
 RESULT_SYMBOLS = ("B", "P", "T")
+
+# Status chỉ để hiển thị: message đầu tiên của ván mới (trước GP_NEW_GAME_START, không có eventType hợp lệ).
+STARTING_NEW_ROUND = "STARTING_NEW_ROUND"
+SEEN_ROUNDS_MAX = 16
 logger = logging.getLogger("Lobby")
 
 VN_TZ = timezone(timedelta(hours=7))
@@ -75,6 +79,7 @@ class SXLobby:
         self.totals = {}
         self._round_status: dict = {}
         self._current_round = None
+        self._seen_rounds: dict = {}          # các (shoe, round) đã thấy (giữ thứ tự, tối đa SEEN_ROUNDS_MAX)
 
     def destructure_message(self, message: dict):
         parent_cls = BaseDetection(message=message)
@@ -88,6 +93,8 @@ class SXLobby:
         self.player_value = parent_cls.get_key("betCurrent") or self.player_value
         self._update_status(self._get_status(parent_cls.get_key("eventType")))
         self.actual_result = self._get_actual_result(parent_cls.get_key("winCounts"))
+        if self.status == STARTING_NEW_ROUND:
+            self.actual_result = None         # kết quả của ván trước không gắn vào ván mới
         self.totals = self._get_win_counts(parent_cls.get_key("winCounts"))
 
         # More Information
@@ -122,13 +129,31 @@ class SXLobby:
         """
         key = (self.stream_shoe, self.stream_round)
         if key != self._current_round:
+            starting = event_status is None and self._is_new_round(self._current_round, key)
             self._current_round = key
+            self._seen_rounds[key] = True
+            while len(self._seen_rounds) > SEEN_ROUNDS_MAX:
+                self._seen_rounds.pop(next(iter(self._seen_rounds)))
             self.status = self._round_status.get(key)
+            if starting:
+                # Message đầu tiên của ván mới (bất kỳ loại nào) mà chưa có eventType: chỉ để hiển thị "Ván mới bắt đầu".
+                self.status = STARTING_NEW_ROUND
+                self._round_status[key] = STARTING_NEW_ROUND
         if event_status:
             self.status = event_status
             self._round_status[key] = event_status
             while len(self._round_status) > 8:   # chỉ cần vài ván gần nhất
                 self._round_status.pop(next(iter(self._round_status)))
+
+    def _is_new_round(self, prev, key) -> bool:
+        """key là ván MỚI của bàn: chưa từng thấy, đã có ván trước để so (không phải lần đầu thấy bàn), và round tăng lên hoặc = 1."""
+        if prev is None or key in self._seen_rounds:
+            return False
+        try:
+            prev_round, new_round = int(prev[1]), int(key[1])
+        except (TypeError, ValueError):
+            return False
+        return new_round > prev_round or new_round == 1
 
     def _get_streamer(self, dealer_id):
         if dealer_id is None:

@@ -1,5 +1,5 @@
 // src/predictions/predictions.constants.ts
-import type { StreamStatus } from "@toolhackchain/shared";
+import type { RoundStatus } from "@toolhackchain/shared";
 
 export const ROUND_STATUS_TTL_SECONDS = 60 * 60;      // round_status:{gsid}, predict_req:{gsid}
 export const RECENT_TTL_SECONDS = 24 * 60 * 60;       // recent:{stream_id}:{shoe}
@@ -21,7 +21,7 @@ export const REDIS_KEEPALIVE_MS = 10_000;
 export const TRIGGER_LOG_INTERVAL_MS = 60_000;        // log INFO/WARN lặp lại tối đa 1 lần / phút cho mỗi khóa
 
 // Trạng thái chỉ tiến. Phải khớp bảng rank trong script advanceRoundStatus (predict-lua.ts).
-export const STATUS_RANK: Record<StreamStatus, number> = {
+export const STATUS_RANK: Record<RoundStatus, number> = {
   IN_PROGRESS: 1,
   DONE: 2,
   GET_RESULT: 3,

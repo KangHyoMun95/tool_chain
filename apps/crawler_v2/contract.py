@@ -25,7 +25,7 @@ class CrawlPayload(TypedDict):
     streamer_id: str
     player_count: int
     player_value: float
-    status: str
+    status: str                        # IN_PROGRESS | DONE | GET_RESULT | SUMMARY_RESULT | STARTING_NEW_ROUND (chỉ hiển thị, api không ghi DB / không dự đoán)
     actual_result: Optional[str]       # ký hiệu kết quả (đúng 1 chữ in hoa, thuộc results của config category); None khi ván chưa có kết quả
     totals: Optional[Dict[str, int]]   # số liệu tổng theo ký hiệu (khớp totals của config category); thiếu / None = nguồn không có
     streamer_name: Optional[str]       # tên người live (chỉ hiển thị, không ghi DB)
