@@ -1,5 +1,3 @@
-import logging
-
 from config import SX_LOBBY, SX_CATEGORY_1
 
 from models.sx_lobby.message.base_detection import BaseDetection
@@ -11,7 +9,6 @@ RESULT_SYMBOLS = ("B", "P", "T")
 # Status chỉ để hiển thị: message đầu tiên của ván mới (trước GP_NEW_GAME_START, không có eventType hợp lệ).
 STARTING_NEW_ROUND = "STARTING_NEW_ROUND"
 SEEN_ROUNDS_MAX = 16
-logger = logging.getLogger("Lobby")
 
 VN_TZ = timezone(timedelta(hours=7))
 FORMAT_DATETIME = "%Y-%m-%d %H:%M:%S"
@@ -173,7 +170,6 @@ class SXLobby:
             case "GP_WINNER":
                 return "SUMMARY_RESULT"
             case _:
-                logger.info(f"Appear new Status {event_type}")
                 return None
 
     def _get_win_counts(self, w_count: list[int]):

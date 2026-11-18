@@ -80,6 +80,14 @@ def shot_message(message_dict: dict):
     rd.destructure_message(message_dict)
     manage_record.update({table_id: rd})
     message_shot = rd.shot_message()
+
+    if table_id == 1007:
+        logger.info(
+            "[WATCH] cls=%s shoe=%s round=%s event=%r -> status=%s winCounts=%s actual=%s message_shot=%s",
+            type(cls).__name__, cls.get_key("gameShoe", None), cls.get_key("gameRound", None), cls.get_key("eventType", None),
+            rd.status, rd.totals, rd.actual_result, message_shot
+        )
+
     if message_shot:
         publish(
             item_id=build_key_id(
