@@ -16,6 +16,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter @toolhackchain/web-admin...
 COPY packages/shared packages/shared
 COPY apps/web-admin apps/web-admin
+ENV NODE_OPTIONS="--max-old-space-size=2048"
 RUN pnpm --filter @toolhackchain/shared build \
  && pnpm --filter @toolhackchain/web-admin build
 
