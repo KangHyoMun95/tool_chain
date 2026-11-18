@@ -26,7 +26,7 @@ def _category2():
 
 
 REGISTRY: dict[str, HandlerSpec] = {
-    # Giống mục ("tgmeq", "bpcdf.tgmeq.com", handle_message, 2.0) của WS_TARGETS
-    "sx_lobby": HandlerSpec("bpcdf.tgmeq.com", 2.0, _sx_lobby),
-    "category2": HandlerSpec("bpcdf.tgmeq.com", 2.0, _category2),
+    # idle_timeout 5.0s (ngưỡng B1 / B2 của WsRunner). WS_TARGETS ở main.py không còn được supervisor dùng.
+    "sx_lobby": HandlerSpec("bpcdf.tgmeq.com", 5.0, _sx_lobby),
+    "category2": HandlerSpec("bpcdf.tgmeq.com", 5.0, _category2),
 }
