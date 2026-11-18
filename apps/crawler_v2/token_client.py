@@ -265,9 +265,6 @@ class SexyTokenClient:
             self._nav("GET", f"{base}/player/gamehall.jsp?dm=1&title=1",
                       referer=f"{base}/player/webMain.jsp?dm=1&title=1")
             self._hall_session = session_id
-        if int(game_group_id) < 0:
-            log.info("bỏ qua queryInitWebGameHall vì gameGroupId=%s (nhóm mặc định)", game_group_id)
-            return None
         j = self._xhr("/player/query/queryInitWebGameHall", f"gameGroupId={game_group_id}", "gamehall.jsp")
         log.info("queryInitWebGameHall gameGroupId=%s status=%s tables=%s",
                  game_group_id, j.get("status"), len(j.get("tableItems") or []))
