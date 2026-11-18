@@ -90,6 +90,7 @@
       "insufficient": "Out of points"
     },
     "status": {
+      "STARTING_NEW_ROUND": "New round starting",
       "IN_PROGRESS": "In progress Hacking",
       "DONE": "Round complete",
       "GET_RESULT": "Receiving result",

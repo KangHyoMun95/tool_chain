@@ -33,8 +33,13 @@ export type CrawlPayload = {
 };
 
 // Trạng thái phiên (CrawlPayload.status). Giá trị khác coi là lạ: hiển thị trung tính.
-export type StreamStatus = "IN_PROGRESS" | "DONE" | "GET_RESULT" | "SUMMARY_RESULT";
-export const STREAM_STATUSES: readonly StreamStatus[] = ["IN_PROGRESS", "DONE", "GET_RESULT", "SUMMARY_RESULT"];
+// STARTING_NEW_ROUND (chỉ category sx_lobby): tick đầu của ván mới, TRƯỚC GP_NEW_GAME_START. CHỈ để hiển thị trên portal:
+// ingestion không ghi DB, predict-trigger không đụng round_status / dự đoán / tính phí; hub vẫn đẩy SSE như mọi tick.
+export const STARTING_NEW_ROUND = "STARTING_NEW_ROUND" as const;
+export type StreamStatus = "IN_PROGRESS" | "DONE" | "GET_RESULT" | "SUMMARY_RESULT" | typeof STARTING_NEW_ROUND;
+export const STREAM_STATUSES: readonly StreamStatus[] = ["IN_PROGRESS", "DONE", "GET_RESULT", "SUMMARY_RESULT", STARTING_NEW_ROUND];
+/** Status của ván đang chạy (có thứ tự, đi vào round_status): StreamStatus trừ STARTING_NEW_ROUND. */
+export type RoundStatus = Exclude<StreamStatus, typeof STARTING_NEW_ROUND>;
 
 export type Tick<T = CrawlPayload> = {
   id: string;                        // khoá dedup (sha1)

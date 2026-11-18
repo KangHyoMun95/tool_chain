@@ -2,7 +2,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import type { DataSource, EntityManager } from "typeorm";
-import { RedisKeys, type Tick } from "@toolhackchain/shared";
+import { RedisKeys, STARTING_NEW_ROUND, type Tick } from "@toolhackchain/shared";
 import { buildKeyId, displayName, normalizeName } from "../common/normalize.js";
 import { toInt } from "../common/to-int.js";
 import { LobbiesService } from "../lobbies/lobbies.service.js";
@@ -91,6 +91,8 @@ export class IngestionService {
       return null;
     };
     if (!d || typeof d !== "object") return fail("thiếu data");
+    // STARTING_NEW_ROUND chỉ để hiển thị: không ghi DB, không tạo lobby / stream / ván (im lặng, không phải tick lỗi).
+    if (d.status === STARTING_NEW_ROUND) return null;
 
     const names: string[] = [];
     for (const f of ["lobby_name", "category_name", "stream_name"] as const) {

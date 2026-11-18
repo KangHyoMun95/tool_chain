@@ -90,6 +90,7 @@
       "insufficient": "Hết điểm"
     },
     "status": {
+      "STARTING_NEW_ROUND": "Ván mới bắt đầu",
       "IN_PROGRESS": "Đang Hack Kết Quả",
       "DONE": "Hoàn tất tiến trình",
       "GET_RESULT": "Nhận kết quả",

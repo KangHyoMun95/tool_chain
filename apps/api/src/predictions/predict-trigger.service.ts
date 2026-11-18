@@ -9,8 +9,8 @@ import { Redis } from "ioredis";
 import { hostname } from "os";
 import {
   AI_RESULT_STREAM, AI_SCHEMA_VERSION, AI_STREAM_MAXLEN, PREDICT_REQUEST_STREAM, PREDICT_TRIGGER_GROUP,
-  RedisKeys, STREAM_STATUSES, TICK_STREAM,
-  type AiResult, type PredictRequest, type StreamStatus, type Tick,
+  RedisKeys, STARTING_NEW_ROUND, TICK_STREAM,
+  type AiResult, type PredictRequest, type RoundStatus, type Tick,
 } from "@toolhackchain/shared";
 import { buildKeyId } from "../common/normalize.js";
 import { fieldsToObject, sleep, StreamEntry } from "../common/stream.util.js";
@@ -27,10 +27,10 @@ import {
 } from "./predictions.constants.js";
 
 /** Những gì process này đã làm cho một ván, để tick lặp lại (nhiều tick / ván) không phải chạm Redis. */
-type SessionState = { status: StreamStatus | null; resultSent: boolean; requestDone: boolean };
+type SessionState = { status: RoundStatus | null; resultSent: boolean; requestDone: boolean };
 
-const rank = (s: StreamStatus | null): number => (s ? STATUS_RANK[s] : 0);
-const isStatus = (v: unknown): v is StreamStatus => typeof v === "string" && (STREAM_STATUSES as readonly string[]).includes(v);
+const rank = (s: RoundStatus | null): number => (s ? STATUS_RANK[s] : 0);
+const isStatus = (v: unknown): v is RoundStatus => typeof v === "string" && Object.prototype.hasOwnProperty.call(STATUS_RANK, v);
 
 @Injectable()
 export class PredictTriggerService implements OnApplicationBootstrap, OnModuleDestroy {
@@ -107,6 +107,9 @@ export class PredictTriggerService implements OnApplicationBootstrap, OnModuleDe
       return;
     }
 
+    // STARTING_NEW_ROUND chỉ để hiển thị: không round_status, không recent / ai:results, không predict:requests, không log.
+    if (d.status === STARTING_NEW_ROUND) return;
+
     // Cùng cách ingestion sinh key_id / game_session_id, để ID khớp với bản ghi game_sessions.
     const names = [d.lobby_name, d.category_name, d.stream_name];
     if (!names.every((n): n is string => typeof n === "string" && n.trim() !== "" && !n.includes("|"))) {
@@ -143,7 +146,7 @@ export class PredictTriggerService implements OnApplicationBootstrap, OnModuleDe
     if (status && rank(status) > rank(st.status)) {
       st.status = (await this.conn.advanceRoundStatus(
         RedisKeys.roundStatus(gsid), status, ROUND_STATUS_TTL_SECONDS,
-      )) as StreamStatus;
+      )) as RoundStatus;
     }
 
     // 2) Kết quả: lưu vào recent + phát ai:results trong một script (chỉ lần đầu có kết quả của ván).
