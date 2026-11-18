@@ -65,6 +65,7 @@ def handle_message(raw):
         if mtype == "Connecting":
             logger.info(f"[ws] Connecting: status={msg.get('status')}")
         elif mtype == "GameHallInfo":
+            logger.info(f"[Message]: {message}")
             shot_message(message)
         else:
             logger.info(f"[ws] {mtype}: {msg}")
