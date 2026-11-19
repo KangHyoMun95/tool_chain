@@ -4,6 +4,9 @@
 //   pnpm --filter @toolhackchain/api create-user --role ADMIN --refer-phone <phone của HOST> [--fixed-admin-id]
 // --fixed-admin-id: dùng MAIN_ADMIN_USER_ID (packages/shared) làm user_id; chỉ cho --role ADMIN, đã tồn tại thì báo lỗi.
 // Phone / mật khẩu lấy từ NEW_USER_PHONE / NEW_USER_PASSWORD, thiếu thì hỏi (mật khẩu được ẩn).
+
+// docker exec -it --env-file .user-host.env <container_id> node dist/cli/create-user.js --role HOST
+// docker exec -it --env-file .user-admin.env <container_id> node dist/cli/create-user.js --role ADMIN --refer-phone <phone_host> --fixed-admin-id
 import "dotenv/config";
 import argon2 from "argon2";
 import pg from "pg";
