@@ -235,7 +235,7 @@ Mỗi category một file (tên file tùy ý), nằm trong repo và **đóng và
 | `prediction_subscriptions` | prediction_subscription_id, user_id, prediction_id, fee_amount, delivered_at, refunded_at, refund_waived_at, created_at | unique (user_id, prediction_id); `delivered_at` = đẩy pick thành công (best effort) |
 | `transactions` | transaction_id, user_id, predictions_subscriptions_id (nullable), transaction_type, amount, balance_before, balance_after, created_by, created_at | |
 
-**Kiểu id:** mọi id là `UUID DEFAULT gen_random_uuid()` (V7), kể cả khóa ngoại; riêng `roles.role_id` giữ `SMALLINT`. Trong TS là `string`; DTO kiểm tra bằng `@IsUUID()`. `AppModule` đặt `installExtensions: false` cho TypeORM (không tự cài extension). Cache id trong Redis chứa giá trị không phải UUID (id số cũ) bị coi là cache miss.
+**Kiểu id:** mọi id là `UUID DEFAULT gen_random_uuid()` (V7), kể cả khóa ngoại; kể cả `roles.role_id` (DB tự sinh, không hardcode). Trong TS là `string`; DTO kiểm tra bằng `@IsUUID()`. `AppModule` đặt `installExtensions: false` cho TypeORM (không tự cài extension). Cache id trong Redis chứa giá trị không phải UUID (id số cũ) bị coi là cache miss.
 
 `transaction_type`: `MINT`, `TRANSFER_OUT`, `TRANSFER_IN`, `CHARGE`, `REFUND`, `INVOKE` (V17: thu hồi điểm của user bị xóa về cấp trên; hai dòng, user giảm / cấp trên tăng, `created_by` = người xóa).
 
@@ -340,11 +340,13 @@ Cùng `users/sub-admins.*`, HOST / ADMIN, `:id` phải là UUID. Phạm vi: `:id
 Helmet, CORS chỉ cho `CORS_ORIGINS` (`credentials: true`), throttler lưu Redis, `ValidationPipe` global (`whitelist`, `forbidNonWhitelisted`, `transform`), body tối đa 100kb, exception filter global (không lộ stack / lỗi DB), cột `users.password` là `select: false`, không log mật khẩu / token. Thiếu `JWT_SECRET`, `JWT_REFRESH_SECRET`, `REDIS_URL`, `DATABASE_URL`, `CORS_ORIGINS` thì app dừng ngay (`config/env.validation.ts`). `SameSite=Strict` ⇒ ở production web và api phải cùng site.
 
 ### Tạo user đầu tiên
-Migration `db/migrations/V4__seed_default_host.sql` seed sẵn một HOST (phone `0000000000`) với mật khẩu ban đầu đã biết và nằm trong repo ⇒ **phải đổi / vô hiệu hóa trước khi deploy ngoài local** (portal có đổi mật khẩu cho USER qua `POST /auth/change-password`; web-admin cũng có (menu avatar → "Đổi mật khẩu", `ChangePasswordModal`), HOST/ADMIN tài khoản seed vẫn nên đổi qua đó hoặc tạo migration mới, không sửa file V4). Có thể tạo thêm HOST bằng CLI bên dưới.
+**Migration không tạo tài khoản và không hardcode hash mật khẩu.** `V2__init_data.sql` chỉ có 3 role (HOST / ADMIN / USER, `role_id` UUID do DB tự sinh). Mọi tài khoản HOST / ADMIN tạo bằng CLI bên dưới; USER do HOST / ADMIN tạo qua web-admin. **UUID cố định của ADMIN chính:** `MAIN_ADMIN_USER_ID = 9ba6b144-782a-4eae-a8bd-b1d9f3866285` (`packages/shared/src/auth.ts`, dùng cho tính năng khác, không nằm trong migration; không đổi). ADMIN chính **phải** tạo bằng CLI với `--fixed-admin-id`. CLI tra role theo tên (`--role`) rồi dùng `role_id` UUID; code ứng dụng không có hằng số UUID cho role.
 
 ```bash
 NEW_USER_PHONE=... NEW_USER_PASSWORD=... [NEW_USER_DISPLAY_NAME=...] pnpm --filter @toolhackchain/api create-host      # thiếu env thì hỏi (mật khẩu được ẩn), tối thiểu 12 ký tự
 pnpm --filter @toolhackchain/api create-user --role ADMIN --refer-phone <phone của HOST>   # USER thì refer tới ADMIN
+# ADMIN chính (user_id = MAIN_ADMIN_USER_ID): thêm --fixed-admin-id (chỉ với --role ADMIN; user_id đã tồn tại ⇒ báo lỗi, không ghi đè)
+NEW_USER_PHONE=... NEW_USER_PASSWORD=... pnpm --filter @toolhackchain/api create-user --role ADMIN --refer-phone <phone của HOST> --fixed-admin-id
 ```
 
 ---
@@ -398,7 +400,7 @@ cd apps/crawler_v2 && python main.py       # tầng 3 (login browser) cần Brav
 ## Quy ước khi làm việc
 
 - Sửa schema event thì cập nhật cả `contract.py` và `packages/shared/src/realtime.ts`.
-- **Schema DB do Flyway quản lý** (`db/migrations/`). Đặt tên `V<số>__<mo_ta_snake_case>.sql` (versioned) hoặc `R__<mo_ta>.sql` (repeatable); mỗi file một mục đích, có comment đầu file.
+- **Schema DB do Flyway quản lý** (`db/migrations/`). Hiện chỉ có 2 file gộp: `V1__init_schema.sql` (toàn bộ schema cuối cùng) và `V2__init_data.sql` (3 role, không có user); **migration mới bắt đầu từ V3**. Các số `Vn` nhắc trong tài liệu này là tên migration CŨ (đã gộp vào V1). **Mọi DB đã chạy migration cũ (local, server thử nghiệm) phải xóa và tạo lại** (`docker compose down -v` với volume Postgres): giữ `flyway_schema_history` cũ thì Flyway lỗi checksum / version. Đặt tên `V<số>__<mo_ta_snake_case>.sql` (versioned) hoặc `R__<mo_ta>.sql` (repeatable); mỗi file một mục đích, có comment đầu file.
 - Mọi thay đổi schema = **một file Flyway mới + sửa entity tương ứng trong cùng commit**. SQL là nguồn sự thật, entity theo SQL.
 - **Không bao giờ sửa file migration đã được apply** (kể cả thêm comment, vì Flyway so checksum); muốn đổi thì tạo file mới.
 - Không bật `synchronize`, không dùng `flyway clean` (đã `FLYWAY_CLEAN_DISABLED=true`). TypeORM không chạy migration (`migrationsRun: false`).
