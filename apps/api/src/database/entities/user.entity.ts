@@ -7,7 +7,7 @@ export class UserEntity {
   @Column({ name: "phone_number", length: 40, unique: true }) phoneNumber!: string;
   @Column({ name: "display_name", type: "varchar", length: 50, nullable: true }) displayName!: string | null;
   @Column({ length: 255, select: false }) password!: string; // always a hash; never selected by default
-  @Column({ name: "role_id", type: "smallint" }) roleId!: number;
+  @Column({ name: "role_id", type: "uuid" }) roleId!: string;
   @Column({ name: "refer_user_id", type: "uuid", nullable: true }) referUserId!: string | null;
   @Column({ type: "bigint", default: 0 }) balance!: string;
   @Column({ length: 20, default: UserStatus.ACTIVE }) status!: UserStatus;

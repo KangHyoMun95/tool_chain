@@ -112,3 +112,12 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+
+## Tạo tài khoản (CLI)
+
+```bash
+NEW_USER_PHONE=... NEW_USER_PASSWORD=... pnpm --filter @toolhackchain/api create-host
+NEW_USER_PHONE=... NEW_USER_PASSWORD=... pnpm --filter @toolhackchain/api create-user --role ADMIN --refer-phone <phone của HOST> [--fixed-admin-id]
+```
+
+`--fixed-admin-id` dùng `MAIN_ADMIN_USER_ID` (`packages/shared/src/auth.ts`) làm `user_id`; chỉ với `--role ADMIN`, đã tồn tại thì báo lỗi. Migration chỉ seed 3 role, không có user.
