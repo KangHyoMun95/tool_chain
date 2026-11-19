@@ -27,6 +27,13 @@ export class EnvVars {
   @IsOptional() @IsInt() @Min(300) SESSION_TTL_SECONDS: number = 7 * 24 * 3600;
   @IsOptional() @IsInt() @Min(1) LOGIN_MAX_ATTEMPTS: number = 5;
   @IsOptional() @IsInt() @Min(1) LOGIN_LOCK_MINUTES: number = 15;
+  // Đăng ký tự do (xem CLAUDE.md "Đăng ký"): captcha ALTCHA chạy ngầm + giới hạn theo IP.
+  @IsString() @MinLength(32) ALTCHA_HMAC_KEY!: string;   // bắt buộc: thiếu / ngắn ⇒ API không khởi động
+  @IsOptional() @IsInt() @Min(1_000) @Max(10_000_000) ALTCHA_MAX_NUMBER: number = 50_000;   // độ khó (số lần băm tối đa)
+  @IsOptional() @IsInt() @Min(30) @Max(3600) ALTCHA_CHALLENGE_TTL_SECONDS: number = 300;
+  @IsOptional() @IsInt() @Min(1) REGISTER_MAX_SUCCESS_PER_IP: number = 5;          // số lần đăng ký THÀNH CÔNG / IP trong cửa sổ trượt
+  @IsOptional() @IsInt() @Min(1) @Max(720) REGISTER_SUCCESS_WINDOW_HOURS: number = 24;
+  @IsOptional() @IsInt() @Min(1) REGISTER_MAX_REQUESTS_PER_HOUR: number = 20;      // số request đăng ký (mọi kết quả) / IP / giờ
   @IsOptional() @IsString() TRUST_PROXY?: string; // số hop, "loopback", ... — bỏ trống = không tin proxy
 }
 

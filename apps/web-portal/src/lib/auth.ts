@@ -1,13 +1,17 @@
 // Gọi API đăng nhập / khôi phục phiên. Access token chỉ giữ trong bộ nhớ (không localStorage / cookie):
 // mất khi tải lại trang, khi đó khôi phục bằng refresh token (cookie httpOnly do API đặt) qua POST /auth/refresh.
 
+import { solveAltcha, type AltchaChallenge } from "./altcha";
+
 // NEXT_PUBLIC_API_URL có thể là gốc (http://host:4000) hoặc đã kèm /api; luôn chuẩn hóa về <gốc>/api.
 const API_BASE = `${(process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:4000").replace(/\/+$/, "").replace(/\/api$/, "")}/api`;
 
 /** URL đầy đủ của một đường dẫn API (vd "/stream"). */
 export const apiUrl = (path: string): string => `${API_BASE}${path}`;
 
-export type AuthErrorCode = "invalid_input" | "invalid_credentials" | "locked" | "network" | "unknown";
+export type AuthErrorCode =
+  | "invalid_input" | "invalid_credentials" | "locked" | "network" | "unknown"
+  | "phone_taken" | "register_limit" | "captcha_failed" | "not_ready" | "password_mismatch";
 
 export class AuthError extends Error {
   constructor(readonly code: AuthErrorCode) {
@@ -24,22 +28,54 @@ export const normalizePhone = (raw: string): string => raw.replace(/[\s-]/g, "")
 /** Khớp ràng buộc API (6–20 ký tự), chỉ nhận chữ số. */
 export const isValidPhone = (phone: string): boolean => /^\d{6,20}$/.test(phone);
 
-/** Gửi số điện thoại để Admin cấp tài khoản (API công khai, không cần đăng nhập). Kết quả giống nhau dù số đã tồn tại hay chưa. */
-export async function registerPhone(phone: string): Promise<void> {
+export type RegisterInput = { phone: string; displayName: string; password: string; confirmPassword: string };
+
+/** Tạo tài khoản USER ngay (API công khai). `onSolved` được gọi khi giải xong captcha, trước khi gửi form. */
+export async function register(input: RegisterInput, onSolved?: () => void): Promise<void> {
+  let challenge: AltchaChallenge;
+  try {
+    const res = await fetch(`${API_BASE}/register/challenge`);
+    if (res.status === 429) throw new AuthError("locked");
+    if (!res.ok) throw new AuthError("unknown");
+    challenge = (await res.json()) as AltchaChallenge;
+  } catch (e) {
+    throw e instanceof AuthError ? e : new AuthError("network");
+  }
+
+  const altcha = await solveAltcha(challenge);
+  if (!altcha) throw new AuthError("captcha_failed");
+  onSolved?.();
+
   let res: Response;
   try {
-    res = await fetch(`${API_BASE}/users-register`, {
+    res = await fetch(`${API_BASE}/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ phone_number: phone }),
+      body: JSON.stringify({
+        phone_number: input.phone,
+        ...(input.displayName.trim() ? { display_name: input.displayName.trim() } : {}),
+        password: input.password,
+        confirm_password: input.confirmPassword,
+        altcha,
+      }),
     });
   } catch {
     throw new AuthError("network");
   }
+  if (res.ok) return;
 
-  if (res.status === 429) throw new AuthError("locked");
+  const body = (await res.json().catch(() => null)) as { code?: string } | null;
+  switch (body?.code) {
+    case "PHONE_TAKEN": throw new AuthError("phone_taken");
+    case "REGISTER_LIMIT": throw new AuthError("register_limit");
+    case "CAPTCHA_FAILED": throw new AuthError("captcha_failed");
+    case "REGISTRATION_NOT_READY": throw new AuthError("not_ready");
+    case "PASSWORD_MISMATCH": throw new AuthError("password_mismatch");
+  }
+  if (res.status === 429) throw new AuthError("register_limit");
   if (res.status === 400) throw new AuthError("invalid_input");
-  if (!res.ok) throw new AuthError("unknown");
+  if (res.status === 503) throw new AuthError("not_ready");
+  throw new AuthError("unknown");
 }
 
 async function readAccessToken(res: Response): Promise<string | null> {

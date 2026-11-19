@@ -5,17 +5,29 @@ import { useI18n } from "@/src/i18n/provider";
 import { EyeIcon, EyeOffIcon, LockIcon } from "../icons";
 import { AUTH_INPUT_CLASS, AuthField } from "./AuthField";
 
-export function PasswordField({ value, onChange, placeholder }: { value: string; onChange: (value: string) => void; placeholder: string }) {
+export function PasswordField({
+  value,
+  onChange,
+  placeholder,
+  label,
+  autoComplete = "current-password",
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  label?: string;
+  autoComplete?: string;
+}) {
   const { t } = useI18n();
   const id = useId();
   const [show, setShow] = useState(false);
 
   return (
-    <AuthField id={id} label={t("auth.passwordLabel")} icon={<LockIcon className="h-5 w-5" />}>
+    <AuthField id={id} label={label ?? t("auth.passwordLabel")} icon={<LockIcon className="h-5 w-5" />}>
       <input
         id={id}
         type={show ? "text" : "password"}
-        autoComplete="current-password"
+        autoComplete={autoComplete}
         required
         maxLength={128}
         value={value}

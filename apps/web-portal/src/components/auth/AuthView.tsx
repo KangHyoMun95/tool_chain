@@ -25,6 +25,7 @@ const INERT = { inert: "" } as Record<string, string>;
 export function AuthView({ telegramUrl = null }: { telegramUrl?: string | null }) {
   const { t } = useI18n();
   const [mode, setMode] = useState<Mode>("login");
+  const [registered, setRegistered] = useState(false);
   const { status } = useAuth();
   const router = useRouter();
 
@@ -106,8 +107,14 @@ export function AuthView({ telegramUrl = null }: { telegramUrl?: string | null }
 
               {/* Hai form cạnh nhau trong một dải 200%, trượt ngang khi chuyển */}
               <div className={cn("flex w-[200%] transition-transform duration-500 ease-out", mode === "register" && "-translate-x-1/2")}>
-                {panel("login", t("auth.loginTitle"), t("auth.loginSubtitle"), <LoginForm />, t("auth.noAccount"), t("auth.registerNow"), "register")}
-                {panel("register", t("auth.registerTitle"), t("auth.registerSubtitle"), <RegisterForm />, t("auth.haveAccount"), t("auth.loginNow"), "login")}
+                {panel("login", t("auth.loginTitle"), t("auth.loginSubtitle"), <LoginForm notice={registered ? "auth.registerSuccess" : null} />, t("auth.noAccount"), t("auth.registerNow"), "register")}
+                {panel("register", t("auth.registerTitle"), t("auth.registerSubtitle"), <RegisterForm
+                    telegramUrl={telegramUrl}
+                    onRegistered={() => {
+                      setRegistered(true);
+                      setMode("login");
+                    }}
+                  />, t("auth.haveAccount"), t("auth.loginNow"), "login")}
               </div>
             </div>
           </section>

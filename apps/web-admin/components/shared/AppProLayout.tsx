@@ -10,7 +10,6 @@ import {
   LogoutOutlined,
   SafetyCertificateOutlined,
   TeamOutlined,
-  UserAddOutlined,
   UserOutlined,
 } from '@ant-design/icons';
 import Link from 'next/link';
@@ -26,7 +25,6 @@ function menuForRole(role: Role): MenuDataItem[] {
     return [
       { path: '/host/dashboard', name: 'Dashboard', icon: <DashboardOutlined /> },
       { path: '/host/admins', name: 'Quản lý người dùng', icon: <TeamOutlined /> },
-      { path: '/host/new-users', name: 'Quản lý người mới', icon: <UserAddOutlined /> },
     ];
   }
   if (role === ROLE.ADMIN) {
