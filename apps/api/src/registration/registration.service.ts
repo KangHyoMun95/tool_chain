@@ -13,7 +13,7 @@ import { ARGON2_OPTIONS } from "../auth/password.js";
 import type { EnvVars } from "../config/env.validation.js";
 import { REDIS } from "../redis/redis.module.js";
 import type { RegisterDto } from "./dto/register.dto.js";
-import { RegistrationLimits, altchaUsedKey } from "./registration.limits.js";
+import { ENFORCE_REGISTER_IP_LIMIT, LimitCheck, RegistrationLimits, altchaUsedKey } from "./registration.limits.js";
 
 const UNIQUE_VIOLATION = "23505";
 
@@ -47,8 +47,8 @@ export class RegistrationService {
     );
   }
 
-  /** Dùng bởi guard: đếm một request đăng ký của IP, false khi vượt ngưỡng. Redis lỗi ⇒ ném lỗi (không mở cổng). */
-  allowRequest(ip: string): Promise<boolean> {
+  /** Dùng bởi guard: đếm một request đăng ký của IP. Redis lỗi ⇒ ném lỗi (không mở cổng). */
+  allowRequest(ip: string): Promise<LimitCheck> {
     return this.limits.allowRequest(ip);
   }
 
@@ -70,9 +70,10 @@ export class RegistrationService {
 
     // Giữ chỗ TRƯỚC khi tạo user; tạo thất bại thì hoàn lại đúng dấu đó.
     const member = randomUUID();
-    if (!(await this.limits.reserve(ip, member))) {
-      this.log.warn(`Đăng ký vượt giới hạn thành công theo IP: ip=${ip}`);
-      throw fail(HttpStatus.TOO_MANY_REQUESTS, "REGISTER_LIMIT", "Too many registrations from this IP");
+    const check = await this.limits.reserve(ip, member);
+    if (!check.allowed) {
+      this.log.warn(`Đăng ký thành công vượt ngưỡng theo IP, ${ENFORCE_REGISTER_IP_LIMIT ? "đã chặn" : "lẽ ra đã chặn"}: ip=${ip}, count=${check.count}, limit=${check.limit}`);
+      if (ENFORCE_REGISTER_IP_LIMIT) throw fail(HttpStatus.TOO_MANY_REQUESTS, "REGISTER_LIMIT", "Too many registrations from this IP");
     }
 
     try {
