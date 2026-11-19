@@ -11,7 +11,7 @@ export const apiUrl = (path: string): string => `${API_BASE}${path}`;
 
 export type AuthErrorCode =
   | "invalid_input" | "invalid_credentials" | "locked" | "network" | "unknown"
-  | "phone_taken" | "register_limit" | "captcha_failed" | "not_ready" | "password_mismatch";
+  | "registration_failed" | "register_limit" | "captcha_failed" | "not_ready" | "password_mismatch";
 
 export class AuthError extends Error {
   constructor(readonly code: AuthErrorCode) {
@@ -66,7 +66,7 @@ export async function register(input: RegisterInput, onSolved?: () => void): Pro
 
   const body = (await res.json().catch(() => null)) as { code?: string } | null;
   switch (body?.code) {
-    case "PHONE_TAKEN": throw new AuthError("phone_taken");
+    case "REGISTRATION_FAILED": throw new AuthError("registration_failed");
     case "REGISTER_LIMIT": throw new AuthError("register_limit");
     case "CAPTCHA_FAILED": throw new AuthError("captcha_failed");
     case "REGISTRATION_NOT_READY": throw new AuthError("not_ready");

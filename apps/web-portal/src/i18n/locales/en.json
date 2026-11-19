@@ -56,7 +56,7 @@
       "invalidDisplayName": "Display name must be at most 50 characters with no control characters.",
       "passwordRule": "Password must be 12 to 128 characters.",
       "passwordMismatch": "Password confirmation does not match.",
-      "phoneTaken": "This phone number is already registered.",
+      "registrationFailed": "Unable to create an account with this phone number. Please check it or try another number.",
       "registerLimit": "You have registered too many times today. Please try again later or contact support.",
       "captchaFailed": "Verification failed. Please try again.",
       "notReady": "Registration is not available yet. Please try again later."

@@ -18,7 +18,7 @@ import { ENFORCE_REGISTER_IP_LIMIT, LimitCheck, RegistrationLimits, altchaUsedKe
 const UNIQUE_VIOLATION = "23505";
 
 /** Mã lỗi cho portal (body `{ code, message }`). */
-export type RegistrationErrorCode = "PASSWORD_MISMATCH" | "PHONE_TAKEN" | "REGISTER_LIMIT" | "CAPTCHA_FAILED" | "REGISTRATION_NOT_READY";
+export type RegistrationErrorCode = "PASSWORD_MISMATCH" | "REGISTRATION_FAILED" | "REGISTER_LIMIT" | "CAPTCHA_FAILED" | "REGISTRATION_NOT_READY";
 
 const fail = (status: HttpStatus, code: RegistrationErrorCode, message: string) => new HttpException({ statusCode: status, code, message }, status);
 
@@ -83,7 +83,7 @@ export class RegistrationService {
       await this.limits.release(ip, member).catch((err) => this.log.error(`Không hoàn lại giữ chỗ đăng ký (ip=${ip}): ${err}`));
       if (e instanceof HttpException) throw e;
       if (e instanceof QueryFailedError && (e.driverError as { code?: string } | undefined)?.code === UNIQUE_VIOLATION) {
-        throw fail(HttpStatus.CONFLICT, "PHONE_TAKEN", "Phone number already registered");
+        throw fail(HttpStatus.BAD_REQUEST, "REGISTRATION_FAILED", "Unable to create an account with this phone number");
       }
       throw e;
     }

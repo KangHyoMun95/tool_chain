@@ -17,7 +17,7 @@ const ERROR_KEYS: Record<AuthErrorCode, MessageKey> = {
   locked: "auth.errors.locked",
   network: "auth.errors.network",
   unknown: "auth.errors.generic",
-  phone_taken: "auth.errors.phoneTaken",
+  registration_failed: "auth.errors.registrationFailed",
   register_limit: "auth.errors.registerLimit",
   captcha_failed: "auth.errors.captchaFailed",
   not_ready: "auth.errors.notReady",
