@@ -1,6 +1,6 @@
-# .github/workflows/deliver.yml
-# Mỗi khi push tag v* lên repo nội bộ -> gộp snapshot của tag thành 1 commit
-# "Delivery Bot" và push sang repo giao khách. Không mang theo lịch sử git.
+# .github/workflows/deliver.yml  (đặt trong REPO CÁ NHÂN)
+# Mỗi khi push tag v* -> lấy snapshot của tag, kiểm tra/làm sạch danh tính,
+# rồi push sang REPO KHÁCH thành 1 commit "Delivery Bot". Không mang theo lịch sử git.
 
 name: Deliver to client
 
@@ -25,12 +25,16 @@ jobs:
     runs-on: ubuntu-latest
     env:
       VERSION: ${{ inputs.version || github.ref_name }}
-      DELIVERY_REPO: ${{ vars.DELIVERY_OWNER }}/${{ vars.DELIVERY_REPO_NAME }}   # vd: acme-delivery/project
+      DELIVERY_REPO: ${{ vars.DELIVERY_OWNER }}/${{ vars.DELIVERY_REPO_NAME }}
       DELIVERY_BRANCH: ${{ vars.DELIVERY_BRANCH || 'main' }}
       LEAK_PATTERN: ${{ vars.LEAK_PATTERN || '@gmail\.com' }}
+      # Đường dẫn máy cá nhân (phân biệt hoa thường, bỏ qua các user phổ biến trong Docker/CI)
+      PATH_PATTERN: '/Users/[A-Za-z0-9._-]+/|/home/(?!node/|bot/|app/|runner/|ubuntu/|user/)[a-z0-9._-]+/|[A-Za-z]:\\Users\\'
+      # Tên file/thư mục không bao giờ được giao (kiểm tra ở mọi cấp thư mục)
+      FORBIDDEN_NAMES: ".github .gitattributes .claude CLAUDE.md .vscode .idea .DS_Store .env .env.local .env.production .npmrc *.pem *.key *.p12 *.pfx id_rsa* id_ed25519*"
       BOT_NAME: Delivery Bot
       BOT_EMAIL: bot@delivery.invalid
-      TZ: UTC                                           # commit không lộ múi giờ
+      TZ: UTC
 
     steps:
       - name: Checkout repo nội bộ (kèm tags)
@@ -41,7 +45,7 @@ jobs:
       - name: Kiểm tra tag tồn tại
         run: git rev-parse --verify "refs/tags/${VERSION}"
 
-      - name: Lấy token từ GitHub App (thay cho deploy key)
+      - name: Lấy token từ GitHub App
         id: app-token
         uses: actions/create-github-app-token@v3
         with:
@@ -62,27 +66,79 @@ jobs:
           git archive "refs/tags/${VERSION}" | tar -x -C out
           echo "Số file sẽ giao: $(find out -type f -not -path 'out/.git/*' | wc -l)"
 
-      - name: Quét dấu vết danh tính
+      # ---------- LỚP 1: file/thư mục cấm ----------
+      - name: Chặn file nội bộ / bí mật lọt vào
         run: |
-          # grep: 0 = có match, 1 = không match, 2 = lỗi (regex sai, lỗi đọc file...)
-          # Chỉ cho đi tiếp khi chắc chắn là 1, mọi trường hợp khác đều dừng (fail-closed).
-          set +e
-          grep -rnIiP "$LEAK_PATTERN" out --exclude-dir=.git \
-               --exclude='*-lock.yaml' --exclude='*.lock' --exclude='package-lock.json'
-          rc=$?
-          set -e
-          if [ "$rc" -eq 0 ]; then
-            echo "::error::Phát hiện dấu vết danh tính (xem các dòng ở trên). Dừng giao."
-            exit 1
-          elif [ "$rc" -ne 1 ]; then
-            echo "::error::Bước quét bị lỗi (rc=$rc), kiểm tra lại biến LEAK_PATTERN. Dừng giao."
+          set -f                                   # không cho shell tự mở rộng *.pem
+          bad=0
+          for n in $FORBIDDEN_NAMES; do
+            hits=$(find out -path out/.git -prune -o -name "$n" -print)
+            if [ -n "$hits" ]; then
+              echo "::error::Không được giao: $hits"
+              bad=1
+            fi
+          done
+          [ "$bad" -eq 0 ] && echo "Không có file cấm."
+          exit "$bad"
+
+      # ---------- LỚP 2: metadata trong ảnh / tài liệu ----------
+      - name: Cài exiftool
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libimage-exiftool-perl >/dev/null
+          exiftool -ver
+
+      - name: Xoá metadata ảnh (giữ ICC profile để không lệch màu)
+        run: |
+          exiftool -r -q -q -overwrite_original -all= --icc_profile:all -i .git \
+            -ext jpg -ext jpeg -ext png -ext webp -ext gif -ext tif -ext tiff -ext heic out || true
+          echo "Đã xoá EXIF/XMP/IPTC trong ảnh."
+
+      - name: Chặn tài liệu PDF/Office còn tên tác giả
+        run: |
+          # exiftool không xoá triệt để được metadata của PDF/Office -> chỉ kiểm tra và dừng
+          found=$(exiftool -r -q -q -f -i .git \
+            -if '$Author or $LastModifiedBy or $Company or $Manager or $XPAuthor' \
+            -p '$Directory/$FileName  Author=$Author  LastModifiedBy=$LastModifiedBy  Company=$Company' \
+            -ext pdf -ext doc -ext docx -ext xls -ext xlsx -ext ppt -ext pptx -ext odt -ext ods out 2>/dev/null || true)
+          if [ -n "$found" ]; then
+            echo "$found"
+            echo "::error::Tài liệu còn metadata tác giả (xem ở trên). Xoá thông tin tác giả rồi commit lại."
             exit 1
           fi
-          echo "Không phát hiện dấu vết."
+          echo "Tài liệu không có metadata tác giả."
 
+      # ---------- LỚP 3: quét nội dung, tên file, đường dẫn máy cá nhân ----------
+      - name: Quét dấu vết danh tính
+        run: |
+          # grep: 0 = có match, 1 = không match, 2 = lỗi -> chỉ đi tiếp khi tất cả đều = 1 (fail-closed)
+          check() {   # $1 = mô tả, $2 = exit code
+            if [ "$2" -eq 0 ]; then
+              echo "::error::$1: phát hiện dấu vết (xem các dòng ở trên)."; exit 1
+            elif [ "$2" -ne 1 ]; then
+              echo "::error::$1: lỗi khi quét (rc=$2), kiểm tra lại pattern."; exit 1
+            fi
+            echo "$1: sạch."
+          }
+          EXCL=(--exclude-dir=.git --exclude='*-lock.yaml' --exclude='*.lock' --exclude='package-lock.json')
+          set +e
+
+          grep -rnIiP "$LEAK_PATTERN" out "${EXCL[@]}"
+          check "Nội dung file (LEAK_PATTERN)" $?
+
+          grep -rnIP "$PATH_PATTERN" out "${EXCL[@]}"
+          check "Đường dẫn máy cá nhân" $?
+
+          (cd out && find . -path ./.git -prune -o -print) | grep -iP "$LEAK_PATTERN"
+          check "Tên file/thư mục" $?
+
+      # ---------- Giao ----------
       - name: Commit & push bằng danh tính trung lập
         working-directory: out
         run: |
+          # Giờ commit + tag cố định 00:00 UTC -> không lộ giờ làm việc
+          D="$(date -u +%Y-%m-%d)T00:00:00+0000"
+          export GIT_AUTHOR_DATE="$D" GIT_COMMITTER_DATE="$D"
           git config user.name  "$BOT_NAME"
           git config user.email "$BOT_EMAIL"
           git add -A
@@ -95,4 +151,4 @@ jobs:
           git push origin "HEAD:${DELIVERY_BRANCH}"
           git push origin "refs/tags/${VERSION}"
           echo "### ✅ Đã giao ${VERSION} sang ${DELIVERY_REPO}" >> "$GITHUB_STEP_SUMMARY"
-          git log --format='- %h %an <%ae> %ad %s' -1 >> "$GITHUB_STEP_SUMMARY"
+          git log --format='- %h %an <%ae> %ad %s' --date=iso -1 >> "$GITHUB_STEP_SUMMARY"
