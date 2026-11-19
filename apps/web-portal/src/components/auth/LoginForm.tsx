@@ -12,7 +12,7 @@ import { useAuth } from "./AuthProvider";
 import { PasswordField } from "./PasswordField";
 import { PhoneField } from "./PhoneField";
 
-const ERROR_KEYS: Record<AuthErrorCode, MessageKey> = {
+const ERROR_KEYS: Partial<Record<AuthErrorCode, MessageKey>> = {
   invalid_input: "auth.errors.invalidPhone",
   invalid_credentials: "auth.errors.invalidCredentials",
   locked: "auth.errors.locked",
@@ -20,7 +20,7 @@ const ERROR_KEYS: Record<AuthErrorCode, MessageKey> = {
   unknown: "auth.errors.generic",
 };
 
-export function LoginForm() {
+export function LoginForm({ notice = null }: { notice?: MessageKey | null }) {
   const { t } = useI18n();
   const router = useRouter();
   const { markAuthenticated } = useAuth();
@@ -44,7 +44,7 @@ export function LoginForm() {
       markAuthenticated();
       router.replace("/");
     } catch (err) {
-      setError(ERROR_KEYS[err instanceof AuthError ? err.code : "unknown"]);
+      setError(ERROR_KEYS[err instanceof AuthError ? err.code : "unknown"] ?? "auth.errors.generic");
       setSubmitting(false);
     }
   }
@@ -53,6 +53,12 @@ export function LoginForm() {
     <form onSubmit={onSubmit} noValidate className="space-y-4">
       <PhoneField value={phone} onChange={setPhone} placeholder={t("auth.phonePlaceholder")} autoFocus />
       <PasswordField value={password} onChange={setPassword} placeholder={t("auth.passwordPlaceholder")} />
+
+      {notice && !error && (
+        <p className="rounded-lg border border-ai/50 bg-green-950/30 px-3 py-2 text-sm text-ai-soft" role="status">
+          {t(notice)}
+        </p>
+      )}
 
       {error && (
         <p className="rounded-lg border border-neon/50 bg-red-950/40 px-3 py-2 text-sm text-red-200" role="alert">
