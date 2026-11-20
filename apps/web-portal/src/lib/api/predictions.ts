@@ -42,15 +42,14 @@ export async function fetchCurrentPrediction(streamId: string): Promise<CurrentP
   }
 }
 
-/** GET /streams/:id/predictions/stats — win_rate là tỉ lệ 0–1. Kết quả thuộc draw của category (hòa) không tính thắng / thua. wins/losses/draws/win_rate chỉ của shoe hiện tại. */
+/** GET /streams/:id/predictions/stats — win_rate là tỉ lệ 0–1. Kết quả thuộc draw của category (hòa) tính là THẮNG. wins/losses/win_rate chỉ của shoe hiện tại. */
 export type PredictionStatsDto = {
   shoe: number | null;
   wins: number;
   losses: number;
-  draws: number;
   win_rate: number | null;
   win_streak: number;
-  shoes: { shoe: number; wins: number; losses: number; draws: number; win_rate: number }[];   // các shoe quá khứ (không gồm hiện tại), cũ → mới
+  shoes: { shoe: number; wins: number; losses: number; win_rate: number }[];   // các shoe quá khứ (không gồm hiện tại), cũ → mới
 };
 
 /** GET /streams/:id/predictions/best-streak — chuỗi thắng dài nhất trong shoe hiện tại (trang chi tiết). */
@@ -70,7 +69,6 @@ export type StreamListStatsDto = {
   live: boolean;
   wins: number;
   losses: number;
-  draws: number;
   win_rate: number | null;
   win_streak: number;   // chuỗi thắng dài nhất của shoe hiện tại, hoặc của shoe trước khi shoe hiện tại còn ít dữ liệu (API quyết định)
 };
