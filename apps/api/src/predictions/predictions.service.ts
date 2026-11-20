@@ -38,7 +38,7 @@ export type PredictionStats = {
   wins: number;                    // các số dưới đây chỉ tính trong shoe hiện tại
   losses: number;
   draws: number;                   // kết quả thuộc `draw` của category: không tính thắng / thua
-  win_rate: number | null;         // wins / (wins + losses), 0–1; null khi shoe hiện tại chưa có ván nào để tính
+  win_rate: number | null;         // (wins + draws) / (wins + draws + losses), 0–1 (hòa tính là thắng, chỉ ở tỷ lệ này); null khi shoe hiện tại chưa có ván nào để tính
   win_streak: number;              // số dự đoán thắng liên tiếp tính từ ván mới nhất (bỏ qua ván hòa), xét trong STATS_STREAK_WINDOW dự đoán
   shoes: {                         // tỷ lệ thắng của từng shoe QUÁ KHỨ (không gồm shoe hiện tại), tối đa STATS_SHOES shoe gần nhất, cũ → mới
     shoe: number; wins: number; losses: number; draws: number; win_rate: number;
@@ -58,7 +58,7 @@ export type StreamListStats = {
   wins: number;                    // chỉ của shoe hiện tại
   losses: number;
   draws: number;
-  win_rate: number | null;         // wins / (wins + losses) của shoe hiện tại, 0–1; null khi chưa có ván nào
+  win_rate: number | null;         // (wins + draws) / (wins + draws + losses) của shoe hiện tại, 0–1 (hòa tính là thắng); null khi chưa có ván nào
   win_streak: number;              // xem listStreak(): chuỗi dài nhất của shoe hiện tại, hoặc của shoe trước khi shoe hiện tại còn ít
 };
 
@@ -213,7 +213,7 @@ export class PredictionsService {
       [streamId, STATS_SHOES + 1, draw]);   // mới → cũ
     const perShoe = rows.map((r) => {
       const wins = Number(r.wins), losses = Number(r.losses);
-      return { shoe: Number(r.shoe), wins, losses, draws: Number(r.draws), win_rate: wins + losses > 0 ? wins / (wins + losses) : null };
+      return { shoe: Number(r.shoe), wins, losses, draws: Number(r.draws), win_rate: winRate(wins, losses, Number(r.draws)) };
     });
     const now = perShoe.find((r) => r.shoe === currentShoe);
 
@@ -291,9 +291,9 @@ export class PredictionsService {
     const curQ: Promise<{ stream_id: string; shoe: string; wins: string; losses: string; draws: string }[]> = this.ds.query(
       `WITH ${curShoe}
        SELECT cur.stream_id, cur.shoe,
-              count(*) FILTER (WHERE gs.result = ALL(${drawParam}::text[]) OR p.predict_result = gs.result) AS wins,
-              count(*) FILTER (WHERE gs.result <> ALL(${drawParam}::text[]) AND p.predict_result <> gs.result) AS losses,
-              count(*) FILTER (WHERE gs.result = ANY(${drawParam}::text[])) AS draws
+              count(*) FILTER (WHERE p.game_session_id IS NOT NULL AND gs.result <> ALL(${drawParam}::text[]) AND p.predict_result = gs.result) AS wins,
+              count(*) FILTER (WHERE p.game_session_id IS NOT NULL AND gs.result <> ALL(${drawParam}::text[]) AND p.predict_result <> gs.result) AS losses,
+              count(*) FILTER (WHERE p.game_session_id IS NOT NULL AND gs.result = ANY(${drawParam}::text[])) AS draws
        FROM cur
        LEFT JOIN game_sessions gs ON gs.stream_id = cur.stream_id AND gs.road_shoe = cur.shoe
                                   AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
@@ -337,11 +337,17 @@ export class PredictionsService {
         round: l ? Number(l.round) : null,
         live: l ? Number(l.age_ms) <= LIVE_WITHIN_MS : false,
         wins, losses, draws,
-        win_rate: wins + losses > 0 ? wins / (wins + losses) : null,
+        win_rate: winRate(wins, losses, draws),
         win_streak: listStreak(byShoe.get(`${id}|1`) ?? [], byShoe.get(`${id}|2`), draw),
       };
     });
   }
+}
+
+/** win_rate: ván hòa (result thuộc `draw`) tính là thắng; wins / losses / draws vẫn tách riêng như cũ. null khi chưa có ván nào được chấm. */
+function winRate(wins: number, losses: number, draws: number): number | null {
+  const total = wins + draws + losses;
+  return total > 0 ? (wins + draws) / total : null;
 }
 
 /** Chuỗi thắng dài nhất trong một shoe (dự đoán đã chấm, cũ → mới): kết quả thuộc `draw` bỏ qua, thua thì đứt chuỗi. */
