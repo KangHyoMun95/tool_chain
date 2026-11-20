@@ -291,7 +291,7 @@ export class PredictionsService {
     const curQ: Promise<{ stream_id: string; shoe: string; wins: string; losses: string; draws: string }[]> = this.ds.query(
       `WITH ${curShoe}
        SELECT cur.stream_id, cur.shoe,
-              count(*) FILTER (WHERE gs.result <> ALL(${drawParam}::text[]) AND p.predict_result = gs.result) AS wins,
+              count(*) FILTER (WHERE gs.result = ALL(${drawParam}::text[]) OR p.predict_result = gs.result) AS wins,
               count(*) FILTER (WHERE gs.result <> ALL(${drawParam}::text[]) AND p.predict_result <> gs.result) AS losses,
               count(*) FILTER (WHERE gs.result = ANY(${drawParam}::text[])) AS draws
        FROM cur
