@@ -1,0 +1,13 @@
+{
+  "lobby": "casino",
+  "category": "tai xiu",
+  "results": {
+    "B": { "label": { "vi": "B", "en": "B" }, "color": "#DC2626" },
+    "S": { "label": { "vi": "S", "en": "S" }, "color": "#2563EB" },
+    "T": { "label": { "vi": "T", "en": "T" }, "color": "#16A34A" }
+  },
+  "predictable": ["B", "S"],
+  "ignore_in_pattern": ["T"],
+  "draw": ["T"],
+  "totals": ["B", "S", "T"]
+}

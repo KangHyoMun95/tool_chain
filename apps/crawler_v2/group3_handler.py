@@ -1,0 +1,56 @@
+"""Handler WSS group 3 (Sic Bo): decode -> SXGroup3 theo từng bàn -> publish."""
+import logging
+from time import time
+
+from contract import build_key_id
+from models.sx_lobby.message.base_detection import BaseDetection
+from message_handler import decode_message
+from models.sx_lobby.sx_group_3 import SXGroup3, resolve_names
+from publisher import publish
+
+logger = logging.getLogger("Listener Message 3")
+
+
+def make_handler(lobby_name: str | None = None, category_name: str | None = None):
+    """Trả về on_message. Thiếu lobby / category -> ValueError ngay (không chạy WSS này, lỗi nêu rõ biến thiếu)."""
+    lobby, category = resolve_names(lobby_name, category_name)
+    tables: dict[str, SXGroup3] = {}
+
+    return handle_message_3
+
+def handle_message_3(raw):
+    kind, msg = decode_message(raw)
+    if isinstance(msg, dict):
+        mtype = msg.get("messageType")
+        message = msg.get("message", {})
+        handler = msg.get("handler")
+
+        if mtype == "Connecting":
+            logger.info(f"[ws] Connecting: status={msg.get('status')}")
+        elif mtype == "GameHallInfo":
+            shot_message(message)
+        else:
+            logger.info(f"[ws] {mtype}: {msg}")
+    else:
+        logger.info(f"[ws] ({kind})", msg if kind != "unknown" else f"{len(msg)} bytes")
+
+
+manage_record = {}
+def shot_message(message_dict: dict):
+    cls = BaseDetection(message=message_dict)
+    table_id = str(cls.get_key("tableID"))
+    rd = manage_record.get(table_id, SXGroup3())
+    rd.destructure_message(message_dict)
+    manage_record.update({table_id: rd})
+    message_shot = rd.shot_message()
+    if message_shot and table_id == '1132':
+        publish(
+            item_id=build_key_id(rd.lobby_name, rd.category_name, rd.stream_name),
+            data=message_shot,
+            source_ts=time(),
+        )
+        logger.info(f"[shot_message] Shot success {rd.stream_name} at {rd.stream_round} Round")
+
+if __name__ == "__main__":
+    data = {'roadInfo': {'repaintTime': 1795264615004, 'tableID': 1132, 'gameShoe': 10819, 'gameRound': 96, 'winCounts': [43, 53, 4], 'bigRoads': [{'showX': 132, 'gameRound': 96, 'dices': [2, 3, 5], 'bigSmall': 'Small', 'oddEven': 'Even', 'totalValue': 10, 'stampTime': 1795267885825}]}}
+    shot_message(data)
