@@ -1,13 +1,13 @@
 {
   "lobby": "casino",
-  "category": "tai xiu",
+  "category": "TÀI XỈU",
   "results": {
-    "B": { "label": { "vi": "B", "en": "B" }, "color": "#DC2626" },
-    "S": { "label": { "vi": "S", "en": "S" }, "color": "#2563EB" },
-    "T": { "label": { "vi": "T", "en": "T" }, "color": "#16A34A" }
+    "T": { "label": { "vi": "T", "en": "T" }, "color": "#DC2626" },
+    "X": { "label": { "vi": "X", "en": "X" }, "color": "#2563EB" },
+    "B": { "label": { "vi": "B", "en": "B" }, "color": "#16A34A" }
   },
-  "predictable": ["B", "S"],
-  "ignore_in_pattern": ["T"],
-  "draw": ["T"],
-  "totals": ["B", "S", "T"]
+  "predictable": ["T", "X"],
+  "ignore_in_pattern": ["B"],
+  "draw": ["B"],
+  "totals": ["T", "X", "B"]
 }

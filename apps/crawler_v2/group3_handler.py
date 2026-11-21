@@ -50,7 +50,3 @@ def shot_message(message_dict: dict):
             source_ts=time(),
         )
         logger.info(f"[shot_message] Shot success {rd.stream_name} at {rd.stream_round} Round")
-
-if __name__ == "__main__":
-    data = {'roadInfo': {'repaintTime': 1795264615004, 'tableID': 1132, 'gameShoe': 10819, 'gameRound': 96, 'winCounts': [43, 53, 4], 'bigRoads': [{'showX': 132, 'gameRound': 96, 'dices': [2, 3, 5], 'bigSmall': 'Small', 'oddEven': 'Even', 'totalValue': 10, 'stampTime': 1795267885825}]}}
-    shot_message(data)

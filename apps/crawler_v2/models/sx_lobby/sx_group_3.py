@@ -26,8 +26,8 @@ STATUS_MAP = {
 STARTING_NEW_ROUND = "STARTING_NEW_ROUND"
 SEEN_ROUNDS_MAX = 16
 
-RESULT_MAP = {"Big": "B", "Small": "S", "Triple": "T"}
-TOTALS_SYMBOLS = ("B", "S", "T")
+RESULT_MAP = {"Big": "T", "Small": "X", "Triple": "B"}
+TOTALS_SYMBOLS = ("T", "X", "B")
 
 PENDING_TIMEOUT_SEC = 60
 RESOLVED_MAX = 16
