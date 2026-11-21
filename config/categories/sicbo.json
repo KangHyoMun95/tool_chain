@@ -1,0 +1,13 @@
+{
+  "lobby": "casino",
+  "category": "TÀI XỈU",
+  "results": {
+    "T": { "label": { "vi": "T", "en": "T" }, "color": "#DC2626" },
+    "X": { "label": { "vi": "X", "en": "X" }, "color": "#2563EB" },
+    "B": { "label": { "vi": "B", "en": "B" }, "color": "#16A34A" }
+  },
+  "predictable": ["T", "X"],
+  "ignore_in_pattern": ["B"],
+  "draw": ["B"],
+  "totals": ["T", "X", "B"]
+}
