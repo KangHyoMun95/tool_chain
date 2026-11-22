@@ -9,6 +9,9 @@ export const STATS_STREAK_WINDOW = 100;               // số dự đoán đã c
 // ⇒ dùng chuỗi dài nhất của shoe trước.
 export const LIST_STREAK_MIN = 4;
 export const LIST_STREAK_MIN_ROUNDS = 5;
+// Chuỗi trượt qua nhiều shoe (PredictionsService.slidingBestStreaks): luôn xét SLIDING_STREAK_SHOES shoe gần nhất, gồm cả shoe hiện tại.
+export const SLIDING_STREAK_SHOES = 3;
+export const SLIDING_STREAK_FETCH = 500;              // số dự đoán đã chấm mới nhất của mỗi stream được đọc (đủ cho 3 shoe)
 export const LIVE_WITHIN_MS = 5 * 60_000;             // stream coi là đang LIVE nếu có ván mới trong khoảng này
 export const STATS_SHOES = 10;                        // số shoe gần nhất trả về cho biểu đồ tỷ lệ thắng theo shoe
 export const TRIGGER_READ_COUNT = 200;

@@ -8,7 +8,10 @@ import { GameSessionEntity, PredictionEntity } from "../database/entities/index.
 import { GameSessionsService } from "../game-sessions/game-sessions.service.js";
 import { BillingService, type ChargeOutcome } from "../billing/billing.service.js";
 import { CategoryConfigService } from "../category-config/category-config.service.js";
-import { LIST_STREAK_MIN, LIST_STREAK_MIN_ROUNDS, LIVE_WITHIN_MS, STATS_SHOES, STATS_STREAK_WINDOW } from "./predictions.constants.js";
+import {
+  LIST_STREAK_MIN, LIST_STREAK_MIN_ROUNDS, LIVE_WITHIN_MS, SLIDING_STREAK_FETCH, SLIDING_STREAK_SHOES,
+  STATS_SHOES, STATS_STREAK_WINDOW,
+} from "./predictions.constants.js";
 
 export type CurrentPrediction = {
   prediction_id: string;
@@ -259,6 +262,41 @@ export class PredictionsService {
   }
 
   /**
+   * Chuỗi dự đoán đúng liên tiếp dài nhất, trượt qua nhiều shoe, của mọi stream trong một category (một truy vấn cho cả danh sách).
+   * Mỗi stream: cửa sổ = SLIDING_STREAK_SHOES (3) shoe gần nhất, gồm cả shoe hiện tại (shoe của dự đoán mới nhất). Các shoe nối theo thời gian nên chuỗi được phép vắt qua ranh giới shoe. Ván hòa (result thuộc `draw` của category) tính là
+   * đúng và KHÔNG đứt chuỗi; dự đoán sai thì đứt. Stream chưa có dự đoán đã chấm: best_streak = 0.
+   * Phạm vi nhìn thấy như GET /streams (USER chỉ thấy stream ACTIVE có category + lobby cha ACTIVE). Thứ tự shoe theo thời điểm
+   * dự đoán; cùng số shoe = cùng một shoe (như stats()). Mỗi stream chỉ đọc SLIDING_STREAK_FETCH dự đoán mới nhất.
+   *
+   * TODO: CHƯA có endpoint / chưa được gọi ở đâu. Bổ sung API (vd GET /categories/:id/...) ở PR sau, cần kiểm tra phạm vi category như stream-stats.
+   */
+  async slidingBestStreaks(role: Role, categoryId: string): Promise<{ stream_id: string; best_streak: number }[]> {
+    const visible = role === "USER" ? "AND s.status = $2 AND c.status = $2 AND l.status = $2" : "";
+    const draw = (await this.resultConfigOfCategory(categoryId))?.draw ?? [];
+    const params: unknown[] = role === "USER" ? [categoryId, CatalogStatus.ACTIVE] : [categoryId];
+    const rows: { stream_id: string; shoe: string; pick: string | null; result: string | null }[] = await this.ds.query(
+      `WITH vis AS (
+         SELECT s.stream_id FROM streams s
+         JOIN categories c ON c.category_id = s.category_id JOIN lobbies l ON l.lobby_id = c.lobby_id
+         WHERE s.category_id = $1 ${visible})
+       SELECT v.stream_id, x.shoe, x.pick, x.result FROM vis v
+       LEFT JOIN LATERAL (
+         SELECT gs.road_shoe AS shoe, p.predict_result AS pick, gs.result, p.created_at
+         FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
+         WHERE p.stream_id = v.stream_id AND p.predict_result IS NOT NULL AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
+         ORDER BY p.created_at DESC LIMIT ${SLIDING_STREAK_FETCH}) x ON true
+       ORDER BY v.stream_id, x.created_at`,   // mỗi stream: cũ → mới
+      params);
+    const byStream = new Map<string, { shoe: number; pick: string; result: string }[]>();
+    for (const r of rows) {
+      const list = byStream.get(r.stream_id) ?? [];
+      if (r.pick !== null && r.result !== null) list.push({ shoe: Number(r.shoe), pick: r.pick, result: r.result });
+      byStream.set(r.stream_id, list);
+    }
+    return [...byStream].map(([stream_id, list]) => ({ stream_id, best_streak: slidingStreak(list, draw) }));
+  }
+
+  /**
    * Thống kê của mọi stream trong một category cho danh sách bàn (ba truy vấn song song cho cả danh sách, không gọi từng bàn).
    * Cùng định nghĩa với stats(): thắng = pick trùng result, T là hòa, win_rate chỉ của shoe hiện tại.
    * Phạm vi nhìn thấy như GET /streams: USER chỉ thấy stream ACTIVE có category + lobby cha ACTIVE.
@@ -370,4 +408,19 @@ function listStreak(current: { pick: string; result: string }[], previous: { pic
   const n = longestWinStreak(current, draw);
   if ((n < LIST_STREAK_MIN || current.length < LIST_STREAK_MIN_ROUNDS) && previous) return Math.max(n, longestWinStreak(previous, draw));
   return n;
+}
+
+/**
+ * Phần thuần của slidingBestStreaks. rows: dự đoán đã chấm của một stream, cũ → mới, mỗi dòng kèm shoe. Lấy 3 shoe gần nhất rồi tìm chuỗi đúng liên tiếp dài nhất (hòa = đúng, sai = đứt).
+ */
+export function slidingStreak(rows: { shoe: number; pick: string; result: string }[], draw: readonly string[]): number {
+  const shoes = new Set<number>();   // SLIDING_STREAK_SHOES shoe gần nhất, theo lần xuất hiện cuối của từng shoe
+  for (let i = rows.length - 1; i >= 0 && (shoes.has(rows[i].shoe) || shoes.size < SLIDING_STREAK_SHOES); i--) shoes.add(rows[i].shoe);
+  let best = 0, run = 0;
+  for (const r of rows) {
+    if (!shoes.has(r.shoe)) continue;
+    run = draw.includes(r.result) || r.pick === r.result ? run + 1 : 0;
+    if (run > best) best = run;
+  }
+  return best;
 }
