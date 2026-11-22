@@ -12,6 +12,13 @@ export const LIST_STREAK_MIN_ROUNDS = 5;
 // Chuỗi trượt qua nhiều shoe (PredictionsService.slidingBestStreaks): luôn xét SLIDING_STREAK_SHOES shoe gần nhất, gồm cả shoe hiện tại.
 export const SLIDING_STREAK_SHOES = 3;
 export const SLIDING_STREAK_FETCH = 500;              // số dự đoán đã chấm mới nhất của mỗi stream được đọc (đủ cho 3 shoe)
+// "Tỷ lệ tốt gần đây" ở danh sách bàn (win_rate của stream-stats): tỷ lệ cao nhất trong các shoe của hôm nay (GMT+7) nếu hôm nay có
+// >= RECENT_RATE_SHOES shoe, ngược lại trong RECENT_RATE_SHOES shoe gần nhất (kể cả ngày trước). Shoe có < RECENT_RATE_MIN_ROUNDS
+// lượt đã chấm không được xét (1/1 = 100% không có ý nghĩa).
+export const RECENT_RATE_SHOES = 7;
+export const RECENT_RATE_MIN_ROUNDS = 5;
+export const RECENT_RATE_LOOKBACK_DAYS = 14;          // chỉ đọc dự đoán trong khoảng này
+export const RECENT_RATE_MAX_SHOES = 60;              // số shoe tối đa đọc cho mỗi stream
 export const LIVE_WITHIN_MS = 5 * 60_000;             // stream coi là đang LIVE nếu có ván mới trong khoảng này
 export const STATS_SHOES = 10;                        // số shoe gần nhất trả về cho biểu đồ tỷ lệ thắng theo shoe
 export const TRIGGER_READ_COUNT = 200;

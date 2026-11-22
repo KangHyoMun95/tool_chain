@@ -21,7 +21,7 @@
     "noSession": "No rounds yet",
     "offline": "OFFLINE",
     "live": "LIVE",
-    "winRate": "CURRENT SHOE WIN",
+    "winRate": "RECENT BEST WIN RATE",
     "winStreak": "RECENT BEST STREAK",
     "viewDetail": "AI Prediction Details",
     "empty": "No tables in this game yet.",

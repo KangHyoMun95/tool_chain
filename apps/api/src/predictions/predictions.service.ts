@@ -9,7 +9,7 @@ import { GameSessionsService } from "../game-sessions/game-sessions.service.js";
 import { BillingService, type ChargeOutcome } from "../billing/billing.service.js";
 import { CategoryConfigService } from "../category-config/category-config.service.js";
 import {
-  LIST_STREAK_MIN, LIST_STREAK_MIN_ROUNDS, LIVE_WITHIN_MS, SLIDING_STREAK_FETCH, SLIDING_STREAK_SHOES,
+  LIST_STREAK_MIN, LIST_STREAK_MIN_ROUNDS, LIVE_WITHIN_MS, RECENT_RATE_LOOKBACK_DAYS, RECENT_RATE_MAX_SHOES, RECENT_RATE_MIN_ROUNDS, RECENT_RATE_SHOES, SLIDING_STREAK_FETCH, SLIDING_STREAK_SHOES,
   STATS_SHOES, STATS_STREAK_WINDOW,
 } from "./predictions.constants.js";
 
@@ -61,7 +61,7 @@ export type StreamListStats = {
   wins: number;                    // chỉ của shoe hiện tại
   losses: number;
   draws: number;
-  win_rate: number | null;         // (wins + draws) / (wins + draws + losses) của shoe hiện tại, 0–1 (hòa tính là thắng); null khi chưa có ván nào
+  win_rate: number | null;         // "tỷ lệ tốt gần đây" (xem recentBestRate()): tỷ lệ shoe cao nhất trong các shoe gần đây, 0–1 (hòa tính là thắng); null khi chưa shoe nào đủ lượt
   win_streak: number;              // xem listStreak(): chuỗi dài nhất của shoe hiện tại, hoặc của shoe trước khi shoe hiện tại còn ít
 };
 
@@ -355,7 +355,31 @@ export class PredictionsService {
        JOIN predictions p ON p.game_session_id = gs.game_session_id AND p.predict_result IS NOT NULL
        ORDER BY s.stream_id, s.rk, p.created_at`, params);
 
-    const [latest, cur, evaluated] = await Promise.all([latestQ, curQ, evaluatedQ]);
+    // Tỷ lệ từng shoe gần đây của mỗi stream (cho win_rate): tối đa RECENT_RATE_MAX_SHOES shoe trong RECENT_RATE_LOOKBACK_DAYS ngày,
+    // mới → cũ theo dự đoán mới nhất; `today` = shoe có dự đoán trong ngày hôm nay (GMT+7, như dashboard).
+    const tz = "Asia/Ho_Chi_Minh";
+    const shoeRatesQ: Promise<{ stream_id: string; wins: string; losses: string; draws: string; today: boolean }[]> = this.ds.query(
+      `WITH vis AS (${vis})
+       SELECT v.stream_id, x.wins, x.losses, x.draws, x.today FROM vis v
+       CROSS JOIN LATERAL (
+         SELECT count(*) FILTER (WHERE gs.result <> ALL(${drawParam}::text[]) AND p.predict_result = gs.result) AS wins,
+                count(*) FILTER (WHERE gs.result <> ALL(${drawParam}::text[]) AND p.predict_result <> gs.result) AS losses,
+                count(*) FILTER (WHERE gs.result = ANY(${drawParam}::text[])) AS draws,
+                bool_or((p.created_at AT TIME ZONE '${tz}')::date = (now() AT TIME ZONE '${tz}')::date) AS today,
+                max(p.created_at) AS last_at
+         FROM predictions p JOIN game_sessions gs ON gs.game_session_id = p.game_session_id
+         WHERE p.stream_id = v.stream_id AND p.predict_result IS NOT NULL AND gs.status = 'FINISHED' AND gs.result IS NOT NULL
+           AND p.created_at > now() - interval '${RECENT_RATE_LOOKBACK_DAYS} days'
+         GROUP BY gs.road_shoe ORDER BY max(p.created_at) DESC LIMIT ${RECENT_RATE_MAX_SHOES}) x
+       ORDER BY v.stream_id, x.last_at DESC`, [...params, draw]);   // mỗi stream: mới → cũ
+
+    const [latest, cur, evaluated, shoeRates] = await Promise.all([latestQ, curQ, evaluatedQ, shoeRatesQ]);
+    const ratesByStream = new Map<string, { wins: number; losses: number; draws: number; today: boolean }[]>();
+    for (const r of shoeRates) {
+      const list = ratesByStream.get(r.stream_id) ?? [];
+      list.push({ wins: Number(r.wins), losses: Number(r.losses), draws: Number(r.draws), today: r.today });
+      ratesByStream.set(r.stream_id, list);
+    }
 
     const byShoe = new Map<string, { pick: string; result: string }[]>();   // `${stream_id}|${rk}` → cũ → mới
     for (const r of evaluated) {
@@ -375,7 +399,7 @@ export class PredictionsService {
         round: l ? Number(l.round) : null,
         live: l ? Number(l.age_ms) <= LIVE_WITHIN_MS : false,
         wins, losses, draws,
-        win_rate: winRate(wins, losses, draws),
+        win_rate: recentBestRate(ratesByStream.get(id) ?? []),
         win_streak: listStreak(byShoe.get(`${id}|1`) ?? [], byShoe.get(`${id}|2`), draw),
       };
     });
@@ -386,6 +410,23 @@ export class PredictionsService {
 function winRate(wins: number, losses: number, draws: number): number | null {
   const total = wins + draws + losses;
   return total > 0 ? (wins + draws) / total : null;
+}
+
+/**
+ * "Tỷ lệ tốt gần đây" của một stream. shoes: tỷ lệ từng shoe, mới → cũ. Hôm nay có >= RECENT_RATE_SHOES shoe ⇒ so các shoe của hôm nay;
+ * ít hơn ⇒ so RECENT_RATE_SHOES shoe gần nhất (kể cả ngày trước). Trả tỷ lệ CAO NHẤT (hòa tính là thắng) trong số shoe có
+ * >= RECENT_RATE_MIN_ROUNDS lượt đã chấm; null khi không shoe nào đủ lượt. Lưu ý đây là giá trị lớn nhất, không phải trung bình.
+ */
+function recentBestRate(shoes: { wins: number; losses: number; draws: number; today: boolean }[]): number | null {
+  const today = shoes.filter((s) => s.today);
+  const pool = today.length >= RECENT_RATE_SHOES ? today : shoes.slice(0, RECENT_RATE_SHOES);
+  let best: number | null = null;
+  for (const s of pool) {
+    if (s.wins + s.losses + s.draws < RECENT_RATE_MIN_ROUNDS) continue;
+    const rate = winRate(s.wins, s.losses, s.draws);
+    if (rate !== null && (best === null || rate > best)) best = rate;
+  }
+  return best;
 }
 
 /** Chuỗi thắng dài nhất trong một shoe (dự đoán đã chấm, cũ → mới): kết quả thuộc `draw` bỏ qua, thua thì đứt chuỗi. */

@@ -62,7 +62,7 @@ export const fetchBestStreak = (streamId: string): Promise<BestStreakDto> =>
 export const fetchPredictionStats = (streamId: string): Promise<PredictionStatsDto> =>
   apiGet<PredictionStatsDto>(`/streams/${encodeURIComponent(streamId)}/predictions/stats`);
 
-/** GET /categories/:id/stream-stats — thống kê của từng bàn cho danh sách. win_rate chỉ của shoe hiện tại (0–1). */
+/** GET /categories/:id/stream-stats — thống kê của từng bàn cho danh sách. win_rate = "tỷ lệ tốt gần đây" (shoe có tỷ lệ cao nhất trong các shoe gần đây, 0–1); wins/losses/draws vẫn của shoe hiện tại. */
 export type StreamListStatsDto = {
   stream_id: string;
   shoe: number | null;
