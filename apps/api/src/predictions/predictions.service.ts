@@ -363,10 +363,11 @@ function longestWinStreak(rows: { pick: string; result: string }[], draw: readon
 
 /**
  * Chuỗi ở danh sách bàn: chuỗi dài nhất của shoe hiện tại (N); nếu nó < LIST_STREAK_MIN hoặc N có < LIST_STREAK_MIN_ROUNDS
- * lượt đã chấm (kể cả hòa) thì lấy chuỗi dài nhất của shoe trước (N−1). Chưa có shoe trước ⇒ giữ của N.
+ * lượt đã chấm (kể cả hòa) thì lấy chuỗi dài nhất của shoe trước (N−1) NẾU nó lớn hơn (max, không thay thế: danh sách không
+ * bao giờ thấp hơn chuỗi của shoe hiện tại). Chưa có shoe trước ⇒ giữ của N.
  */
 function listStreak(current: { pick: string; result: string }[], previous: { pick: string; result: string }[] | undefined, draw: readonly string[]): number {
   const n = longestWinStreak(current, draw);
-  if ((n < LIST_STREAK_MIN || current.length < LIST_STREAK_MIN_ROUNDS) && previous) return longestWinStreak(previous, draw);
+  if ((n < LIST_STREAK_MIN || current.length < LIST_STREAK_MIN_ROUNDS) && previous) return Math.max(n, longestWinStreak(previous, draw));
   return n;
 }
