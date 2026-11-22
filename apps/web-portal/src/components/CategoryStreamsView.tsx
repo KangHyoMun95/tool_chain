@@ -34,7 +34,7 @@ export function CategoryStreamsView({ categoryId }: { categoryId: string }) {
   }, []);
 
   // Bàn hiện ngay khi có danh sách; số liệu AI về sau (khung chờ trong lúc đó, lỗi thì hiện "—"), lúc đó mới xếp lại.
-  // Xếp theo tỷ lệ win của shoe hiện tại, cao → thấp; bàn chưa có tỷ lệ xuống cuối; hòa thì nhiều ván hơn trước, rồi theo tên.
+  // Xếp theo "tỷ lệ tốt gần đây" (win_rate), cao → thấp; bàn chưa có tỷ lệ xuống cuối; hòa thì nhiều ván hơn trước, rồi theo tên.
   const sorted = useMemo(() => {
     if (streams.status !== "success") return [];
     const byId = new Map(stats.status === "success" ? stats.data.map((s) => [s.stream_id, s]) : []);
