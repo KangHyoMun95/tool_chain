@@ -6,6 +6,7 @@ import pandas as pd
 MIN_LEN = 3          # độ dài trượt ngắn nhất
 MAX_LEN = 10         # độ dài trượt dài nhất
 MIN_COUNT = 3        # số lần xuất hiện tối thiểu để đuôi được xét chọn (total = tổng số lần của các ký hiệu predictable)
+MAX_CONFIDENCE = 0.9    # trần của `confidence` trả ra (chỉ giá trị hiển thị; việc chọn pick vẫn theo % thật)
 MAX_GAP = pd.Timedelta(minutes=10)   # chỉ dùng khi dữ liệu thiếu road_shoe (backtest nguồn file cũ)
 WINDOW = 10                          # số kết quả trước dùng để đoán kết quả tiếp theo
 RESET_ON_ROAD_DROP = True            # road_count giảm = bắt đầu đoạn mới (chỉ khi thiếu road_shoe)

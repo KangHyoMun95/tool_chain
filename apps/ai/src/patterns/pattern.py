@@ -4,7 +4,7 @@
 from collections import defaultdict
 from typing import Callable, Iterable, Mapping, Sequence
 
-from .config import MAX_LEN, MIN_COUNT, MIN_LEN
+from .config import MAX_CONFIDENCE, MAX_LEN, MIN_COUNT, MIN_LEN
 
 # patterns -> {pattern: {ký_hiệu predictable: số lần}}; pattern / ký hiệu không có trong bảng đếm thì 0
 CountLookup = Callable[[list[str]], Mapping[str, Mapping[str, int]]]
@@ -33,7 +33,7 @@ def choose_pick(history: str, lookup: CountLookup, predictable: Sequence[str], m
     history: chuỗi ký hiệu đã bỏ ignore_in_pattern, cũ -> mới (chỉ lấy MAX_LEN ký tự cuối).
     Với mỗi k = MIN_LEN..min(MAX_LEN, len): pattern = k ký tự cuối, total = tổng counts của các ký hiệu `predictable`,
     đuôi hợp lệ (eligible) khi total >= min_count VÀ ký hiệu nhiều nhất là DUY NHẤT (2 ký hiệu: count_x != count_y).
-    Chọn: % của ký hiệu nhiều nhất cao nhất -> total lớn hơn -> k ngắn hơn.
+    Chọn: % của ký hiệu nhiều nhất cao nhất -> total lớn hơn -> k ngắn hơn. `confidence` = % đó nhưng không vượt MAX_CONFIDENCE.
     Trả {pick, confidence, chosen, detail, history_used, reason} theo contract predict:results.
     """
     history = history[-MAX_LEN:]
@@ -67,7 +67,7 @@ def choose_pick(history: str, lookup: CountLookup, predictable: Sequence[str], m
     pct, total, _, pick, row = max(candidates, key=lambda c: c[:3])
     out.update(
         pick=pick,
-        confidence=round(pct, 4),
+        confidence=round(min(pct, MAX_CONFIDENCE), 4),
         chosen={"k": row["k"], "pattern": row["pattern"], "occurrences": total, "pct": dict(row["pct"])},
         reason="OK",
     )
