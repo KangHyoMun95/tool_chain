@@ -23,3 +23,7 @@ READ_COUNT = 50                      # XREADGROUP COUNT
 BLOCK_MS = 2_000
 MAX_CONCURRENT_PREDICTIONS = 32
 RETRY_DELAY_S = 1.0
+
+# Tín hiệu ai:rebuild (API vừa CLEAR_HISTORY): chờ chừng này giây trước khi dựng lại, để batch ghi DB của ingestion (tối đa ~3s)
+# kịp commit những ván vừa đếm bằng đường realtime; nếu không, bản dựng lại từ DB có thể thiếu chúng.
+REBUILD_SIGNAL_DELAY_S = int(os.environ.get("AI_REBUILD_DELAY_S", "5"))

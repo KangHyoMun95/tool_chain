@@ -3,6 +3,7 @@ import { Injectable } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
 import type { AuthUser } from "../auth/auth.types.js";
+import { appTimeZone } from "../common/timezone.js";
 
 export type DashboardResponse = {
   total_users: number;
@@ -15,9 +16,9 @@ export type DashboardResponse = {
 
 const MAX_DEPTH = 10;
 const DAYS = 7;
-const TZ = "Asia/Ho_Chi_Minh";   // ranh giới "ngày" của biểu đồ
 
-// Mọi user dưới người gọi (con trực tiếp và con cháu), không gồm DELETED. $1 = actor, $2 = MAX_DEPTH.
+// Mọi user dưới người gọi (con trực tiếp và con cháu), không gồm DELETED. $1 = actor, $2 = MAX_DEPTH, $3 = múi giờ của process
+// (ranh giới "ngày" của biểu đồ, appTimeZone()).
 const TREE = `
   WITH RECURSIVE tree AS (
     SELECT user_id, 1 AS depth, ARRAY[user_id] AS path FROM users WHERE refer_user_id = $1
@@ -33,7 +34,7 @@ const TREE = `
   ),
   days AS (
     SELECT d::date AS day
-    FROM generate_series((now() AT TIME ZONE '${TZ}')::date - ${DAYS - 1}, (now() AT TIME ZONE '${TZ}')::date, interval '1 day') d
+    FROM generate_series((now() AT TIME ZONE $3::text)::date - ${DAYS - 1}, (now() AT TIME ZONE $3::text)::date, interval '1 day') d
   )`;
 
 @Injectable()
@@ -42,7 +43,7 @@ export class DashboardService {
 
   /** Số liệu dashboard của cây user dưới người gọi (HOST: admin + user của họ; ADMIN: user). Phạm vi chỉ lấy từ token. */
   async get(actor: AuthUser): Promise<DashboardResponse> {
-    const params = [actor.userId, MAX_DEPTH];
+    const params = [actor.userId, MAX_DEPTH, appTimeZone()];
     const [totals, created, used] = await Promise.all([
       this.dataSource.query(
         `${TREE}
@@ -57,7 +58,7 @@ export class DashboardService {
         `${TREE}
          SELECT to_char(d.day, 'YYYY-MM-DD') AS date, count(s.user_id)::int AS value
          FROM days d
-         LEFT JOIN scope s ON (s.created_at AT TIME ZONE '${TZ}')::date = d.day
+         LEFT JOIN scope s ON (s.created_at AT TIME ZONE $3::text)::date = d.day
          GROUP BY d.day ORDER BY d.day`,
         params,
       ),
@@ -67,7 +68,7 @@ export class DashboardService {
                 COALESCE(sum(CASE t.transaction_type WHEN 'CHARGE' THEN t.amount ELSE -t.amount END), 0)::text AS value
          FROM days d
          LEFT JOIN (
-           SELECT tx.amount, tx.transaction_type, (tx.created_at AT TIME ZONE '${TZ}')::date AS day
+           SELECT tx.amount, tx.transaction_type, (tx.created_at AT TIME ZONE $3::text)::date AS day
            FROM transactions tx JOIN scope s ON s.user_id = tx.user_id
            WHERE tx.transaction_type IN ('CHARGE', 'REFUND') AND tx.created_at >= now() - interval '${DAYS + 1} days'
          ) t ON t.day = d.day

@@ -15,6 +15,10 @@ AI_RESULT_STREAM = "ai:results"               # API ghi, AI đọc
 PREDICT_RESULT_STREAM = "predict:results"     # AI ghi, API đọc
 STREAM_MAXLEN = 10_000                        # XADD MAXLEN ~ cho cả 3 stream
 
+# Pub/Sub (không phải stream): API publish sau khi CLEAR_HISTORY xóa ván; AI nghe và dựng lại bảng đếm (không restart).
+# Phải khớp AI_REBUILD_CHANNEL ở packages/shared/src/ai.ts.
+AI_REBUILD_CHANNEL = "ai:rebuild"
+
 AI_COUNTER_GROUP = "ai-counter"               # AI, trên ai:results
 AI_PREDICTOR_GROUP = "ai-predictor"           # AI, trên predict:requests
 

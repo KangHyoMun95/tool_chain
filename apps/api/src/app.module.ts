@@ -19,6 +19,7 @@ import { IngestionModule } from "./ingestion/ingestion.module.js";
 import { RealtimeModule } from "./realtime/realtime.module.js";
 import { PredictionsModule } from "./predictions/predictions.module.js";
 import { entities } from "./database/entities/index.js";
+import { JobsModule } from "./jobs/jobs.module.js";
 import { CategoryConfigModule } from "./category-config/category-config.module.js";
 
 export const { ObserveModule, ObserveInstrument } = createObserveModule();
@@ -67,6 +68,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     IngestionModule,
     RealtimeModule,
     PredictionsModule,
+    JobsModule,   // job dọn dữ liệu (CLEAR_PREDICT_UNUSE mỗi giờ, CLEAR_HISTORY 03:00)
   ],
   controllers: [AppController],
   providers: [

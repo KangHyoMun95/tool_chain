@@ -11,6 +11,15 @@ export const AI_RESULT_STREAM = "ai:results";               // API ghi, AI đọ
 export const PREDICT_RESULT_STREAM = "predict:results";     // AI ghi, API đọc
 export const AI_STREAM_MAXLEN = 10_000;                     // XADD MAXLEN ~ cho cả 3 stream
 
+// Pub/Sub (không phải stream): API publish sau khi CLEAR_HISTORY xóa ván, AI nghe và dựng lại bảng đếm (không restart).
+// Mất tín hiệu khi AI tắt không sao vì AI luôn dựng lại từ DB lúc khởi động. Phải khớp AI_REBUILD_CHANNEL ở contract.py.
+export const AI_REBUILD_CHANNEL = "ai:rebuild";
+export type AiRebuildSignal = {
+  schema_version: 1;
+  reason: string;                    // vd "CLEAR_HISTORY"
+  sent_at: string;                   // ISO-8601 UTC
+};
+
 // Consumer group (tên consumer cố định qua env, không dùng --scale)
 export const PREDICT_TRIGGER_GROUP = "predict-trigger";     // API, trên `ticks`
 export const PREDICT_PERSIST_GROUP = "predict-persist";     // API, trên `predict:results`

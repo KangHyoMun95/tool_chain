@@ -4,6 +4,7 @@
 #   predict:requests -> tính dự đoán pattern-v1 -> predict:results
 # AI KHÔNG ghi bảng nghiệp vụ nào trong DB: chỉ đọc DB (dựng lại bảng đếm) và ghi Redis của riêng nó + predict:results.
 import asyncio
+import json
 import logging
 import os
 import signal
@@ -17,9 +18,11 @@ import redis.asyncio as aioredis
 from sqlalchemy import Engine, text
 
 from .category_config import CategoryConfig, CategoryRegistry, load_registry
-from .config import HISTORY_DB_WINDOW_HOURS, MAX_CONCURRENT_PREDICTIONS, MISSING_PREVIOUS_DELAY_S, MISSING_PREVIOUS_RETRIES
+from .config import (
+    HISTORY_DB_WINDOW_HOURS, MAX_CONCURRENT_PREDICTIONS, MISSING_PREVIOUS_DELAY_S, MISSING_PREVIOUS_RETRIES, REBUILD_SIGNAL_DELAY_S,
+)
 from .contract import (
-    AI_COUNTER_GROUP, AI_PREDICTOR_GROUP, AI_RESULT_STREAM, MODEL_VERSION, PREDICT_REQUEST_STREAM,
+    AI_COUNTER_GROUP, AI_REBUILD_CHANNEL, AI_PREDICTOR_GROUP, AI_RESULT_STREAM, MODEL_VERSION, PREDICT_REQUEST_STREAM,
     PREDICT_RESULT_STREAM, STREAM_MAXLEN, AiResult, PredictRequest, PredictResult, prediction_id,
     recent_key, round_status_key,
 )
@@ -47,6 +50,10 @@ class AiService:
         self.registry = registry
         self._last_error: dict[str, float] = {}
         self.counts = RedisCounts(r)
+        # Khóa ĐẾM: on_ai_result giữ khi đếm; rebuild_now giữ suốt lúc dựng lại (chờ lần đếm đang dở xong, rồi chặn đếm mới).
+        # Dự đoán (on_request) KHÔNG dùng khóa này nên vẫn chạy bằng bảng cũ; kết quả mới nằm lại trong ai:results, đếm bù sau RENAME.
+        self._count_lock = asyncio.Lock()
+        self.rebuilding = False
         self.delay_s = int(os.environ.get("AI_ARTIFICIAL_DELAY_MS", "0")) / 1000   # giả lập AI chậm để thử hạn chót
 
     async def _recent(self, stream_id: str, shoe: int) -> dict[int, str]:
@@ -94,6 +101,10 @@ class AiService:
         return history, missing, source
 
     async def on_ai_result(self, msg: AiResult) -> None:
+        async with self._count_lock:
+            await self._count_result(msg)
+
+    async def _count_result(self, msg: AiResult) -> None:
         cfg = self._config(msg.key_id, "đếm kết quả")
         if cfg is None:
             return
@@ -106,6 +117,26 @@ class AiService:
                         msg.round - 1, msg.stream_id, msg.shoe, msg.round)
         counted = await self.counts.add_result(msg.stream_id, msg.shoe, msg.game_session_id, before, msg.result, cfg.predictable)
         log.debug("đếm %s shoe %d round %d result=%s: %s", msg.stream_id, msg.shoe, msg.round, msg.result, "mới" if counted else "đã đếm / không predictable")
+
+    async def rebuild_now(self, url: str, reason: str) -> None:
+        """Dựng lại bảng đếm từ DB không restart (tín hiệu ai:rebuild). Bảng cũ vẫn dùng cho dự đoán cho tới lúc RENAME; chỉ tạm dừng ĐẾM."""
+        self.rebuilding = True
+        try:
+            await asyncio.sleep(REBUILD_SIGNAL_DELAY_S)
+            started = time.monotonic()
+            log.info("Dựng lại bảng đếm bắt đầu (tín hiệu %s): tạm dừng ĐẾM kết quả mới, dự đoán vẫn chạy", reason)
+            async with self._count_lock:
+                sync_r = redis.from_url(url, decode_responses=True)
+                try:
+                    totals = await asyncio.to_thread(rebuild, sync_r, self.db, self.registry)
+                finally:
+                    sync_r.close()
+            log.info("Dựng lại bảng đếm kết thúc sau %.1fs: nạp %d kết quả (%d stream, %d pattern); tiếp tục đếm",
+                     time.monotonic() - started, totals["results"], totals["streams"], totals["patterns"])
+        except Exception:
+            log.exception("Dựng lại bảng đếm theo tín hiệu %s lỗi (bảng đếm giữ nguyên; restart AI để dựng lại từ DB)", reason)
+        finally:
+            self.rebuilding = False
 
     async def on_request(self, msg: PredictRequest) -> None:
         cfg = self._config(msg.key_id, "dự đoán")
@@ -131,6 +162,37 @@ class AiService:
             created_at=datetime.now(timezone.utc).isoformat(), **pick,
         )
         await self.r.xadd(PREDICT_RESULT_STREAM, {"payload": result.model_dump_json()}, maxlen=STREAM_MAXLEN, approximate=True)
+
+
+async def listen_rebuild(url: str, svc: AiService, stop: asyncio.Event) -> None:
+    """Nghe ai:rebuild (Redis Pub/Sub). Đang dựng lại mà có tín hiệu thêm thì bỏ qua. Mất kết nối thì tự nghe lại."""
+    tasks: set[asyncio.Task] = set()
+    while not stop.is_set():
+        conn = aioredis.from_url(url, decode_responses=True)
+        try:
+            pubsub = conn.pubsub()
+            await pubsub.subscribe(AI_REBUILD_CHANNEL)
+            log.info("Đang nghe tín hiệu %s", AI_REBUILD_CHANNEL)
+            while not stop.is_set():
+                msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                if msg is None:
+                    continue
+                try:
+                    reason = str(json.loads(msg["data"]).get("reason", "?"))
+                except (ValueError, AttributeError):
+                    reason = "?"
+                if svc.rebuilding:
+                    log.info("Bỏ qua tín hiệu %s (%s): đang dựng lại", AI_REBUILD_CHANNEL, reason)
+                    continue
+                svc.rebuilding = True      # đặt ngay để tín hiệu kế tiếp (kể cả trong lúc chờ) bị bỏ qua
+                task = asyncio.create_task(svc.rebuild_now(url, reason))
+                tasks.add(task)
+                task.add_done_callback(tasks.discard)
+        except Exception:
+            log.exception("Nghe %s lỗi, thử lại sau 3s", AI_REBUILD_CHANNEL)
+            await asyncio.sleep(3)
+        finally:
+            await conn.aclose()
 
 
 async def run(registry: CategoryRegistry | None = None) -> None:
@@ -159,5 +221,6 @@ async def run(registry: CategoryRegistry | None = None) -> None:
         consume(r, AI_RESULT_STREAM, AI_COUNTER_GROUP, consumer, AiResult, svc.on_ai_result, stop),
         consume(r, PREDICT_REQUEST_STREAM, AI_PREDICTOR_GROUP, consumer, PredictRequest, svc.on_request, stop,
                 concurrency=MAX_CONCURRENT_PREDICTIONS),
+        listen_rebuild(url, svc, stop),
     )
     await r.aclose()
