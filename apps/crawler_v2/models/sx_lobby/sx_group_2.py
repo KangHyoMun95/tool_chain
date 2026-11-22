@@ -1,6 +1,6 @@
 """
 Nguồn dữ liệu:
-  - actual_result: roadInfo.bigRoads[0].bS (bigRoads[0] là kết quả của ván roadInfo.gameRound), ánh xạ ở RESULT_MAP.
+  - actual_result: roadInfo.evenOddRoads[0].oddEven (phần tử đầu là kết quả của ván roadInfo.gameRound), ánh xạ ở RESULT_MAP.
   - totals: roadInfo.winCounts lấy TRỰC TIẾP (không cộng dồn), ánh xạ theo vị trí ở TOTALS_SYMBOLS. Message khác không có
     winCounts thì giữ totals gần nhất của bàn (để portal không ẩn khung tỉ lệ ở các tick khác).
   - status: ánh xạ eventType ở STATUS_MAP (một chỗ duy nhất).
@@ -180,7 +180,7 @@ class SXGroup2:
             return None
         road_round = first.get("gameRound")
         if road_round is not None and round_of_message is not None and road_round != round_of_message:
-            logger.warning("smallBigRoads[0].gameRound=%r khác roadInfo.gameRound=%r (table=%s) -> bỏ actual_result",
+            logger.warning("evenOddRoads[0].gameRound=%r khác roadInfo.gameRound=%r (table=%s) -> bỏ actual_result",
                            road_round, round_of_message, self.stream_id)
             return None
         symbol = RESULT_MAP.get(raw)
