@@ -1,0 +1,12 @@
+{
+  "lobby": "casino",
+  "category": "SEXY - XÓC ĐĨA",
+  "results": {
+    "C": { "label": { "vi": "C", "en": "C" }, "color": "#DC2626" },
+    "L": { "label": { "vi": "L", "en": "L" }, "color": "#2563EB" }
+  },
+  "predictable": ["C", "L"],
+  "ignore_in_pattern": [],
+  "draw": [],
+  "totals": ["C", "L"]
+}

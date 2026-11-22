@@ -20,8 +20,8 @@ def _sx_lobby():
     return handle_message
 
 
-def _category2():
-    from category2_handler import handle_message_2
+def _sx_group_2():
+    from group2_handler import handle_message_2
     return handle_message_2
 
 
@@ -33,6 +33,6 @@ def _sx_group_3():
 REGISTRY: dict[str, HandlerSpec] = {
     # idle_timeout 5.0s (ngưỡng B1 / B2 của WsRunner). WS_TARGETS ở main.py không còn được supervisor dùng.
     "sx_lobby": HandlerSpec("bpcdf.tgmeq.com", 5.0, _sx_lobby),
-    "category2": HandlerSpec("bpcdf.tgmeq.com", 5.0, _category2),
+    "sx_group_2": HandlerSpec("bpcdf.tgmeq.com", 5.0, _sx_group_2),
     "sx_group_3": HandlerSpec("bpcdf.tgmeq.com", 5.0, _sx_group_3),
 }

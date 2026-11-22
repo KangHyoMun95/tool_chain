@@ -1,22 +1,14 @@
-"""Handler WSS group 3 (Sic Bo): decode -> SXGroup3 theo từng bàn -> publish."""
 import logging
 from time import time
 
 from contract import build_key_id
 from models.sx_lobby.message.base_detection import BaseDetection
 from message_handler import decode_message
-from models.sx_lobby.sx_group_3 import SXGroup3, resolve_names
+from models.sx_lobby.sx_group_3 import SXGroup3
 from publisher import publish
 
 logger = logging.getLogger("Listener Message 3")
 
-
-def make_handler(lobby_name: str | None = None, category_name: str | None = None):
-    """Trả về on_message. Thiếu lobby / category -> ValueError ngay (không chạy WSS này, lỗi nêu rõ biến thiếu)."""
-    lobby, category = resolve_names(lobby_name, category_name)
-    tables: dict[str, SXGroup3] = {}
-
-    return handle_message_3
 
 def handle_message_3(raw):
     kind, msg = decode_message(raw)
@@ -43,7 +35,7 @@ def shot_message(message_dict: dict):
     rd.destructure_message(message_dict)
     manage_record.update({table_id: rd})
     message_shot = rd.shot_message()
-    if message_shot and table_id == '1132':
+    if message_shot:
         publish(
             item_id=build_key_id(rd.lobby_name, rd.category_name, rd.stream_name),
             data=message_shot,
