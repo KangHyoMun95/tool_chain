@@ -5,6 +5,7 @@ services:
     image: postgres:16.3
     container_name: tool-chain-database
     environment:
+      TZ: ${TZ:-Asia/Bangkok}
       POSTGRES_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
       POSTGRES_DB: ${POSTGRES_DB:?set POSTGRES_DB in .env}
@@ -22,6 +23,7 @@ services:
     container_name: tool-chain-flyway
     command: migrate
     environment:
+      TZ: ${TZ:-Asia/Bangkok}
       FLYWAY_URL: jdbc:postgresql://${DB_HOST:?set DB_HOST in .env}:${DB_PORT:-5432}/${POSTGRES_DB:?set POSTGRES_DB in .env}?sslmode=${DB_SSLMODE:-prefer}
       FLYWAY_USER: ${POSTGRES_USER:?set POSTGRES_USER in .env}
       FLYWAY_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
@@ -47,6 +49,7 @@ services:
       timeout: 3s
       retries: 20
     environment:
+      TZ: ${TZ:-Asia/Bangkok}
       REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}
   api:
     build:
@@ -56,6 +59,7 @@ services:
     container_name: tool-chain-api
     restart: unless-stopped
     environment:
+      TZ: ${TZ:-Asia/Bangkok}   # múi giờ hệ thống (code không ghi cứng): mốc 0h của job dọn dữ liệu, dashboard
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${DB_HOST:?set DB_HOST in .env}:${DB_PORT:-5432}/${POSTGRES_DB}
       DB_SSL: ${DB_SSL:-false}
       DB_SSL_REJECT_UNAUTHORIZED: ${DB_SSL_REJECT_UNAUTHORIZED:-true}
@@ -106,6 +110,7 @@ services:
     container_name: tool-chain-web-portal
     restart: unless-stopped
     environment:
+      TZ: ${TZ:-Asia/Bangkok}
       # Link Telegram ở trang đăng nhập / đăng ký; đọc lúc chạy, để trống thì ẩn. Đổi giá trị chỉ cần restart.
       TELE_CONTRACT: ${TELE_CONTRACT:-}
     ports:
@@ -121,6 +126,8 @@ services:
     image: tool-chain-web-admin
     container_name: tool-chain-web-admin
     restart: unless-stopped
+    environment:
+      TZ: ${TZ:-Asia/Bangkok}
     ports:
       - "127.0.0.1:${ADMIN_PORT:-5000}:3000"
     depends_on:
@@ -133,6 +140,7 @@ services:
     container_name: tool-chain-ai
     restart: unless-stopped
     environment:
+      TZ: ${TZ:-Asia/Bangkok}
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379
       # AI chỉ ĐỌC DB. Ưu tiên user chỉ có SELECT (SQL tạo role: apps/ai/README.md); để trống thì dùng tài khoản chính.
       DATABASE_URL_READONLY: ${AI_DATABASE_URL_READONLY:-}
@@ -156,7 +164,7 @@ services:
     stop_grace_period: 30s
     env_file: apps/crawler_v2/.env
     environment:
-      TZ: Asia/Ho_Chi_Minh
+      TZ: ${TZ:-Asia/Bangkok}
       REDIS_URL: redis://:${REDIS_PASSWORD:?set REDIS_PASSWORD in .env}@redis:6379
       VNC: "${VNC:-0}"
       # Mỗi WSS bật / tắt riêng (WS_TARGETS ở main.py). Lỗi cấp phiên (check bot...) ⇒ chờ RESTART_DELAY giây rồi thoát mã 1, Docker chạy lại.

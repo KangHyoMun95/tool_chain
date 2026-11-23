@@ -50,7 +50,7 @@ Service chỉ cần `SELECT` trên `game_sessions` (`status`, `result`, `road_sh
 
 ## Cấu hình trọng số theo độ mới (bảng `job_configs`)
 
-Không dùng biến môi trường. AI đọc lại bảng `job_configs` (Flyway V4) mỗi 60 giây, không cần restart:
+Không dùng biến môi trường. AI đọc lại bảng `job_configs` (Flyway V4, dòng AI do V5 thêm) mỗi 60 giây, không cần restart:
 
 | `type` | `unit` | Ý nghĩa | Khi đổi |
 |---|---|---|---|

@@ -5,6 +5,7 @@
 # AI KHÔNG ghi bảng nghiệp vụ nào trong DB: chỉ đọc DB (dựng lại bảng đếm) và ghi Redis của riêng nó + predict:results.
 import asyncio
 import contextlib
+import json
 import logging
 import os
 import signal
@@ -23,7 +24,7 @@ from .config import (
     MAX_WEIGHT_EXPONENT, MISSING_PREVIOUS_DELAY_S, MISSING_PREVIOUS_RETRIES, REBUILD_SETTLE_SECONDS,
 )
 from .contract import (
-    AI_COUNTER_GROUP, AI_PREDICTOR_GROUP, AI_RESULT_STREAM, MODEL_VERSION, PREDICT_REQUEST_STREAM,
+    AI_COUNTER_GROUP, AI_REBUILD_CHANNEL, AI_PREDICTOR_GROUP, AI_RESULT_STREAM, MODEL_VERSION, PREDICT_REQUEST_STREAM,
     PREDICT_RESULT_STREAM, STREAM_MAXLEN, AiResult, PredictRequest, PredictResult, prediction_id,
     recent_key, round_status_key,
 )
@@ -61,6 +62,7 @@ class AiService:
         self._count_open.set()
         self._count_inflight = 0
         self._rebuild_lock = asyncio.Lock()
+        self._rebuild_pending = False
         self._need_rebuild = False   # lần dựng lại trước thất bại ⇒ thử lại ở lần đọc cấu hình kế tiếp
         self._tasks: set[asyncio.Task] = set()
 
@@ -81,6 +83,7 @@ class AiService:
         Thất bại ⇒ log ERROR, bảng và t0 cũ giữ nguyên (counts.rebuild đã xóa key tạm), thử lại ở lần đọc cấu hình sau.
         """
         async with self._rebuild_lock:
+            self._rebuild_pending = False
             self._count_open.clear()
             try:
                 while self._count_inflight:
@@ -138,12 +141,20 @@ class AiService:
         except ValueError:
             return time.time()
 
+    def request_rebuild(self, reason: str) -> bool:
+        """Yêu cầu dựng lại bảng đếm (cấu hình hiện tại) ở nền; bỏ qua nếu đang dựng / đã có yêu cầu chờ. True nếu đã nhận yêu cầu."""
+        if self._rebuild_lock.locked() or self._rebuild_pending:
+            return False
+        self._rebuild_pending = True
+        task = asyncio.create_task(self.rebuild_now(reason, self.tuning))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
+        return True
+
     def _maybe_rebuild_for_overflow(self, exponent: float) -> None:
         """Số mũ trọng số vượt MAX_WEIGHT_EXPONENT ⇒ tự dựng lại (đặt lại t0)."""
-        if exponent > MAX_WEIGHT_EXPONENT and not self._rebuild_lock.locked():
-            task = asyncio.create_task(self.rebuild_now("số mũ trọng số vượt ngưỡng", self.tuning))
-            self._tasks.add(task)
-            task.add_done_callback(self._tasks.discard)
+        if exponent > MAX_WEIGHT_EXPONENT:
+            self.request_rebuild("số mũ trọng số vượt ngưỡng")
 
     def _config(self, key_id: str, what: str) -> CategoryConfig | None:
         """Cấu hình category của stream; không có ⇒ log ERROR (tối đa 1 dòng / phút / category) và trả None (không dự đoán, không đếm)."""
@@ -239,6 +250,31 @@ class AiService:
         await self.r.xadd(PREDICT_RESULT_STREAM, {"payload": result.model_dump_json()}, maxlen=STREAM_MAXLEN, approximate=True)
 
 
+async def listen_rebuild(url: str, svc: AiService, stop: asyncio.Event) -> None:
+    """Nghe ai:rebuild (Redis Pub/Sub; API publish sau CLEAR_HISTORY) ⇒ AiService.request_rebuild (nguyên tử, không chặn dự đoán). Đang dựng lại mà có tín hiệu thêm thì bỏ qua. Mất kết nối thì tự nghe lại."""
+    while not stop.is_set():
+        conn = aioredis.from_url(url, decode_responses=True)
+        try:
+            pubsub = conn.pubsub()
+            await pubsub.subscribe(AI_REBUILD_CHANNEL)
+            log.info("Đang nghe tín hiệu %s", AI_REBUILD_CHANNEL)
+            while not stop.is_set():
+                msg = await pubsub.get_message(ignore_subscribe_messages=True, timeout=1.0)
+                if msg is None:
+                    continue
+                try:
+                    reason = str(json.loads(msg["data"]).get("reason", "?"))
+                except (ValueError, AttributeError):
+                    reason = "?"
+                if not svc.request_rebuild(f"tín hiệu {AI_REBUILD_CHANNEL}: {reason}"):
+                    log.info("Bỏ qua tín hiệu %s (%s): đang dựng lại", AI_REBUILD_CHANNEL, reason)
+        except Exception:
+            log.exception("Nghe %s lỗi, thử lại sau 3s", AI_REBUILD_CHANNEL)
+            await asyncio.sleep(3)
+        finally:
+            await conn.aclose()
+
+
 async def run(registry: CategoryRegistry | None = None) -> None:
     registry = registry or load_registry()
     url = os.environ["REDIS_URL"]
@@ -274,5 +310,6 @@ async def run(registry: CategoryRegistry | None = None) -> None:
         consume(r, AI_RESULT_STREAM, AI_COUNTER_GROUP, consumer, AiResult, svc.on_ai_result, stop),
         consume(r, PREDICT_REQUEST_STREAM, AI_PREDICTOR_GROUP, consumer, PredictRequest, svc.on_request, stop,
                 concurrency=MAX_CONCURRENT_PREDICTIONS),
+        listen_rebuild(url, svc, stop),
     )
     await r.aclose()

@@ -21,7 +21,8 @@
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
     "test:e2e": "vitest run --config ./vitest.config.e2e.ts",
     "create-user": "tsx src/cli/create-user.ts",
-    "create-host": "tsx src/cli/create-user.ts --role HOST"
+    "create-host": "tsx src/cli/create-user.ts --role HOST",
+    "run-job": "tsx src/cli/run-job.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",

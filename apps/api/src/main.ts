@@ -1,12 +1,13 @@
 import "dotenv/config";
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, type LogLevel } from '@nestjs/common';
+import { Logger, ValidationPipe, type LogLevel } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { AppModule } from './app.module.js';
 import { AllExceptionsFilter } from './common/all-exceptions.filter.js';
+import { appTimeZone } from './common/timezone.js';
 import type { EnvVars } from './config/env.validation.js';
 
 // "1" → 1 hop, "true"/"false" → boolean, còn lại ("loopback", CIDR...) giữ nguyên chuỗi.
@@ -26,6 +27,7 @@ async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, { logger });
   const config = app.get<ConfigService<EnvVars, true>>(ConfigService);
 
+  new Logger("Bootstrap").log(`Múi giờ: ${appTimeZone()}`);   // thiếu / sai TZ ⇒ appTimeZone() log WARN và dùng UTC
   app.setGlobalPrefix("api");
   app.set('trust proxy', parseTrustProxy(config.get('TRUST_PROXY', { infer: true })));
   app.use(helmet());
