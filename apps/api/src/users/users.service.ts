@@ -3,7 +3,7 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { InjectDataSource } from "@nestjs/typeorm";
 import argon2 from "argon2";
 import { DataSource, QueryFailedError } from "typeorm";
-import { UserStatus } from "@toolhackchain/shared";
+import { MAIN_ADMIN_USER_ID, UserStatus } from "@toolhackchain/shared";
 import type { AuthUser } from "../auth/auth.types.js";
 import { updateReturning } from "../common/update-returning.js";
 import { ARGON2_OPTIONS } from "../auth/password.js";
@@ -86,6 +86,10 @@ export class UsersService {
 
   async updateStatus(actor: AuthUser, targetUserId: string, status: UserStatus, transferToAdminId?: string) {
     const target = await this.permissions.assertCanManage(actor, targetUserId);
+    // ADMIN chính (hardcode) là cấp trên của mọi user tự đăng ký: không được deactive / xóa (đăng ký sẽ trả 503 nếu nó không ACTIVE).
+    if (target.userId === MAIN_ADMIN_USER_ID && status !== UserStatus.ACTIVE) {
+      throw new ForbiddenException("The main admin account cannot be deactivated or deleted");
+    }
     if (target.status === UserStatus.DELETED) throw new ConflictException("User is deleted");
     if (status === UserStatus.DELETED) return this.remove(actor, target.userId, transferToAdminId);
     if (transferToAdminId !== undefined) throw new BadRequestException("transfer_to_admin_id is only for deleting an admin");
