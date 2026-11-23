@@ -35,6 +35,9 @@ def recent_key(stream_id: str, shoe: int) -> str: return f"recent:{stream_id}:{s
 def ai_counts_key(stream_id: str) -> str: return f"ai:counts:{stream_id}"
 # HASH như ai:counts nhưng số đếm CÓ trọng số theo độ mới (float, tính từ mốc t0 của lần dựng lại); chỉ AI dùng.
 def ai_wcounts_key(stream_id: str) -> str: return f"ai:wcounts:{stream_id}"
+# HASH {t0, half_life_minutes}: mốc t0 và bán rã mà ai:wcounts* đang dùng ('' = tắt trọng số). Đổi CÙNG LÚC với các bảng (MULTI/EXEC) nên đọc
+# trong cùng transaction với bảng thì luôn khớp; script Lua đếm cũng đọc nó để tính trọng số.
+AI_WSTATE_KEY = "ai:wstate"
 def ai_shoe_wcounts_key(stream_id: str, shoe: int) -> str: return f"ai:wcounts:{stream_id}:{shoe}"   # chỉ shoe này, có TTL
 def ai_counted_key(stream_id: str, shoe: int) -> str: return f"ai:counted:{stream_id}:{shoe}"
 

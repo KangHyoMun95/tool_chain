@@ -52,12 +52,12 @@ Service chỉ cần `SELECT` trên `game_sessions` (`status`, `result`, `road_sh
 
 Không dùng biến môi trường. AI đọc lại bảng `job_configs` (Flyway V4) mỗi 60 giây, không cần restart:
 
-| `config_key` | `unit` | Ý nghĩa | Khi đổi |
+| `type` | `unit` | Ý nghĩa | Khi đổi |
 |---|---|---|---|
-| `AI_HALF_LIFE` | `minute` \| `hour` | Bán rã: một lần pattern xuất hiện mất nửa trọng số sau từng đó thời gian. `config_value` = NULL ⇒ tắt trọng số, chạy đúng pattern-v1. Mặc định 60 phút | Tự dựng lại bảng đếm (cổng xử lý đóng vài giây ~ thời gian đọc DB + 5s) |
+| `AI_HALF_LIFE` | `minute` \| `hour` | Bán rã: một lần pattern xuất hiện mất nửa trọng số sau từng đó thời gian. `value` = NULL ⇒ tắt trọng số, chạy đúng pattern-v1. Mặc định 60 phút | Tự dựng lại bảng đếm nguyên tử, KHÔNG chặn dự đoán (chỉ tạm dừng đếm kết quả mới, vài giây ~ thời gian đọc DB + 5s) |
 | `AI_SHOE_WEIGHT` | `times` | Hệ số nhân của shoe hiện tại: `W[R] = W_bàn[R] + (n − 1) × W_shoe_hiện_tại[R]`, số nguyên >= 1 (1 = không ưu tiên). Mặc định 5 | Áp dụng ngay |
 
-Dòng thiếu / giá trị hoặc `unit` không hợp lệ ⇒ log WARN (không lặp mỗi phút) và dùng mặc định. Đổi bằng SQL, ví dụ `UPDATE job_configs SET config_value = 30 WHERE config_key = 'AI_HALF_LIFE';` (chỉ cần quyền ghi của tài khoản quản trị DB; user `ai_readonly` chỉ đọc). Số mũ trọng số vượt 900 half-life (18,75 ngày với 30 phút, 37,5 ngày với 60 phút) thì AI tự dựng lại như khi đổi `AI_HALF_LIFE`. Chi tiết thuật toán: `CLAUDE.md`, mục "Luồng dự đoán AI".
+Cột của bảng: `type` (khóa), `value` (NULL = tắt với `AI_HALF_LIFE`), `unit`, `updated_at`; bảng dùng chung cho mọi job. Dòng thiếu / giá trị hoặc `unit` không hợp lệ ⇒ log WARN (không lặp mỗi phút) và dùng mặc định. Đổi bằng SQL, ví dụ `UPDATE job_configs SET value = 30, updated_at = now() WHERE type = 'AI_HALF_LIFE';` (chỉ cần quyền ghi của tài khoản quản trị DB; user `ai_readonly` chỉ đọc). Số mũ trọng số vượt 900 half-life (18,75 ngày với 30 phút, 37,5 ngày với 60 phút) thì AI tự dựng lại như khi đổi `AI_HALF_LIFE`. Chi tiết thuật toán: `CLAUDE.md`, mục "Luồng dự đoán AI".
 
 ## Vận hành
 

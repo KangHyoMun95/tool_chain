@@ -1,7 +1,7 @@
 # src/patterns/job_config.py
-# Cấu hình chạy của AI đọc từ bảng job_configs (Flyway V4), đọc lại mỗi CONFIG_REFRESH_SECONDS. Chỉ ĐỌC DB.
-#   AI_HALF_LIFE   unit 'minute' | 'hour', config_value >= 1; config_value NULL = tắt trọng số (chạy đúng pattern-v1)
-#   AI_SHOE_WEIGHT unit 'times', config_value nguyên >= 1
+# Cấu hình chạy của AI đọc từ bảng job_configs (Flyway V4: type, value, unit, updated_at), đọc lại mỗi CONFIG_REFRESH_SECONDS. Chỉ ĐỌC DB.
+#   AI_HALF_LIFE   unit 'minute' | 'hour', value >= 1; value NULL = tắt trọng số (chạy đúng pattern-v1)
+#   AI_SHOE_WEIGHT unit 'times', value nguyên >= 1
 # Dòng thiếu / không hợp lệ ⇒ WARN (chỉ khi lý do đổi, không lặp mỗi phút) và dùng mặc định.
 import logging
 from dataclasses import dataclass
@@ -29,34 +29,34 @@ def _int(v) -> int | None:
 
 
 def parse(rows: Iterable[Mapping], warn=lambda msg: None) -> AiTuning:
-    """rows: {config_key, config_value, unit}. `warn(msg)` được gọi cho mỗi dòng thiếu / không hợp lệ."""
-    by_key = {r["config_key"]: r for r in rows}
+    """rows: {type, value, unit}. `warn(msg)` được gọi cho mỗi dòng thiếu / không hợp lệ."""
+    by_key = {r["type"]: r for r in rows}
 
     half_life: int | None = DEFAULT_HALF_LIFE_MINUTES
     row = by_key.get(HALF_LIFE_KEY)
     if row is None:
         warn(f"{HALF_LIFE_KEY}: không có dòng, dùng mặc định {DEFAULT_HALF_LIFE_MINUTES} phút")
-    elif row["config_value"] is None:
+    elif row["value"] is None:
         half_life = None                              # tắt có chủ ý
-    elif _int(row["config_value"]) is None or row["config_value"] < 1 or row["unit"] not in _UNIT_MINUTES:
-        warn(f"{HALF_LIFE_KEY}: giá trị {row['config_value']!r} / unit {row['unit']!r} không hợp lệ (cần số nguyên >= 1, unit minute|hour), "
+    elif _int(row["value"]) is None or row["value"] < 1 or row["unit"] not in _UNIT_MINUTES:
+        warn(f"{HALF_LIFE_KEY}: giá trị {row['value']!r} / unit {row['unit']!r} không hợp lệ (cần số nguyên >= 1, unit minute|hour), "
              f"dùng mặc định {DEFAULT_HALF_LIFE_MINUTES} phút")
     else:
-        half_life = row["config_value"] * _UNIT_MINUTES[row["unit"]]
+        half_life = row["value"] * _UNIT_MINUTES[row["unit"]]
 
     shoe_weight = DEFAULT_SHOE_WEIGHT
     row = by_key.get(SHOE_WEIGHT_KEY)
     if row is None:
         warn(f"{SHOE_WEIGHT_KEY}: không có dòng, dùng mặc định {DEFAULT_SHOE_WEIGHT}")
-    elif _int(row["config_value"]) is None or row["config_value"] < 1 or row["unit"] != "times":
-        warn(f"{SHOE_WEIGHT_KEY}: giá trị {row['config_value']!r} / unit {row['unit']!r} không hợp lệ (cần số nguyên >= 1, unit times), "
+    elif _int(row["value"]) is None or row["value"] < 1 or row["unit"] != "times":
+        warn(f"{SHOE_WEIGHT_KEY}: giá trị {row['value']!r} / unit {row['unit']!r} không hợp lệ (cần số nguyên >= 1, unit times), "
              f"dùng mặc định {DEFAULT_SHOE_WEIGHT}")
     else:
-        shoe_weight = row["config_value"]
+        shoe_weight = row["value"]
     return AiTuning(half_life, shoe_weight)
 
 
-_QUERY = text("SELECT config_key, config_value, unit FROM job_configs WHERE config_key IN (:a, :b)")
+_QUERY = text("SELECT type, value, unit FROM job_configs WHERE type IN (:a, :b)")
 
 
 class TuningReader:

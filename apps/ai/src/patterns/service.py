@@ -30,7 +30,7 @@ from .contract import (
 from .counts import RedisCounts, rebuild
 from .db import engine
 from .job_config import AiTuning, TuningReader
-from .pattern import choose_pick, combine_weighted, format_detail, history_before, recency_weight, suffix_patterns, weight_scale
+from .pattern import choose_pick, combine_weighted, format_detail, history_before, suffix_patterns, weight_scale
 from .redis_io import consume, ensure_group
 
 log = logging.getLogger("pattern")
@@ -46,55 +46,60 @@ _HISTORY_QUERY = text("""
 
 
 class AiService:
-    def __init__(self, r: aioredis.Redis, db: Engine, registry: CategoryRegistry, tuning: AiTuning, t0: float, redis_url: str = ""):
+    def __init__(self, r: aioredis.Redis, db: Engine, registry: CategoryRegistry, tuning: AiTuning, redis_url: str = ""):
         self.r = r
         self.db = db
         self.registry = registry
         self.redis_url = redis_url
-        self.tuning = tuning         # cấu hình trọng số đang dùng (job_configs); đổi cùng t0 dưới cổng _open, lúc không có handler nào đang chạy
-        self.t0 = t0                 # mốc trọng số = lúc dựng lại bảng đếm gần nhất (counts.rebuild)
+        self.tuning = tuning         # cấu hình đang áp dụng (job_configs). half_life_minutes chỉ đổi SAU khi rebuild thành công; shoe_weight đổi ngay
         self._last_error: dict[str, float] = {}
         self.counts = RedisCounts(r)
         self.delay_s = int(os.environ.get("AI_ARTIFICIAL_DELAY_MS", "0")) / 1000   # giả lập AI chậm để thử hạn chót
-        # Cổng cho handler trong lúc dựng lại giữa chừng: đóng cổng ⇒ handler mới chờ (tin nằm yên trong stream / PEL), rebuild chờ handler đang chạy xong.
-        self._open = asyncio.Event()
-        self._open.set()
-        self._inflight = 0
+        # Cổng CHỈ cho phần ĐẾM kết quả mới (ai:results): đóng trong lúc dựng lại ⇒ message nằm lại trong stream. Dự đoán KHÔNG bị chặn: nó đọc bảng cũ
+        # cùng (t0, half-life) của chúng trong một transaction Redis (RedisCounts.snapshot) cho tới khi rebuild đổi bảng.
+        self._count_open = asyncio.Event()
+        self._count_open.set()
+        self._count_inflight = 0
         self._rebuild_lock = asyncio.Lock()
-        self._need_rebuild = False   # lần dựng lại giữa chừng trước thất bại ⇒ thử lại ở lần đọc cấu hình kế tiếp
+        self._need_rebuild = False   # lần dựng lại trước thất bại ⇒ thử lại ở lần đọc cấu hình kế tiếp
         self._tasks: set[asyncio.Task] = set()
 
     @contextlib.asynccontextmanager
-    async def _work(self):
-        await self._open.wait()
-        self._inflight += 1          # không có await giữa wait() và dòng này nên cổng không thể đóng chen vào
+    async def _counting(self):
+        await self._count_open.wait()
+        self._count_inflight += 1    # không có await giữa wait() và dòng này nên cổng không thể đóng chen vào
         try:
             yield
         finally:
-            self._inflight -= 1
+            self._count_inflight -= 1
 
     async def rebuild_now(self, reason: str, tuning: AiTuning) -> bool:
-        """Dựng lại bảng đếm giữa chừng (không restart) với cấu hình `tuning`; đặt lại mốc t0. True nếu thành công."""
+        """Dựng lại bảng đếm giữa chừng (không restart) với cấu hình `tuning`; nguyên tử (counts.rebuild). True nếu thành công.
+
+        Chỉ tạm dừng ĐẾM kết quả mới: đóng cổng, chờ handler đếm đang chạy dở, chờ REBUILD_SETTLE_SECONDS cho ingestion ghi nốt batch cuối
+        rồi mới đọc DB (ván đã đếm live nhưng chưa vào DB sẽ mất khi đổi bảng, như khi restart). Dự đoán vẫn chạy bằng bảng cũ.
+        Thất bại ⇒ log ERROR, bảng và t0 cũ giữ nguyên (counts.rebuild đã xóa key tạm), thử lại ở lần đọc cấu hình sau.
+        """
         async with self._rebuild_lock:
-            self._open.clear()
+            self._count_open.clear()
             try:
-                while self._inflight:
+                while self._count_inflight:
                     await asyncio.sleep(0.05)
-                await asyncio.sleep(REBUILD_SETTLE_SECONDS)   # ingestion ghi nốt batch cuối (<= 3s) trước khi đọc DB
+                await asyncio.sleep(REBUILD_SETTLE_SECONDS)
                 log.info("Dựng lại bảng đếm giữa chừng (%s): half_life=%s phút", reason, tuning.half_life_minutes)
                 sync_r = redis.from_url(self.redis_url, decode_responses=True)
                 try:
-                    totals = await asyncio.to_thread(rebuild, sync_r, self.db, self.registry, tuning.half_life_minutes)
+                    await asyncio.to_thread(rebuild, sync_r, self.db, self.registry, tuning.half_life_minutes)
                 finally:
                     sync_r.close()
-                self.t0, self.tuning, self._need_rebuild = totals["t0"], tuning, False
+                self.tuning, self._need_rebuild = tuning, False
                 return True
             except Exception:
-                log.exception("Dựng lại bảng đếm giữa chừng THẤT BẠI (%s); sẽ thử lại sau %ds", reason, CONFIG_REFRESH_SECONDS)
+                log.exception("Dựng lại bảng đếm giữa chừng THẤT BẠI (%s): giữ nguyên bảng và t0 cũ, thử lại sau %ds", reason, CONFIG_REFRESH_SECONDS)
                 self._need_rebuild = True
                 return False
             finally:
-                self._open.set()
+                self._count_open.set()
 
     async def refresh_loop(self, reader: TuningReader, stop: asyncio.Event) -> None:
         """Mỗi CONFIG_REFRESH_SECONDS đọc job_configs: AI_HALF_LIFE đổi ⇒ dựng lại; AI_SHOE_WEIGHT đổi ⇒ áp dụng ngay (không dựng lại)."""
@@ -125,21 +130,20 @@ class AiService:
             rows = c.execute(_HISTORY_QUERY, {"stream_id": stream_id, "shoe": shoe, "round": round_, "hours": HISTORY_DB_WINDOW_HOURS})
             return {int(r.road_count): str(r.result) for r in rows}
 
-    def _weight(self, received_at: str) -> float | None:
-        """Trọng số theo độ mới của kết quả vừa nhận (mốc thời gian = `received_at`, cùng nghĩa với ended_at khi dựng lại: lúc kết quả được ghi
-        nhận); None khi tắt trọng số. Số mũ vượt MAX_WEIGHT_EXPONENT ⇒ tự dựng lại (đặt lại t0)."""
-        half_life = self.tuning.half_life_minutes
-        if not half_life:
-            return None
+    @staticmethod
+    def _ts(received_at: str) -> float:
+        """Thời điểm kết quả được ghi nhận (`received_at`, cùng nghĩa với ended_at khi dựng lại: lúc kết quả được ghi nhận)."""
         try:
-            ts = datetime.fromisoformat(received_at.replace("Z", "+00:00")).timestamp()
+            return datetime.fromisoformat(received_at.replace("Z", "+00:00")).timestamp()
         except ValueError:
-            ts = time.time()
-        if (ts - self.t0) / (half_life * 60.0) > MAX_WEIGHT_EXPONENT and not self._rebuild_lock.locked():
+            return time.time()
+
+    def _maybe_rebuild_for_overflow(self, exponent: float) -> None:
+        """Số mũ trọng số vượt MAX_WEIGHT_EXPONENT ⇒ tự dựng lại (đặt lại t0)."""
+        if exponent > MAX_WEIGHT_EXPONENT and not self._rebuild_lock.locked():
             task = asyncio.create_task(self.rebuild_now("số mũ trọng số vượt ngưỡng", self.tuning))
             self._tasks.add(task)
             task.add_done_callback(self._tasks.discard)
-        return recency_weight(ts, self.t0, half_life)
 
     def _config(self, key_id: str, what: str) -> CategoryConfig | None:
         """Cấu hình category của stream; không có ⇒ log ERROR (tối đa 1 dòng / phút / category) và trả None (không dự đoán, không đếm)."""
@@ -177,7 +181,7 @@ class AiService:
         return history, missing, source
 
     async def on_ai_result(self, msg: AiResult) -> None:
-        async with self._work():
+        async with self._counting():
             await self._count_result(msg)
 
     async def _count_result(self, msg: AiResult) -> None:
@@ -191,13 +195,13 @@ class AiService:
         if missing:
             log.warning("ai:results thiếu round %d của stream %s shoe %d khi đếm round %d (bản dựng lại lúc khởi động sẽ sửa)",
                         msg.round - 1, msg.stream_id, msg.shoe, msg.round)
-        counted = await self.counts.add_result(msg.stream_id, msg.shoe, msg.game_session_id, before, msg.result, cfg.predictable,
-                                               weight=self._weight(msg.received_at))
+        counted, exponent = await self.counts.add_result(msg.stream_id, msg.shoe, msg.game_session_id, before, msg.result, cfg.predictable,
+                                                         self._ts(msg.received_at))
+        self._maybe_rebuild_for_overflow(exponent)
         log.debug("đếm %s shoe %d round %d result=%s: %s", msg.stream_id, msg.shoe, msg.round, msg.result, "mới" if counted else "đã đếm / không predictable")
 
     async def on_request(self, msg: PredictRequest) -> None:
-        async with self._work():
-            await self._predict(msg)
+        await self._predict(msg)
 
     async def _predict(self, msg: PredictRequest) -> None:
         cfg = self._config(msg.key_id, "dự đoán")
@@ -209,15 +213,16 @@ class AiService:
             return
 
         history, missing, source = await self._history(msg, cfg)
-        tuning = self.tuning
         patterns = suffix_patterns(history)
-        table = await self.counts.lookup(msg.stream_id, patterns, cfg.predictable)      # số lần THẬT (điều kiện >= 3)
+        snap = await self.counts.snapshot(msg.stream_id, msg.shoe, patterns, cfg.predictable)   # một transaction: bảng + (t0, half-life) khớp nhau
+        table = snap.raw                                                                        # số lần THẬT (điều kiện >= 3)
+        half_life, shoe_weight = snap.half_life_minutes, self.tuning.shoe_weight
         wlookup = None
-        if tuning.half_life_minutes:
-            table_w, shoe_w = await self.counts.wlookup(msg.stream_id, msg.shoe, patterns, cfg.predictable)
-            scale = weight_scale(time.time(), self.t0, tuning.half_life_minutes)
-            combined = combine_weighted(table_w, shoe_w, tuning.shoe_weight, scale, patterns, cfg.predictable)
+        if half_life and snap.t0 is not None:
+            combined = combine_weighted(snap.table_w, snap.shoe_w, shoe_weight, weight_scale(time.time(), snap.t0, half_life), patterns, cfg.predictable)
             wlookup = lambda _patterns: combined
+        else:
+            half_life = None
         pick = choose_pick(history, lambda _patterns: table, cfg.predictable, wlookup=wlookup)
         log.info("Dự đoán %s shoe %d round %d history=%s%s\n%s", msg.key_id, msg.shoe, msg.round, source,
                  " (THIẾU round trước)" if missing else "", format_detail(pick))
@@ -228,7 +233,7 @@ class AiService:
             schema_version=1, prediction_id=prediction_id(msg.game_session_id),
             game_session_id=msg.game_session_id, stream_id=msg.stream_id, key_id=msg.key_id,
             shoe=msg.shoe, round=msg.round, missing_previous=missing, model_version=MODEL_VERSION,
-            half_life_minutes=tuning.half_life_minutes, shoe_weight=tuning.shoe_weight if tuning.half_life_minutes else None,
+            half_life_minutes=half_life, shoe_weight=shoe_weight if half_life else None,
             created_at=datetime.now(timezone.utc).isoformat(), **pick,
         )
         await self.r.xadd(PREDICT_RESULT_STREAM, {"payload": result.model_dump_json()}, maxlen=STREAM_MAXLEN, approximate=True)
@@ -257,11 +262,11 @@ async def run(registry: CategoryRegistry | None = None) -> None:
         tuning = AiTuning(DEFAULT_HALF_LIFE_MINUTES, DEFAULT_SHOE_WEIGHT)
     sync_r = redis.from_url(url, decode_responses=True)
     try:
-        rebuilt = await asyncio.to_thread(rebuild, sync_r, db, registry, tuning.half_life_minutes)
+        await asyncio.to_thread(rebuild, sync_r, db, registry, tuning.half_life_minutes)
     finally:
         sync_r.close()
 
-    svc = AiService(r, db, registry, tuning, rebuilt["t0"], url)
+    svc = AiService(r, db, registry, tuning, url)
     log.info("AI service sẵn sàng (consumer=%s, model=%s, half_life=%s phút, shoe_weight=%s)", consumer, MODEL_VERSION,
              tuning.half_life_minutes or "tắt", tuning.shoe_weight)
     await asyncio.gather(
