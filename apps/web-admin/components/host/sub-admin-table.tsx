@@ -16,6 +16,7 @@ import {
   StopOutlined,
 } from '@ant-design/icons';
 import Link from 'next/link';
+import { MAIN_ADMIN_USER_ID } from '@toolhackchain/shared';
 import { AccountStatus } from '@/lib/legacy-types';
 import { ApiError } from '@/lib/api/client';
 import { useActivateUser, useDeleteUser } from '@/lib/api/user';
@@ -178,7 +179,9 @@ export function SubAdminTable() {
         </Tooltip>,
           );
         }
-        if (record.depth === 1 && record.status === AccountStatus.ACTIVE) {
+        // ADMIN chính (hardcode, MAIN_ADMIN_USER_ID): ẩn Deactive / Xóa (API cũng chặn). Các thao tác khác giữ nguyên.
+        const isMainAdmin = record.id === MAIN_ADMIN_USER_ID;
+        if (record.depth === 1 && record.status === AccountStatus.ACTIVE && !isMainAdmin) {
           actions.push(
             <Tooltip key="deactivate" title="Deactive">
               <Button
@@ -201,16 +204,20 @@ export function SubAdminTable() {
                 onClick={() => confirmActivate(record)}
               />
             </Tooltip>,
-            <Tooltip key="delete" title="Xoá">
-              <Button
-                type="text"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-                onClick={() => confirmDelete(record)}
-              />
-            </Tooltip>,
           );
+          if (!isMainAdmin) {
+            actions.push(
+              <Tooltip key="delete" title="Xoá">
+                <Button
+                  type="text"
+                  size="small"
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={() => confirmDelete(record)}
+                />
+              </Tooltip>,
+            );
+          }
         }
         return actions;
       },
