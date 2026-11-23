@@ -4,10 +4,18 @@
 from collections import defaultdict
 from typing import Callable, Iterable, Mapping, Sequence
 
-from .config import MAX_CONFIDENCE, MAX_LEN, MIN_COUNT, MIN_LEN
+from .config import MAX_CONFIDENCE, MAX_LEN, MAX_WEIGHT_EXPONENT, MIN_COUNT, MIN_LEN, RECENCY_BLEND
 
 # patterns -> {pattern: {ký_hiệu predictable: số lần}}; pattern / ký hiệu không có trong bảng đếm thì 0
 CountLookup = Callable[[list[str]], Mapping[str, Mapping[str, int]]]
+# Như CountLookup nhưng số đếm CÓ trọng số theo độ mới (float).
+WeightedLookup = Callable[[list[str]], Mapping[str, Mapping[str, float]]]
+
+
+def recency_weight(ts: float, t0: float, half_life_hours: float) -> float:
+    """Trọng số 2^((ts - t0) / half-life). Chỉ tỉ lệ giữa các trọng số có ý nghĩa nên t0 tùy ý:
+    t0 = lúc dựng lại bảng đếm ⇒ ván cũ < 1, ván mới sau đó > 1 (clamp ở 2^MAX_WEIGHT_EXPONENT để không tràn float)."""
+    return 2.0 ** min((ts - t0) / (half_life_hours * 3600.0), MAX_WEIGHT_EXPONENT)
 
 
 def history_before(results: Mapping[int, str], round_: int, ignore: Iterable[str] = (), limit: int = MAX_LEN) -> tuple[str, bool]:
@@ -27,13 +35,17 @@ def suffix_patterns(history: str) -> list[str]:
     return [history[-k:] for k in range(MIN_LEN, len(history) + 1)]
 
 
-def choose_pick(history: str, lookup: CountLookup, predictable: Sequence[str], min_count: int = MIN_COUNT) -> dict:
+def choose_pick(history: str, lookup: CountLookup, predictable: Sequence[str], min_count: int = MIN_COUNT,
+                wlookup: WeightedLookup | None = None, blend: float = RECENCY_BLEND) -> dict:
     """HÀM THUẦN (không I/O) của pattern-v1; service và backtest dùng chung.
 
     history: chuỗi ký hiệu đã bỏ ignore_in_pattern, cũ -> mới (chỉ lấy MAX_LEN ký tự cuối).
     Với mỗi k = MIN_LEN..min(MAX_LEN, len): pattern = k ký tự cuối, total = tổng counts của các ký hiệu `predictable`,
     đuôi hợp lệ (eligible) khi total >= min_count VÀ ký hiệu nhiều nhất là DUY NHẤT (2 ký hiệu: count_x != count_y).
     Chọn: % của ký hiệu nhiều nhất cao nhất -> total lớn hơn -> k ngắn hơn. `confidence` = % đó nhưng không vượt MAX_CONFIDENCE.
+    wlookup (tùy chọn): số đếm có trọng số theo độ mới. Có ⇒ tỉ lệ của mỗi ký hiệu = (1 - blend) * tỉ lệ số lần thật + blend * tỉ lệ có trọng số,
+    pct / pick / confidence tính trên tỉ lệ đó (lịch sử lặp lại gần đây nặng hơn lịch sử cũ); `counts`, `total` và điều kiện eligible vẫn theo
+    số lần thật. Không có ⇒ như cũ (mọi lần cùng trọng số).
     Trả {pick, confidence, chosen, detail, history_used, reason} theo contract predict:results.
     """
     history = history[-MAX_LEN:]
@@ -41,7 +53,9 @@ def choose_pick(history: str, lookup: CountLookup, predictable: Sequence[str], m
     if len(history) < MIN_LEN:
         return out
 
-    table = lookup(suffix_patterns(history))
+    patterns = suffix_patterns(history)
+    table = lookup(patterns)
+    wtable = wlookup(patterns) if wlookup else None
     detail, candidates = [], []
     for k in range(MIN_LEN, len(history) + 1):
         pat = history[-k:]
@@ -51,13 +65,22 @@ def choose_pick(history: str, lookup: CountLookup, predictable: Sequence[str], m
         top = max(counts.values())
         winners = [s for s, n in counts.items() if n == top]
         eligible = total >= min_count and len(winners) == 1
-        detail.append({
-            "k": k, "pattern": pat, "counts": counts, "total": total,
-            "pct": {s: round(n / total, 4) if total else None for s, n in counts.items()},
-            "eligible": eligible,
-        })
+        # Tỉ lệ dùng để chọn pick / hiển thị: trộn số lần thật với số lần có trọng số (nếu có và tổng > 0), ngược lại số lần thật.
+        shares: dict[str, float] = {s: n / total if total else 0.0 for s, n in counts.items()}
+        if wtable is not None and total:
+            w = {s: float(wtable.get(pat, {}).get(s, 0.0)) for s in predictable}
+            wsum = sum(w.values())
+            if wsum > 0:
+                shares = {s: (1 - blend) * shares[s] + blend * w[s] / wsum for s in predictable}
+        share_total = sum(shares.values())
+        pct = {s: round(v / share_total, 4) if share_total else None for s, v in shares.items()}
+        detail.append({"k": k, "pattern": pat, "counts": counts, "total": total, "pct": pct, "eligible": eligible})
         if eligible:
-            candidates.append((top / total, total, -k, winners[0], detail[-1]))
+            best = max(shares.values())
+            leaders = [s for s, v in shares.items() if v == best]
+            # Hòa sau khi có trọng số (rất hiếm): rơi về ký hiệu nhiều nhất theo số lần thật.
+            pick_symbol = leaders[0] if len(leaders) == 1 else winners[0]
+            candidates.append((shares[pick_symbol] / share_total, total, -k, pick_symbol, detail[-1]))
 
     out["detail"] = detail
     if not candidates:
@@ -89,10 +112,13 @@ def format_detail(result: dict) -> str:
 class PatternStats:
     """Bảng đếm trong bộ nhớ của MỘT stream: pattern -> {ký_hiệu predictable: n}. Dùng cho backtest, verify và dựng lại bảng đếm."""
 
-    def __init__(self, predictable: Sequence[str], min_len: int = MIN_LEN, max_len: int = MAX_LEN):
+    def __init__(self, predictable: Sequence[str], min_len: int = MIN_LEN, max_len: int = MAX_LEN,
+                 half_life_hours: float = 0.0, t0: float = 0.0):
         self.predictable = tuple(predictable)
         self.min_len, self.max_len = min_len, max_len
+        self.half_life_hours, self.t0 = half_life_hours, t0   # half_life_hours = 0: không tính số đếm có trọng số
         self.counts: dict[str, dict[str, int]] = defaultdict(lambda: defaultdict(int))
+        self.wcounts: dict[str, dict[str, float]] = defaultdict(lambda: defaultdict(float))
 
     def add_sequence(self, seq: str) -> None:
         """Đếm mọi pattern (gối đầu) có ký hiệu predictable theo sau, trong một chuỗi liền mạch (đã bỏ ignore) của MỘT shoe (brute-force)."""
@@ -101,7 +127,7 @@ class PatternStats:
                 if seq[i + n] in self.predictable:
                     self.counts[seq[i:i + n]][seq[i + n]] += 1
 
-    def add_result(self, before: str, result: str) -> None:
+    def add_result(self, before: str, result: str, ts: float | None = None) -> None:
         """Cập nhật tăng dần khi có một kết quả mới; `before` là chuỗi liền mạch (đã bỏ ignore) ngay trước nó (cùng shoe).
 
         Cùng quy tắc với script Lua của service. result ngoài `predictable` không được đếm.
@@ -109,8 +135,14 @@ class PatternStats:
         if result not in self.predictable:
             return
         before = before[-self.max_len:]
+        w = recency_weight(ts, self.t0, self.half_life_hours) if self.half_life_hours and ts is not None else None
         for n in range(self.min_len, min(self.max_len, len(before)) + 1):
             self.counts[before[-n:]][result] += 1
+            if w is not None:
+                self.wcounts[before[-n:]][result] += w
 
     def lookup(self, patterns: Iterable[str]) -> dict[str, dict[str, int]]:
         return {p: dict(self.counts.get(p, {})) for p in patterns}
+
+    def wlookup(self, patterns: Iterable[str]) -> dict[str, dict[str, float]]:
+        return {p: dict(self.wcounts.get(p, {})) for p in patterns}

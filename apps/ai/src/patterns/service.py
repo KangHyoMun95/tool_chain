@@ -17,7 +17,10 @@ import redis.asyncio as aioredis
 from sqlalchemy import Engine, text
 
 from .category_config import CategoryConfig, CategoryRegistry, load_registry
-from .config import HISTORY_DB_WINDOW_HOURS, MAX_CONCURRENT_PREDICTIONS, MISSING_PREVIOUS_DELAY_S, MISSING_PREVIOUS_RETRIES
+from .config import (
+    HISTORY_DB_WINDOW_HOURS, MAX_CONCURRENT_PREDICTIONS, MAX_WEIGHT_EXPONENT, MISSING_PREVIOUS_DELAY_S, MISSING_PREVIOUS_RETRIES,
+    RECENCY_HALF_LIFE_HOURS,
+)
 from .contract import (
     AI_COUNTER_GROUP, AI_PREDICTOR_GROUP, AI_RESULT_STREAM, MODEL_VERSION, PREDICT_REQUEST_STREAM,
     PREDICT_RESULT_STREAM, STREAM_MAXLEN, AiResult, PredictRequest, PredictResult, prediction_id,
@@ -25,7 +28,7 @@ from .contract import (
 )
 from .counts import RedisCounts, rebuild
 from .db import engine
-from .pattern import choose_pick, format_detail, history_before, suffix_patterns
+from .pattern import choose_pick, format_detail, history_before, recency_weight, suffix_patterns
 from .redis_io import consume, ensure_group
 
 log = logging.getLogger("pattern")
@@ -41,10 +44,12 @@ _HISTORY_QUERY = text("""
 
 
 class AiService:
-    def __init__(self, r: aioredis.Redis, db: Engine, registry: CategoryRegistry):
+    def __init__(self, r: aioredis.Redis, db: Engine, registry: CategoryRegistry, t0: float):
         self.r = r
         self.db = db
         self.registry = registry
+        self.t0 = t0                 # mốc trọng số = lúc dựng lại bảng đếm (xem counts.rebuild); restart ⇒ dựng lại và đổi mốc
+        self._weight_warned = False
         self._last_error: dict[str, float] = {}
         self.counts = RedisCounts(r)
         self.delay_s = int(os.environ.get("AI_ARTIFICIAL_DELAY_MS", "0")) / 1000   # giả lập AI chậm để thử hạn chót
@@ -57,6 +62,19 @@ class AiService:
         with self.db.connect() as c:
             rows = c.execute(_HISTORY_QUERY, {"stream_id": stream_id, "shoe": shoe, "round": round_, "hours": HISTORY_DB_WINDOW_HOURS})
             return {int(r.road_count): str(r.result) for r in rows}
+
+    def _weight(self, received_at: str) -> float | None:
+        """Trọng số theo độ mới của kết quả vừa nhận; None khi tắt (RECENCY_HALF_LIFE_HOURS = 0)."""
+        if not RECENCY_HALF_LIFE_HOURS:
+            return None
+        try:
+            ts = datetime.fromisoformat(received_at.replace("Z", "+00:00")).timestamp()
+        except ValueError:
+            ts = time.time()
+        if not self._weight_warned and (ts - self.t0) / (RECENCY_HALF_LIFE_HOURS * 3600) > MAX_WEIGHT_EXPONENT * 0.9:
+            self._weight_warned = True
+            log.error("Trọng số theo độ mới gần tràn (chạy quá lâu so với half-life %sh): restart service để dựng lại bảng đếm", RECENCY_HALF_LIFE_HOURS)
+        return recency_weight(ts, self.t0, RECENCY_HALF_LIFE_HOURS)
 
     def _config(self, key_id: str, what: str) -> CategoryConfig | None:
         """Cấu hình category của stream; không có ⇒ log ERROR (tối đa 1 dòng / phút / category) và trả None (không dự đoán, không đếm)."""
@@ -104,7 +122,8 @@ class AiService:
         if missing:
             log.warning("ai:results thiếu round %d của stream %s shoe %d khi đếm round %d (bản dựng lại lúc khởi động sẽ sửa)",
                         msg.round - 1, msg.stream_id, msg.shoe, msg.round)
-        counted = await self.counts.add_result(msg.stream_id, msg.shoe, msg.game_session_id, before, msg.result, cfg.predictable)
+        counted = await self.counts.add_result(msg.stream_id, msg.shoe, msg.game_session_id, before, msg.result, cfg.predictable,
+                                               weight=self._weight(msg.received_at))
         log.debug("đếm %s shoe %d round %d result=%s: %s", msg.stream_id, msg.shoe, msg.round, msg.result, "mới" if counted else "đã đếm / không predictable")
 
     async def on_request(self, msg: PredictRequest) -> None:
@@ -118,7 +137,8 @@ class AiService:
 
         history, missing, source = await self._history(msg, cfg)
         table = await self.counts.lookup(msg.stream_id, suffix_patterns(history), cfg.predictable)
-        pick = choose_pick(history, lambda _patterns: table, cfg.predictable)
+        wtable = await self.counts.wlookup(msg.stream_id, suffix_patterns(history), cfg.predictable) if RECENCY_HALF_LIFE_HOURS else None
+        pick = choose_pick(history, lambda _patterns: table, cfg.predictable, wlookup=(lambda _patterns: wtable) if wtable is not None else None)
         log.info("Dự đoán %s shoe %d round %d history=%s%s\n%s", msg.key_id, msg.shoe, msg.round, source,
                  " (THIẾU round trước)" if missing else "", format_detail(pick))
 
@@ -149,12 +169,12 @@ async def run(registry: CategoryRegistry | None = None) -> None:
     db = engine()
     sync_r = redis.from_url(url, decode_responses=True)
     try:
-        await asyncio.to_thread(rebuild, sync_r, db, registry)
+        rebuilt = await asyncio.to_thread(rebuild, sync_r, db, registry)
     finally:
         sync_r.close()
 
-    svc = AiService(r, db, registry)
-    log.info("AI service sẵn sàng (consumer=%s, model=%s)", consumer, MODEL_VERSION)
+    svc = AiService(r, db, registry, rebuilt["t0"])
+    log.info("AI service sẵn sàng (consumer=%s, model=%s, recency_half_life=%sh)", consumer, MODEL_VERSION, RECENCY_HALF_LIFE_HOURS or "tắt")
     await asyncio.gather(
         consume(r, AI_RESULT_STREAM, AI_COUNTER_GROUP, consumer, AiResult, svc.on_ai_result, stop),
         consume(r, PREDICT_REQUEST_STREAM, AI_PREDICTOR_GROUP, consumer, PredictRequest, svc.on_request, stop,

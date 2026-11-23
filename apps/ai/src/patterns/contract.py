@@ -29,10 +29,11 @@ Pick = Symbol
 Reason = Literal["OK", "NOT_ENOUGH_HISTORY", "NO_ELIGIBLE_SUFFIX"]
 
 
-# Redis key. API sở hữu (ghi): round_status, recent. AI sở hữu (ghi): ai_counts, ai_counted.
+# Redis key. API sở hữu (ghi): round_status, recent. AI sở hữu (ghi): ai_counts, ai_wcounts, ai_counted.
 def round_status_key(game_session_id: str) -> str: return f"round_status:{game_session_id}"
 def recent_key(stream_id: str, shoe: int) -> str: return f"recent:{stream_id}:{shoe}"
 def ai_counts_key(stream_id: str) -> str: return f"ai:counts:{stream_id}"
+def ai_wcounts_key(stream_id: str) -> str: return f"ai:wcounts:{stream_id}"   # HASH như ai:counts nhưng số đếm CÓ trọng số theo độ mới (float); chỉ AI dùng
 def ai_counted_key(stream_id: str, shoe: int) -> str: return f"ai:counted:{stream_id}:{shoe}"
 
 

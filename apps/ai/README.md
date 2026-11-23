@@ -31,6 +31,8 @@ Docker: service `ai` trong `docker-compose.yml` (build từ thư mục này, ch�
 | `DATABASE_URL` | DB URL dự phòng |
 | `CATEGORY_CONFIG_DIR` | Thư mục `config/categories` (bỏ trống: tìm ở thư mục chạy hoặc ở gốc repo; docker: `/app/config/categories`) |
 | `AI_CONSUMER_NAME` | Tên consumer cố định (mặc định hostname). Không chạy hai instance trùng tên, không dùng `--scale` |
+| `AI_RECENCY_HALF_LIFE_HOURS` | Trọng số theo độ mới (mặc định 48; `0` = tắt như pattern-v1 cũ; nếu bật phải >= 1). Mỗi lần pattern xuất hiện có trọng số 2^(-tuổi / half-life giờ) |
+| `AI_RECENCY_BLEND` | Phần của % dành cho tỉ lệ có trọng số theo độ mới, trong [0, 1) (mặc định 0.5): `pct = (1 - BLEND) * tỉ lệ số lần thật + BLEND * tỉ lệ có trọng số`. Đổi hai biến này phải restart AI (dựng lại bảng đếm) |
 | `AI_ARTIFICIAL_DELAY_MS` | Chỉ để thử: trì hoãn mỗi dự đoán N ms (kiểm tra hạn chót DONE ở API) |
 | `LOG_LEVEL` | Mặc định `INFO` |
 

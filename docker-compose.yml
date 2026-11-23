@@ -141,6 +141,8 @@ services:
       AI_CONSUMER_NAME: ai-worker-0
       LOG_LEVEL: ${AI_LOG_LEVEL:-INFO}
       AI_HISTORY_DB_WINDOW_HOURS: ${AI_HISTORY_DB_WINDOW_HOURS:-6}
+      AI_RECENCY_HALF_LIFE_HOURS: ${AI_RECENCY_HALF_LIFE_HOURS:-48}
+      AI_RECENCY_BLEND: ${AI_RECENCY_BLEND:-0.5}
     depends_on:
       redis:
         condition: service_healthy
