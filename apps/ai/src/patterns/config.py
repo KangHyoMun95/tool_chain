@@ -6,17 +6,15 @@ import pandas as pd
 MIN_LEN = 3          # độ dài trượt ngắn nhất
 MAX_LEN = 10         # độ dài trượt dài nhất
 MIN_COUNT = 3        # số lần xuất hiện tối thiểu để đuôi được xét chọn (total = tổng số lần của các ký hiệu predictable)
-# Trọng số theo độ mới: mỗi lần xuất hiện của một pattern có trọng số 2^(-tuổi / half-life), tuổi = thời gian từ lúc ván ra kết quả.
-# pct = (1 - BLEND) * tỉ lệ số lần thật + BLEND * tỉ lệ có trọng số ⇒ pattern lặp lại ở lịch sử GẦN thì % cao hơn, lặp lại ở lịch sử cũ thì thấp hơn.
-# `counts` / `total` / MIN_COUNT vẫn là số lần THẬT. Không để BLEND = 1: vài lần xuất hiện gần nhất sẽ quyết định cả %, dễ ra % rất cao từ rất ít mẫu.
-# HALF_LIFE_HOURS = 0 ⇒ tắt (mọi lần xuất hiện cùng trọng số, như pattern-v1 cũ). Tối thiểu 1 giờ.
-RECENCY_HALF_LIFE_HOURS = float(os.environ.get("AI_RECENCY_HALF_LIFE_HOURS", "48"))
-RECENCY_BLEND = float(os.environ.get("AI_RECENCY_BLEND", "0.5"))
-if RECENCY_HALF_LIFE_HOURS != 0 and RECENCY_HALF_LIFE_HOURS < 1:
-    raise ValueError("AI_RECENCY_HALF_LIFE_HOURS phải bằng 0 (tắt) hoặc >= 1")
-if not 0 <= RECENCY_BLEND < 1:
-    raise ValueError("AI_RECENCY_BLEND phải trong [0, 1)")
-MAX_WEIGHT_EXPONENT = 1000           # 2^1000 gần trần của float64: trọng số live tăng theo 2^(giờ chạy / half-life), quá mức này cần restart để dựng lại
+# Trọng số theo độ mới: cấu hình (AI_HALF_LIFE, AI_SHOE_WEIGHT) nằm ở bảng job_configs (xem job_config.py), không phải env.
+DEFAULT_HALF_LIFE_MINUTES = 60       # dùng khi dòng AI_HALF_LIFE thiếu / không hợp lệ (config_value NULL = tắt, không phải mặc định)
+DEFAULT_SHOE_WEIGHT = 5              # dùng khi dòng AI_SHOE_WEIGHT thiếu / không hợp lệ
+CONFIG_REFRESH_SECONDS = 60          # đọc lại job_configs
+# Trọng số live = 2^((ts - t0) / half-life); số mũ này vượt ngưỡng ⇒ TỰ dựng lại bảng đếm (đặt lại t0). float64 chịu tới 2^1023: còn dư ~2^123 cho tổng nhiều lần cộng.
+# Bán rã 30 phút: 900 × 30 phút = 450 giờ ≈ 18,75 ngày một lần dựng lại; 60 phút ≈ 37,5 ngày; 2 giờ ≈ 75 ngày.
+MAX_WEIGHT_EXPONENT = 900
+SHOE_WCOUNTS_TTL_SECONDS = 6 * 60 * 60   # ai:wcounts:{stream}:{shoe}
+REBUILD_SETTLE_SECONDS = 5           # dựng lại giữa chừng: chờ ingestion ghi nốt batch cuối (tối đa 3s) trước khi đọc DB
 MAX_CONFIDENCE = 0.9    # trần của `confidence` trả ra (chỉ giá trị hiển thị; việc chọn pick vẫn theo % thật)
 MAX_GAP = pd.Timedelta(minutes=10)   # chỉ dùng khi dữ liệu thiếu road_shoe (backtest nguồn file cũ)
 WINDOW = 10                          # số kết quả trước dùng để đoán kết quả tiếp theo

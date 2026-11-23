@@ -4,6 +4,7 @@
 #   predict:requests -> tính dự đoán pattern-v1 -> predict:results
 # AI KHÔNG ghi bảng nghiệp vụ nào trong DB: chỉ đọc DB (dựng lại bảng đếm) và ghi Redis của riêng nó + predict:results.
 import asyncio
+import contextlib
 import logging
 import os
 import signal
@@ -18,8 +19,8 @@ from sqlalchemy import Engine, text
 
 from .category_config import CategoryConfig, CategoryRegistry, load_registry
 from .config import (
-    HISTORY_DB_WINDOW_HOURS, MAX_CONCURRENT_PREDICTIONS, MAX_WEIGHT_EXPONENT, MISSING_PREVIOUS_DELAY_S, MISSING_PREVIOUS_RETRIES,
-    RECENCY_HALF_LIFE_HOURS,
+    CONFIG_REFRESH_SECONDS, DEFAULT_HALF_LIFE_MINUTES, DEFAULT_SHOE_WEIGHT, HISTORY_DB_WINDOW_HOURS, MAX_CONCURRENT_PREDICTIONS,
+    MAX_WEIGHT_EXPONENT, MISSING_PREVIOUS_DELAY_S, MISSING_PREVIOUS_RETRIES, REBUILD_SETTLE_SECONDS,
 )
 from .contract import (
     AI_COUNTER_GROUP, AI_PREDICTOR_GROUP, AI_RESULT_STREAM, MODEL_VERSION, PREDICT_REQUEST_STREAM,
@@ -28,7 +29,8 @@ from .contract import (
 )
 from .counts import RedisCounts, rebuild
 from .db import engine
-from .pattern import choose_pick, format_detail, history_before, recency_weight, suffix_patterns
+from .job_config import AiTuning, TuningReader
+from .pattern import choose_pick, combine_weighted, format_detail, history_before, recency_weight, suffix_patterns, weight_scale
 from .redis_io import consume, ensure_group
 
 log = logging.getLogger("pattern")
@@ -44,15 +46,75 @@ _HISTORY_QUERY = text("""
 
 
 class AiService:
-    def __init__(self, r: aioredis.Redis, db: Engine, registry: CategoryRegistry, t0: float):
+    def __init__(self, r: aioredis.Redis, db: Engine, registry: CategoryRegistry, tuning: AiTuning, t0: float, redis_url: str = ""):
         self.r = r
         self.db = db
         self.registry = registry
-        self.t0 = t0                 # mốc trọng số = lúc dựng lại bảng đếm (xem counts.rebuild); restart ⇒ dựng lại và đổi mốc
-        self._weight_warned = False
+        self.redis_url = redis_url
+        self.tuning = tuning         # cấu hình trọng số đang dùng (job_configs); đổi cùng t0 dưới cổng _open, lúc không có handler nào đang chạy
+        self.t0 = t0                 # mốc trọng số = lúc dựng lại bảng đếm gần nhất (counts.rebuild)
         self._last_error: dict[str, float] = {}
         self.counts = RedisCounts(r)
         self.delay_s = int(os.environ.get("AI_ARTIFICIAL_DELAY_MS", "0")) / 1000   # giả lập AI chậm để thử hạn chót
+        # Cổng cho handler trong lúc dựng lại giữa chừng: đóng cổng ⇒ handler mới chờ (tin nằm yên trong stream / PEL), rebuild chờ handler đang chạy xong.
+        self._open = asyncio.Event()
+        self._open.set()
+        self._inflight = 0
+        self._rebuild_lock = asyncio.Lock()
+        self._need_rebuild = False   # lần dựng lại giữa chừng trước thất bại ⇒ thử lại ở lần đọc cấu hình kế tiếp
+        self._tasks: set[asyncio.Task] = set()
+
+    @contextlib.asynccontextmanager
+    async def _work(self):
+        await self._open.wait()
+        self._inflight += 1          # không có await giữa wait() và dòng này nên cổng không thể đóng chen vào
+        try:
+            yield
+        finally:
+            self._inflight -= 1
+
+    async def rebuild_now(self, reason: str, tuning: AiTuning) -> bool:
+        """Dựng lại bảng đếm giữa chừng (không restart) với cấu hình `tuning`; đặt lại mốc t0. True nếu thành công."""
+        async with self._rebuild_lock:
+            self._open.clear()
+            try:
+                while self._inflight:
+                    await asyncio.sleep(0.05)
+                await asyncio.sleep(REBUILD_SETTLE_SECONDS)   # ingestion ghi nốt batch cuối (<= 3s) trước khi đọc DB
+                log.info("Dựng lại bảng đếm giữa chừng (%s): half_life=%s phút", reason, tuning.half_life_minutes)
+                sync_r = redis.from_url(self.redis_url, decode_responses=True)
+                try:
+                    totals = await asyncio.to_thread(rebuild, sync_r, self.db, self.registry, tuning.half_life_minutes)
+                finally:
+                    sync_r.close()
+                self.t0, self.tuning, self._need_rebuild = totals["t0"], tuning, False
+                return True
+            except Exception:
+                log.exception("Dựng lại bảng đếm giữa chừng THẤT BẠI (%s); sẽ thử lại sau %ds", reason, CONFIG_REFRESH_SECONDS)
+                self._need_rebuild = True
+                return False
+            finally:
+                self._open.set()
+
+    async def refresh_loop(self, reader: TuningReader, stop: asyncio.Event) -> None:
+        """Mỗi CONFIG_REFRESH_SECONDS đọc job_configs: AI_HALF_LIFE đổi ⇒ dựng lại; AI_SHOE_WEIGHT đổi ⇒ áp dụng ngay (không dựng lại)."""
+        while not stop.is_set():
+            with contextlib.suppress(asyncio.TimeoutError):
+                await asyncio.wait_for(stop.wait(), CONFIG_REFRESH_SECONDS)
+            if stop.is_set():
+                return
+            try:
+                new = await asyncio.to_thread(reader.read)
+            except Exception as e:
+                log.warning("Không đọc được job_configs (giữ cấu hình hiện tại): %s", e)
+                continue
+            if new.half_life_minutes != self.tuning.half_life_minutes or self._need_rebuild:
+                log.info("AI_HALF_LIFE đổi %s -> %s phút (shoe_weight %s -> %s)", self.tuning.half_life_minutes, new.half_life_minutes,
+                         self.tuning.shoe_weight, new.shoe_weight)
+                await self.rebuild_now("AI_HALF_LIFE đổi", new)
+            elif new.shoe_weight != self.tuning.shoe_weight:
+                log.info("AI_SHOE_WEIGHT đổi %s -> %s (áp dụng ngay)", self.tuning.shoe_weight, new.shoe_weight)
+                self.tuning = new
 
     async def _recent(self, stream_id: str, shoe: int) -> dict[int, str]:
         raw = await self.r.hgetall(recent_key(stream_id, shoe))
@@ -64,17 +126,20 @@ class AiService:
             return {int(r.road_count): str(r.result) for r in rows}
 
     def _weight(self, received_at: str) -> float | None:
-        """Trọng số theo độ mới của kết quả vừa nhận; None khi tắt (RECENCY_HALF_LIFE_HOURS = 0)."""
-        if not RECENCY_HALF_LIFE_HOURS:
+        """Trọng số theo độ mới của kết quả vừa nhận (mốc thời gian = `received_at`, cùng nghĩa với ended_at khi dựng lại: lúc kết quả được ghi
+        nhận); None khi tắt trọng số. Số mũ vượt MAX_WEIGHT_EXPONENT ⇒ tự dựng lại (đặt lại t0)."""
+        half_life = self.tuning.half_life_minutes
+        if not half_life:
             return None
         try:
             ts = datetime.fromisoformat(received_at.replace("Z", "+00:00")).timestamp()
         except ValueError:
             ts = time.time()
-        if not self._weight_warned and (ts - self.t0) / (RECENCY_HALF_LIFE_HOURS * 3600) > MAX_WEIGHT_EXPONENT * 0.9:
-            self._weight_warned = True
-            log.error("Trọng số theo độ mới gần tràn (chạy quá lâu so với half-life %sh): restart service để dựng lại bảng đếm", RECENCY_HALF_LIFE_HOURS)
-        return recency_weight(ts, self.t0, RECENCY_HALF_LIFE_HOURS)
+        if (ts - self.t0) / (half_life * 60.0) > MAX_WEIGHT_EXPONENT and not self._rebuild_lock.locked():
+            task = asyncio.create_task(self.rebuild_now("số mũ trọng số vượt ngưỡng", self.tuning))
+            self._tasks.add(task)
+            task.add_done_callback(self._tasks.discard)
+        return recency_weight(ts, self.t0, half_life)
 
     def _config(self, key_id: str, what: str) -> CategoryConfig | None:
         """Cấu hình category của stream; không có ⇒ log ERROR (tối đa 1 dòng / phút / category) và trả None (không dự đoán, không đếm)."""
@@ -112,6 +177,10 @@ class AiService:
         return history, missing, source
 
     async def on_ai_result(self, msg: AiResult) -> None:
+        async with self._work():
+            await self._count_result(msg)
+
+    async def _count_result(self, msg: AiResult) -> None:
         cfg = self._config(msg.key_id, "đếm kết quả")
         if cfg is None:
             return
@@ -127,6 +196,10 @@ class AiService:
         log.debug("đếm %s shoe %d round %d result=%s: %s", msg.stream_id, msg.shoe, msg.round, msg.result, "mới" if counted else "đã đếm / không predictable")
 
     async def on_request(self, msg: PredictRequest) -> None:
+        async with self._work():
+            await self._predict(msg)
+
+    async def _predict(self, msg: PredictRequest) -> None:
         cfg = self._config(msg.key_id, "dự đoán")
         if cfg is None:
             return
@@ -136,9 +209,16 @@ class AiService:
             return
 
         history, missing, source = await self._history(msg, cfg)
-        table = await self.counts.lookup(msg.stream_id, suffix_patterns(history), cfg.predictable)
-        wtable = await self.counts.wlookup(msg.stream_id, suffix_patterns(history), cfg.predictable) if RECENCY_HALF_LIFE_HOURS else None
-        pick = choose_pick(history, lambda _patterns: table, cfg.predictable, wlookup=(lambda _patterns: wtable) if wtable is not None else None)
+        tuning = self.tuning
+        patterns = suffix_patterns(history)
+        table = await self.counts.lookup(msg.stream_id, patterns, cfg.predictable)      # số lần THẬT (điều kiện >= 3)
+        wlookup = None
+        if tuning.half_life_minutes:
+            table_w, shoe_w = await self.counts.wlookup(msg.stream_id, msg.shoe, patterns, cfg.predictable)
+            scale = weight_scale(time.time(), self.t0, tuning.half_life_minutes)
+            combined = combine_weighted(table_w, shoe_w, tuning.shoe_weight, scale, patterns, cfg.predictable)
+            wlookup = lambda _patterns: combined
+        pick = choose_pick(history, lambda _patterns: table, cfg.predictable, wlookup=wlookup)
         log.info("Dự đoán %s shoe %d round %d history=%s%s\n%s", msg.key_id, msg.shoe, msg.round, source,
                  " (THIẾU round trước)" if missing else "", format_detail(pick))
 
@@ -148,6 +228,7 @@ class AiService:
             schema_version=1, prediction_id=prediction_id(msg.game_session_id),
             game_session_id=msg.game_session_id, stream_id=msg.stream_id, key_id=msg.key_id,
             shoe=msg.shoe, round=msg.round, missing_previous=missing, model_version=MODEL_VERSION,
+            half_life_minutes=tuning.half_life_minutes, shoe_weight=tuning.shoe_weight if tuning.half_life_minutes else None,
             created_at=datetime.now(timezone.utc).isoformat(), **pick,
         )
         await self.r.xadd(PREDICT_RESULT_STREAM, {"payload": result.model_dump_json()}, maxlen=STREAM_MAXLEN, approximate=True)
@@ -167,15 +248,24 @@ async def run(registry: CategoryRegistry | None = None) -> None:
     await ensure_group(r, AI_RESULT_STREAM, AI_COUNTER_GROUP)
     await ensure_group(r, PREDICT_REQUEST_STREAM, AI_PREDICTOR_GROUP)
     db = engine()
+    reader = TuningReader(db)
+    try:
+        tuning = await asyncio.to_thread(reader.read)
+    except Exception as e:   # bảng job_configs thiếu (chưa chạy migration V4) / không có quyền SELECT: vẫn chạy với mặc định, đọc lại mỗi phút
+        log.error("Không đọc được job_configs (chạy migration V4? user DB chỉ đọc cần SELECT): dùng mặc định half_life=%d phút, shoe_weight=%d: %s",
+                  DEFAULT_HALF_LIFE_MINUTES, DEFAULT_SHOE_WEIGHT, e)
+        tuning = AiTuning(DEFAULT_HALF_LIFE_MINUTES, DEFAULT_SHOE_WEIGHT)
     sync_r = redis.from_url(url, decode_responses=True)
     try:
-        rebuilt = await asyncio.to_thread(rebuild, sync_r, db, registry)
+        rebuilt = await asyncio.to_thread(rebuild, sync_r, db, registry, tuning.half_life_minutes)
     finally:
         sync_r.close()
 
-    svc = AiService(r, db, registry, rebuilt["t0"])
-    log.info("AI service sẵn sàng (consumer=%s, model=%s, recency_half_life=%sh)", consumer, MODEL_VERSION, RECENCY_HALF_LIFE_HOURS or "tắt")
+    svc = AiService(r, db, registry, tuning, rebuilt["t0"], url)
+    log.info("AI service sẵn sàng (consumer=%s, model=%s, half_life=%s phút, shoe_weight=%s)", consumer, MODEL_VERSION,
+             tuning.half_life_minutes or "tắt", tuning.shoe_weight)
     await asyncio.gather(
+        svc.refresh_loop(reader, stop),
         consume(r, AI_RESULT_STREAM, AI_COUNTER_GROUP, consumer, AiResult, svc.on_ai_result, stop),
         consume(r, PREDICT_REQUEST_STREAM, AI_PREDICTOR_GROUP, consumer, PredictRequest, svc.on_request, stop,
                 concurrency=MAX_CONCURRENT_PREDICTIONS),

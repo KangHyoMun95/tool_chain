@@ -29,11 +29,13 @@ Pick = Symbol
 Reason = Literal["OK", "NOT_ENOUGH_HISTORY", "NO_ELIGIBLE_SUFFIX"]
 
 
-# Redis key. API sở hữu (ghi): round_status, recent. AI sở hữu (ghi): ai_counts, ai_wcounts, ai_counted.
+# Redis key. API sở hữu (ghi): round_status, recent. AI sở hữu (ghi): ai_counts, ai_wcounts (+ theo shoe), ai_counted.
 def round_status_key(game_session_id: str) -> str: return f"round_status:{game_session_id}"
 def recent_key(stream_id: str, shoe: int) -> str: return f"recent:{stream_id}:{shoe}"
 def ai_counts_key(stream_id: str) -> str: return f"ai:counts:{stream_id}"
-def ai_wcounts_key(stream_id: str) -> str: return f"ai:wcounts:{stream_id}"   # HASH như ai:counts nhưng số đếm CÓ trọng số theo độ mới (float); chỉ AI dùng
+# HASH như ai:counts nhưng số đếm CÓ trọng số theo độ mới (float, tính từ mốc t0 của lần dựng lại); chỉ AI dùng.
+def ai_wcounts_key(stream_id: str) -> str: return f"ai:wcounts:{stream_id}"
+def ai_shoe_wcounts_key(stream_id: str, shoe: int) -> str: return f"ai:wcounts:{stream_id}:{shoe}"   # chỉ shoe này, có TTL
 def ai_counted_key(stream_id: str, shoe: int) -> str: return f"ai:counted:{stream_id}:{shoe}"
 
 
@@ -69,19 +71,22 @@ class AiResult(_Msg):
 
 
 class PatternRow(BaseModel):
-    """Một đuôi k đã xét. Khóa của counts / pct = các ký hiệu `predictable` của category; pct[x] = None khi total = 0."""
+    """Một đuôi k đã xét. Khóa của counts / pct = các ký hiệu `predictable` của category; pct[x] = None khi total = 0.
+
+    counts / total là số CÓ trọng số theo độ mới (đã gồm hệ số shoe hiện tại, "lần hiệu dụng": một kết quả vừa xảy ra = 1);
+    KHÔNG chứa số lần thật. Khi tắt trọng số (half_life_minutes = None) chúng chính là số lần thật."""
     k: int
     pattern: str                  # chuỗi ký hiệu nối liền (vd "BPBP")
-    counts: dict[str, int]
+    counts: dict[str, float]
     pct: dict[str, Optional[float]]
-    total: int                    # = tổng counts
-    eligible: bool                # total >= 3 và kết quả nhiều nhất là duy nhất
+    total: float                  # = tổng counts (tổng trọng số)
+    eligible: bool                # số lần THẬT >= 3 và ký hiệu nhiều nhất (theo số có trọng số) là duy nhất
 
 
 class ChosenPattern(BaseModel):
     k: int
     pattern: str
-    occurrences: int              # = total của đuôi được chọn
+    occurrences: float            # = total (tổng trọng số) của đuôi được chọn
     pct: dict[str, float]         # cùng khóa với counts của PatternRow
 
 
@@ -99,6 +104,8 @@ class PredictResult(_Msg):
     detail: list[PatternRow]
     history_used: str             # chuỗi ký hiệu (đã bỏ ignore_in_pattern), tối đa 10 ký tự gần nhất
     missing_previous: bool
+    half_life_minutes: Optional[int]   # bán rã trọng số theo độ mới đã dùng; None = tắt (đúng pattern-v1)
+    shoe_weight: Optional[int]         # hệ số shoe hiện tại đã dùng; None khi tắt trọng số
     reason: Reason
     model_version: str
     created_at: str

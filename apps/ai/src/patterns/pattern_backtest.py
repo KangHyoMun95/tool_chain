@@ -8,7 +8,7 @@ import logging
 import pandas as pd
 
 from .category_config import CategoryRegistry
-from .config import MAX_LEN, MIN_LEN, RECENCY_HALF_LIFE_HOURS
+from .config import MAX_LEN, MIN_LEN
 from .dataset import add_segments, load_sessions
 from .pattern import PatternStats, choose_pick
 
@@ -21,29 +21,34 @@ def _epoch(ts) -> float:
     return (t.tz_localize("UTC") if t.tzinfo is None else t).timestamp()
 
 
-def run(df: pd.DataFrame, registry: CategoryRegistry) -> tuple[pd.DataFrame, int]:
-    """df đã có cột segment (xem add_segments) và lobby_name / category_name. Trả (bảng mỗi ván có dự đoán, tổng số ván)."""
+def run(df: pd.DataFrame, registry: CategoryRegistry, half_life_minutes: int | None = None, shoe_weight: int = 1) -> tuple[pd.DataFrame, int]:
+    """df đã có cột segment (xem add_segments) và lobby_name / category_name. Trả (bảng mỗi ván có dự đoán, tổng số ván).
+
+    half_life_minutes: bán rã trọng số theo độ mới (None = tắt, đúng pattern-v1); shoe_weight: hệ số shoe hiện tại (chỉ khi có half_life).
+    Thời điểm của ván = cột happened_at (ended_at, như rebuild của service) nếu có, không thì created_at.
+    """
     rows = []
-    # Mốc trọng số = ván mới nhất của dữ liệu ⇒ mọi trọng số <= 1 (chỉ tỉ lệ giữa chúng có ý nghĩa), không tràn khi dữ liệu dài.
-    t0 = _epoch(df["created_at"].max())
+    time_col = "happened_at" if "happened_at" in df.columns else "created_at"
     for sid, sdf in df.groupby("stream_id", sort=False):
         cfg = registry.get(str(sdf["lobby_name"].iloc[0]), str(sdf["category_name"].iloc[0]))
         if cfg is None:
             log.error("Bỏ qua stream %s: category %r / %r không có file định nghĩa trong config/categories",
                       sid, sdf["lobby_name"].iloc[0], sdf["category_name"].iloc[0])
             continue
-        stats = PatternStats(cfg.predictable, half_life_hours=RECENCY_HALF_LIFE_HOURS, t0=t0)
+        stats = PatternStats(cfg.predictable, half_life_minutes=half_life_minutes)
         seen = {s: 0 for s in cfg.predictable}                   # lịch sử cộng dồn của stream (cho baseline)
         # Các shoe/đoạn của stream theo thứ tự thời gian của ván đầu; trong đoạn theo round
         for _, seg in sorted(sdf.groupby("segment"), key=lambda kv: kv[1]["created_at"].min()):
             before = ""
-            for res, created in zip(*(seg.sort_values("road_count")[c] for c in ("result", "created_at"))):
+            stats.begin_shoe()
+            for res, created in zip(*(seg.sort_values("road_count")[c] for c in ("result", time_col))):
                 if res not in cfg.results:
                     log.warning("Bỏ qua ván của stream %s: result %r không thuộc results của %s", sid, res, cfg.key)
                     continue
                 row = {"stream_id": sid, "actual": res, "is_draw": res in cfg.draw, "pattern_pick": None, "baseline_pick": None}
                 if len(before) >= MIN_LEN:
-                    p = choose_pick(before, stats.lookup, cfg.predictable, wlookup=stats.wlookup if RECENCY_HALF_LIFE_HOURS else None)
+                    wl = (lambda pats, now=_epoch(created): stats.wlookup(pats, shoe_weight, now)) if half_life_minutes else None
+                    p = choose_pick(before, stats.lookup, cfg.predictable, wlookup=wl)
                     if p["pick"]:
                         row.update(pattern_pick=p["pick"], pct=p["confidence"], length=p["chosen"]["k"], n=p["chosen"]["occurrences"])
                 top = max(seen.values())
@@ -70,11 +75,12 @@ def _summary(name: str, r: pd.DataFrame, col: str, total: int) -> dict:
     }
 
 
-def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False) -> None:
+def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False,
+         half_life_minutes: int | None = None, shoe_weight: int = 1) -> None:
     df = add_segments(load_sessions(source=source, refresh=refresh))
-    r, total = run(df, registry)
-    print(f"{total} ván, {df['stream_id'].nunique()} stream (nguồn: {source}); trọng số theo độ mới: "
-          f"{f'half-life {RECENCY_HALF_LIFE_HOURS:g}h' if RECENCY_HALF_LIFE_HOURS else 'tắt'}\n")
+    r, total = run(df, registry, half_life_minutes, shoe_weight)
+    weighting = f"half-life {half_life_minutes} phút, shoe_weight {shoe_weight}" if half_life_minutes else "tắt (pattern-v1)"
+    print(f"{total} ván, {df['stream_id'].nunique()} stream (nguồn: {source}); trọng số theo độ mới: {weighting}\n")
     print(pd.DataFrame([_summary("pattern-v1", r, "pattern_pick", total),
                         _summary("baseline (nhiều hơn trong lịch sử)", r, "baseline_pick", total)]).to_string(index=False))
 
