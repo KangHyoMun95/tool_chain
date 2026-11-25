@@ -53,7 +53,7 @@ export function PredictionPanel({ streamId, connection, shoe, round, status, sta
 
   return (
     <>
-    <ResultOverlay tone={overlayTone} roundKey={`${streamId}:${shoe}:${round}`} />
+    <ResultOverlay tone={overlayTone} roundKey={`${streamId}:${shoe}:${round}`} triple={result === "B"} />
     <HudCard glow className={cn("relative flex h-[236px] flex-col items-center justify-start overflow-hidden p-3", tone && tone !== "win" && TONE_CLASS[tone])} aria-live="polite">
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <DecorImage src="/images/pedestal-bg.png" className="h-full w-full object-cover opacity-70 mix-blend-screen" />
