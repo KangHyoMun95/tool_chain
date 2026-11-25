@@ -15,7 +15,7 @@ cp .env.example .env                 # điền REDIS_URL, DATABASE_URL(_READONLY
 # Cần config/categories/*.json (ở gốc repo, xem CLAUDE.md mục "File định nghĩa category"): thiếu / sai ⇒ mọi lệnh thoát mã 1 và in tất cả lỗi
 
 python main.py serve                 # service (mặc định)
-python main.py backtest [--source file|db] [--refresh]
+python main.py backtest [--source file|db] [--refresh] [--half-life PHÚT] [--shoe-weight N]   # bỏ --half-life = pattern-v1
 python main.py verify                # so bảng đếm Redis với đếm brute-force từ DB
 python main.py predict               # in dự đoán một lần cho các stream đang hoạt động
 ```
@@ -43,9 +43,21 @@ CREATE ROLE ai_readonly LOGIN PASSWORD '<mật khẩu mạnh>';
 GRANT CONNECT ON DATABASE <tên_db> TO ai_readonly;
 GRANT USAGE ON SCHEMA public TO ai_readonly;
 GRANT SELECT ON game_sessions TO ai_readonly;
+GRANT SELECT ON job_configs TO ai_readonly;   -- cấu hình trọng số (xem mục dưới)
 ```
 
-Service chỉ cần `SELECT` trên `game_sessions` (`status`, `result`, `road_shoe`, `road_count`, `stream_id`, `created_at`).
+Service chỉ cần `SELECT` trên `game_sessions` (`status`, `result`, `road_shoe`, `road_count`, `stream_id`, `created_at`, `ended_at`) và `job_configs`.
+
+## Cấu hình trọng số theo độ mới (bảng `job_configs`)
+
+Không dùng biến môi trường. AI đọc lại bảng `job_configs` (Flyway V4, dòng AI do V5 thêm) mỗi 60 giây, không cần restart:
+
+| `type` | `unit` | Ý nghĩa | Khi đổi |
+|---|---|---|---|
+| `AI_HALF_LIFE` | `minute` \| `hour` | Bán rã: một lần pattern xuất hiện mất nửa trọng số sau từng đó thời gian. `value` = NULL ⇒ tắt trọng số, chạy đúng pattern-v1. Mặc định 60 phút | Tự dựng lại bảng đếm nguyên tử, KHÔNG chặn dự đoán (chỉ tạm dừng đếm kết quả mới, vài giây ~ thời gian đọc DB + 5s) |
+| `AI_SHOE_WEIGHT` | `times` | Hệ số nhân của shoe hiện tại: `W[R] = W_bàn[R] + (n − 1) × W_shoe_hiện_tại[R]`, số nguyên >= 1 (1 = không ưu tiên). Mặc định 5 | Áp dụng ngay |
+
+Cột của bảng: `type` (khóa), `value` (NULL = tắt với `AI_HALF_LIFE`), `unit`, `updated_at`; bảng dùng chung cho mọi job. Dòng thiếu / giá trị hoặc `unit` không hợp lệ ⇒ log WARN (không lặp mỗi phút) và dùng mặc định. Đổi bằng SQL, ví dụ `UPDATE job_configs SET value = 30, updated_at = now() WHERE type = 'AI_HALF_LIFE';` (chỉ cần quyền ghi của tài khoản quản trị DB; user `ai_readonly` chỉ đọc). Số mũ trọng số vượt 900 half-life (18,75 ngày với 30 phút, 37,5 ngày với 60 phút) thì AI tự dựng lại như khi đổi `AI_HALF_LIFE`. Chi tiết thuật toán: `CLAUDE.md`, mục "Luồng dự đoán AI".
 
 ## Vận hành
 

@@ -1,6 +1,6 @@
 # apps/ai/main.py
 # python main.py serve              chạy service (mặc định)
-# python main.py backtest [--source file|db] [--refresh]
+# python main.py backtest [--source file|db] [--refresh] [--half-life MINUTES] [--shoe-weight N]
 # python main.py verify             so khớp bảng đếm Redis với đếm brute-force từ DB
 # python main.py predict            in dự đoán một lần cho các stream đang hoạt động (cần DB)
 import argparse
@@ -17,6 +17,8 @@ def main() -> int:
     bt = sub.add_parser("backtest")
     bt.add_argument("--source", choices=["file", "db"], default="file", help="file: data/sessions.parquet (lấy từ DB nếu chưa có); db: đọc DB")
     bt.add_argument("--refresh", action="store_true", help="với --source file: lấy lại từ DB và ghi đè file")
+    bt.add_argument("--half-life", type=int, default=None, metavar="MINUTES", help="bán rã trọng số theo độ mới (phút); bỏ trống = tắt (pattern-v1)")
+    bt.add_argument("--shoe-weight", type=int, default=1, metavar="N", help="hệ số shoe hiện tại (>= 1, chỉ khi có --half-life)")
     sub.add_parser("verify")
     pr = sub.add_parser("predict")
     pr.add_argument("--source", choices=["file", "db"], default="db")
@@ -38,7 +40,7 @@ def main() -> int:
         asyncio.run(run(registry))
     elif cmd == "backtest":
         from src.patterns.pattern_backtest import main as backtest
-        backtest(registry, source=args.source, refresh=args.refresh)
+        backtest(registry, source=args.source, refresh=args.refresh, half_life_minutes=args.half_life, shoe_weight=args.shoe_weight)
     elif cmd == "verify":
         from src.patterns.verify import main as verify
         return verify(registry)
