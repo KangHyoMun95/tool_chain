@@ -11,7 +11,7 @@ from .category_config import CategoryRegistry
 from .config import MAX_LEN, MIN_LEN
 from .dataset import add_segments, load_sessions
 from .pattern import PatternStats, choose_pick
-from .run_rule import RULES, blend_pick
+from .run_rule import RULES, STRENGTH, blend_pick
 
 log = logging.getLogger("pattern")
 
@@ -72,6 +72,8 @@ def run(df: pd.DataFrame, registry: CategoryRegistry, half_life_minutes: int | N
                 signals = {name: RULES[name](before, cfg.predictable) for name in rules}   # luật hình thù (độc lập với pattern-v1)
                 for name, sig in signals.items():
                     row[f"rule_{name}"] = sig
+                    if name in STRENGTH:
+                        row[f"strength_{name}"] = STRENGTH[name](before, cfg.predictable)
                 if len(before) >= MIN_LEN:
                     wl = (lambda pats, now=_epoch(created): stats.wlookup(pats, shoe_weight, now)) if half_life_minutes else None
                     p = choose_pick(before, stats.lookup, cfg.predictable, wlookup=wl)
@@ -104,6 +106,27 @@ def _summary(name: str, r: pd.DataFrame, col: str, total: int) -> dict:
     }
 
 
+def _by_strength(name: str, r: pd.DataFrame) -> None:
+    """Tỉ lệ đúng của luật theo ĐỘ MẠNH của hình (độ dài khớp), kèm pattern-v1 trên đúng những ván đó và ±2 sai số chuẩn.
+
+    Mục tiêu của luật hình thù là bắt đúng khi hình rõ, còn hình yếu ≈ 50% là chấp nhận được: nếu hình dài hơn mà tỉ lệ đúng
+    không tăng thì luật không bắt được hình thật.
+    """
+    col, sc = f"rule_{name}", f"strength_{name}"
+    d = r[r[col].notna() & ~r["is_draw"]].copy()
+    if d.empty:
+        return
+    d["hit"] = d[col] == d["actual"]
+    d["p_hit"] = d["pattern_pick"].notna() & (d["pattern_pick"] == d["actual"])
+    d["p_has"] = d["pattern_pick"].notna()
+    d["bucket"] = pd.cut(d[sc], [0, 1, 2, 3, 4, 5, 6, 8, 100], labels=["1", "2", "3", "4", "5", "6", "7-8", "9+"])
+    g = d.groupby("bucket", observed=True).agg(so_van=("hit", "size"), luat_dung=("hit", "mean"), pv1_co_du_doan=("p_has", "sum"), pv1_dung_tren_van_co=("p_hit", "sum"))
+    g["±2se"] = (2 * (g["luat_dung"] * (1 - g["luat_dung"]) / g["so_van"]) ** 0.5).round(4)
+    g["pv1_dung"] = (g["pv1_dung_tren_van_co"] / g["pv1_co_du_doan"]).where(g["pv1_co_du_doan"] > 0)
+    print(f"\nLuật {name} theo độ mạnh của hình (độ dài khớp; bỏ ván hòa):")
+    print(g[["so_van", "luat_dung", "±2se", "pv1_dung"]].round(4))
+
+
 def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False,
          half_life_minutes: int | None = None, shoe_weight: int = 1, since: str = "2026-01-01", assume_category: tuple[str, str] | None = None, infer_category: bool = False,
          rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",)) -> None:
@@ -122,6 +145,10 @@ def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False
                         _summary("baseline (nhiều hơn trong lịch sử)", r, "baseline_pick", total),
                         *[_summary(f"luật {n} (riêng)", r, f"rule_{n}", total) for n in rules],
                         *[_summary(f"pattern-v1 + {n} (w={w})", r, f"blend_{n}_{w}", total) for n in rules for w in rule_weights]]).to_string(index=False))
+
+    for name in rules:
+        if name in STRENGTH:
+            _by_strength(name, r)
 
     both = r[r["pattern_pick"].notna() & r["baseline_pick"].notna() & ~r["is_draw"]]
     skipped = int((r["pattern_pick"].notna() & r["baseline_pick"].isna()).sum())

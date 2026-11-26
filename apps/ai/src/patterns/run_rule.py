@@ -33,10 +33,11 @@ def rule_signal(history: str, predictable: Sequence[str]) -> str | None:
     return predictable[1] if last_sym == predictable[0] else predictable[0]
 
 
-def repeat_signal(history: str, predictable: Sequence[str]) -> str | None:
+def repeat_match(history: str, predictable: Sequence[str]) -> tuple[str | None, int]:
     """Lặp lại: tìm đuôi DÀI NHẤT của history đã xuất hiện trước đó trong chính history (cùng shoe); dự đoán ký hiệu
     đứng ngay sau lần xuất hiện GẦN NHẤT của đuôi đó. 1221 -> 2 (đuôi "1" từng đứng trước 2); 12212 -> 2 ("12" -> 2);
-    1222 -> 2; 12221 -> 2. Ký hiệu đứng sau phải thuộc predictable (ngoài ra: bỏ qua lần xuất hiện đó). Không có -> None."""
+    1222 -> 2; 12221 -> 2. Ký hiệu đứng sau phải thuộc predictable (ngoài ra: bỏ qua lần xuất hiện đó).
+    Trả (ký hiệu, độ dài k của đuôi khớp = "độ mạnh" của hình); không có -> (None, 0)."""
     n = len(history)
     for k in range(n - 1, 0, -1):
         tail = history[-k:]
@@ -44,23 +45,33 @@ def repeat_signal(history: str, predictable: Sequence[str]) -> str | None:
         while i != -1:
             nxt = history[i + k]
             if nxt in predictable:
-                return nxt
+                return nxt, k
             i = history.rfind(tail, 0, i + k - 1) if i > 0 else -1
-    return None
+    return None, 0
 
 
-def mirror_signal(history: str, predictable: Sequence[str]) -> str | None:
+def repeat_signal(history: str, predictable: Sequence[str]) -> str | None:
+    return repeat_match(history, predictable)[0]
+
+
+def mirror_match(history: str, predictable: Sequence[str]) -> tuple[str | None, int]:
     """Đối xứng: đuôi có dạng gương (nửa sau = nửa trước đảo ngược, độ dài mỗi nửa L >= 2, L lớn nhất); dự đoán ký hiệu
-    ở vị trí đối xứng tiếp theo = ký tự đứng ngay trước nửa trước (…x [12][21] -> x). Không có -> None."""
+    ở vị trí đối xứng tiếp theo = ký tự đứng ngay trước nửa trước (…x [12][21] -> x). Trả (ký hiệu, L); không có -> (None, 0)."""
     n = len(history)
     for L in range(n // 2, 1, -1):
         if history[-L:] == history[-2 * L:-L][::-1] and n > 2 * L:
             nxt = history[-2 * L - 1]
-            return nxt if nxt in predictable else None
-    return None
+            return (nxt, L) if nxt in predictable else (None, 0)
+    return None, 0
+
+
+def mirror_signal(history: str, predictable: Sequence[str]) -> str | None:
+    return mirror_match(history, predictable)[0]
 
 
 RULES = {"run": rule_signal, "repeat": repeat_signal, "mirror": mirror_signal}
+# Độ mạnh của hình (độ dài khớp) cho báo cáo theo độ mạnh; luật không có thì không có báo cáo này.
+STRENGTH = {"repeat": lambda h, p: repeat_match(h, p)[1], "mirror": lambda h, p: mirror_match(h, p)[1]}
 
 
 def blend_pick(result: dict, signal: str | None, weight: float, predictable: Sequence[str]) -> tuple[str | None, float | None]:
