@@ -15,7 +15,7 @@ cp .env.example .env                 # điền REDIS_URL, DATABASE_URL(_READONLY
 # Cần config/categories/*.json (ở gốc repo, xem CLAUDE.md mục "File định nghĩa category"): thiếu / sai ⇒ mọi lệnh thoát mã 1 và in tất cả lỗi
 
 python main.py serve                 # service (mặc định)
-python main.py backtest [--source file|db] [--refresh] [--rule-weights 0.1,0.3]
+python main.py backtest [--source file|db] [--refresh] [--rule-weights 0.1,0.3] [--rules run,repeat,mirror]
 python main.py verify                # so bảng đếm Redis với đếm brute-force từ DB
 python main.py predict               # in dự đoán một lần cho các stream đang hoạt động
 ```
@@ -57,6 +57,10 @@ Service chỉ cần `SELECT` trên `game_sessions` (`status`, `result`, `road_sh
 
 `python main.py backtest` dùng chung hàm `choose_pick` với service, mỗi ván chỉ dùng dữ liệu trước nó, và so với baseline "chọn ký hiệu `predictable` xuất hiện nhiều nhất (duy nhất) trong lịch sử stream". In kèm độ phủ (số ván có dự đoán / tổng số ván). Ván có kết quả thuộc `draw` của category (baccarat: T) không tính đúng/sai. Ký hiệu `predictable` / `ignore_in_pattern` / `draw` lấy theo category của từng stream (cần cột `lobby_name`, `category_name`: file `data/sessions.parquet` cũ thiếu cột này thì tự lấy lại từ DB); stream của category không có file bị bỏ qua (log ERROR).
 
-- **Luật độ dài đoạn (thử nghiệm, chỉ backtest, `src/patterns/run_rule.py`):** `--rule-weights 0.1,0.3` in thêm dòng "luật độ dài đoạn (riêng)" và "pattern-v1 + luật (w=...)". Luật: tách chuỗi (đã bỏ `ignore_in_pattern`) thành các đoạn liên tiếp cùng ký hiệu; độ dài mục tiêu = độ dài đoạn cùng ký hiệu liền trước (không có thì đoạn ngay trước, không có nữa thì tiếp tục); đoạn hiện tại < mục tiêu ⇒ tiếp tục ký hiệu cuối, ngược lại đổi sang ký hiệu kia. Chỉ áp dụng khi category có đúng 2 ký hiệu `predictable`. Trộn: `pct'[x] = (1-w)·pct[x] + w·[x = ký hiệu của luật]` trên đuôi pattern-v1 đã chọn (độ phủ giữ như pattern-v1). Service KHÔNG dùng luật này.
+- **Luật "hình thù" (thử nghiệm, chỉ backtest, `src/patterns/run_rule.py`):** `--rules run,repeat,mirror --rule-weights 0.1,0.3` in dòng "luật <tên> (riêng)" và "pattern-v1 + <tên> (w=...)" cho từng luật. Chỉ áp dụng khi category có đúng 2 ký hiệu `predictable` (riêng `repeat` / `mirror` không cần). Chuỗi đã bỏ `ignore_in_pattern`, trong một shoe.
+  - `run` (mặc định): tách thành các đoạn cùng ký hiệu; độ dài mục tiêu = độ dài đoạn cùng ký hiệu liền trước (không có thì đoạn ngay trước, không có nữa thì tiếp tục); đoạn hiện tại < mục tiêu ⇒ tiếp tục ký hiệu cuối, ngược lại đổi sang ký hiệu kia.
+  - `repeat`: đuôi dài nhất của chuỗi đã xuất hiện trước đó trong shoe ⇒ dự đoán ký hiệu đứng sau lần xuất hiện gần nhất (1221→2, 12212→2, 1222→2, 12221→2).
+  - `mirror`: đuôi dạng gương (nửa sau = nửa trước đảo ngược, mỗi nửa >= 2) ⇒ dự đoán ký tự đứng trước nửa trước.
+  - Trộn: `pct'[x] = (1-w)·pct[x] + w·[x = ký hiệu của luật]` trên đuôi pattern-v1 đã chọn (độ phủ giữ như pattern-v1). Service KHÔNG dùng các luật này.
 - File `data/sessions.parquet` cũ thiếu `road_shoe`: backtest dùng cách chia chuỗi theo khoảng cách thời gian / `road_count` giảm và in cảnh báo. Dùng `--source db` (hoặc `--refresh`) để có chia theo shoe thật.
 - Lần đo gần nhất trên file hiện có (5437 ván, 27 stream): pattern-v1 ≈ 50.0% đúng, baseline ≈ 50.3%, trong khi `% hiển thị` trung bình ≈ 74%. Nghĩa là trên dữ liệu đó mô hình chưa có khả năng dự đoán và `confidence` không phản ánh tỉ lệ đúng thực tế. Đo lại trên dữ liệu shoe thật trước khi dựa vào `confidence`.

@@ -11,12 +11,12 @@ from .category_config import CategoryRegistry
 from .config import MAX_LEN, MIN_LEN
 from .dataset import add_segments, load_sessions
 from .pattern import PatternStats, choose_pick
-from .run_rule import blend_pick, rule_signal
+from .run_rule import RULES, blend_pick
 
 log = logging.getLogger("pattern")
 
 
-def run(df: pd.DataFrame, registry: CategoryRegistry, rule_weights: tuple[float, ...] = ()) -> tuple[pd.DataFrame, int]:
+def run(df: pd.DataFrame, registry: CategoryRegistry, rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",)) -> tuple[pd.DataFrame, int]:
     """df đã có cột segment (xem add_segments) và lobby_name / category_name. Trả (bảng mỗi ván có dự đoán, tổng số ván)."""
     rows = []
     for sid, sdf in df.groupby("stream_id", sort=False):
@@ -34,14 +34,17 @@ def run(df: pd.DataFrame, registry: CategoryRegistry, rule_weights: tuple[float,
                 if res not in cfg.results:
                     log.warning("Bỏ qua ván của stream %s: result %r không thuộc results của %s", sid, res, cfg.key)
                     continue
-                row = {"stream_id": sid, "actual": res, "is_draw": res in cfg.draw, "pattern_pick": None, "baseline_pick": None, "rule_pick": None}
-                row["rule_pick"] = rule_signal(before, cfg.predictable)   # luật độ dài đoạn (độc lập với pattern-v1)
+                row = {"stream_id": sid, "actual": res, "is_draw": res in cfg.draw, "pattern_pick": None, "baseline_pick": None}
+                signals = {name: RULES[name](before, cfg.predictable) for name in rules}   # luật hình thù (độc lập với pattern-v1)
+                for name, sig in signals.items():
+                    row[f"rule_{name}"] = sig
                 if len(before) >= MIN_LEN:
                     p = choose_pick(before, stats.lookup, cfg.predictable)
                     if p["pick"]:
                         row.update(pattern_pick=p["pick"], pct=p["confidence"], length=p["chosen"]["k"], n=p["chosen"]["occurrences"])
-                        for w in rule_weights:
-                            row[f"blend_{w}"] = blend_pick(p, row["rule_pick"], w, cfg.predictable)[0]
+                        for name, sig in signals.items():
+                            for w in rule_weights:
+                                row[f"blend_{name}_{w}"] = blend_pick(p, sig, w, cfg.predictable)[0]
                 top = max(seen.values())
                 winners = [s for s, n in seen.items() if n == top]
                 if len(winners) == 1:
@@ -66,14 +69,14 @@ def _summary(name: str, r: pd.DataFrame, col: str, total: int) -> dict:
     }
 
 
-def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False, rule_weights: tuple[float, ...] = ()) -> None:
+def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False, rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",)) -> None:
     df = add_segments(load_sessions(source=source, refresh=refresh))
-    r, total = run(df, registry, rule_weights)
+    r, total = run(df, registry, rule_weights, rules)
     print(f"{total} ván, {df['stream_id'].nunique()} stream (nguồn: {source})\n")
     print(pd.DataFrame([_summary("pattern-v1", r, "pattern_pick", total),
                         _summary("baseline (nhiều hơn trong lịch sử)", r, "baseline_pick", total),
-                        _summary("luật độ dài đoạn (riêng)", r, "rule_pick", total),
-                        *[_summary(f"pattern-v1 + luật (w={w})", r, f"blend_{w}", total) for w in rule_weights]]).to_string(index=False))
+                        *[_summary(f"luật {n} (riêng)", r, f"rule_{n}", total) for n in rules],
+                        *[_summary(f"pattern-v1 + {n} (w={w})", r, f"blend_{n}_{w}", total) for n in rules for w in rule_weights]]).to_string(index=False))
 
     both = r[r["pattern_pick"].notna() & r["baseline_pick"].notna() & ~r["is_draw"]]
     skipped = int((r["pattern_pick"].notna() & r["baseline_pick"].isna()).sum())

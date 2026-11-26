@@ -1,6 +1,6 @@
 # apps/ai/main.py
 # python main.py serve              chạy service (mặc định)
-# python main.py backtest [--source file|db] [--refresh] [--rule-weights 0.1,0.3]
+# python main.py backtest [--source file|db] [--refresh] [--rule-weights 0.1,0.3] [--rules run,repeat,mirror]
 # python main.py verify             so khớp bảng đếm Redis với đếm brute-force từ DB
 # python main.py predict            in dự đoán một lần cho các stream đang hoạt động (cần DB)
 import argparse
@@ -18,6 +18,7 @@ def main() -> int:
     bt.add_argument("--source", choices=["file", "db"], default="file", help="file: data/sessions.parquet (lấy từ DB nếu chưa có); db: đọc DB")
     bt.add_argument("--refresh", action="store_true", help="với --source file: lấy lại từ DB và ghi đè file")
     bt.add_argument("--rule-weights", default="", help="thử trộn luật độ dài đoạn vào %% của pattern-v1, vd 0.1,0.3 (w = trọng số của luật, 0..1)")
+    bt.add_argument("--rules", default="run", help="luật hình thù thử nghiệm: run (độ dài đoạn), repeat (lặp lại), mirror (đối xứng); cách nhau bằng dấu phẩy")
     sub.add_parser("verify")
     pr = sub.add_parser("predict")
     pr.add_argument("--source", choices=["file", "db"], default="db")
@@ -39,8 +40,14 @@ def main() -> int:
         asyncio.run(run(registry))
     elif cmd == "backtest":
         from src.patterns.pattern_backtest import main as backtest
+        from src.patterns.run_rule import RULES
+        bad = [x for x in args.rules.split(",") if x.strip() and x.strip() not in RULES]
+        if bad:
+            print(f"--rules không hợp lệ: {bad}; chọn trong {list(RULES)}", file=sys.stderr)
+            return 1
         backtest(registry, source=args.source, refresh=args.refresh,
-                 rule_weights=tuple(float(x) for x in args.rule_weights.split(",") if x.strip()))
+                 rule_weights=tuple(float(x) for x in args.rule_weights.split(",") if x.strip()),
+                 rules=tuple(x.strip() for x in args.rules.split(",") if x.strip()))
     elif cmd == "verify":
         from src.patterns.verify import main as verify
         return verify(registry)
