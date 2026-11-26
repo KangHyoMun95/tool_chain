@@ -166,6 +166,22 @@ def _scan(seqs: list[str], n_perm: int, kmin: int, kmax: int, seed: int, top: in
     print(d.to_string(index=False))
 
 
+def _duplicates(cdf: pd.DataFrame, cfg, prefix: int = 30) -> None:
+    """Đếm shoe có `prefix` kết quả đầu (đã bỏ ignore) trùng hệt một shoe KHÁC. Dữ liệu ngẫu nhiên độc lập gần như không trùng (2^-30)."""
+    ign = set(cfg.ignore_in_pattern)
+    seen: dict[str, list] = {}
+    for seg, g in cdf.groupby("segment"):
+        q = "".join(r for r in g.sort_values("road_count")["result"] if r in cfg.results and r not in ign)
+        if len(q) >= prefix:
+            seen.setdefault(q[:prefix], []).append((str(g["stream_id"].iloc[0]), g["created_at"].min()))
+    total = sum(len(v) for v in seen.values())
+    dup = [v for v in seen.values() if len(v) > 1]
+    n_dup = sum(len(v) for v in dup)
+    cross = sum(1 for v in dup if len({sid for sid, _ in v}) > 1)
+    print(f"{total} shoe có >= {prefix} ván; {n_dup} shoe ({n_dup / total:.1%} có {prefix} ván đầu trùng hệt shoe khác "
+          f"({len(dup)} nhóm trùng, {cross} nhóm trùng giữa các stream KHÁC nhau)." if total else f"Không shoe nào có >= {prefix} ván.")
+
+
 def _canon(tail: str) -> tuple[str, str]:
     first = tail[0]
     return "".join("1" if c == first else "2" for c in tail), first
@@ -236,6 +252,8 @@ def main(df: pd.DataFrame, registry: CategoryRegistry, n_perm: int = 200, max_la
         print(pd.DataFrame(rows).to_string(index=False))
         print("\n(2) Cầu bệt: đoạn cùng ký hiệu đã dài L thì có dài thêm 1 không (50% = không thiên lệch):")
         print(_runs_table(seqs).to_string(index=False))
+        print("\n(0) KIỂM TRA DỮ LIỆU BỊ NHÂN ĐÔI (nhiều stream phát cùng một bàn sẽ làm số lần n và z bị phóng đại):")
+        _duplicates(cdf, cfg)
         print("\n(5) KIỂM CHỨNG NGOÀI MẪU, chỉ tính ván có hình (học nửa đầu theo thời gian, đo nửa sau):")
         timed = [(g["created_at"].min(), "".join(r for r in g.sort_values("road_count")["result"] if r in cfg.results and r not in set(cfg.ignore_in_pattern)))
                  for _, g in cdf.groupby("segment")]
