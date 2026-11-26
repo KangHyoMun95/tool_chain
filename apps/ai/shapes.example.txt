@@ -1,0 +1,13 @@
+# Danh sách hình để đo: mỗi dòng `đuôi>dự_đoán`. Chỉ dùng ký hiệu 1 và 2 (1 = predictable[0], 2 = predictable[1] của category;
+# mỗi hình được đo cả hai chiều 1<->2). Đuôi là các ván GẦN NHẤT, cũ -> mới. Dòng bắt đầu bằng # là ghi chú.
+# Chạy: python main.py backtest --source db --infer-category --shapes 200 --shapes-file shapes.example.txt
+1212>1
+1221>2
+12212>2
+1211>2
+111>1
+11111>1
+2211>2
+22112>2
+1222>2
+12221>2

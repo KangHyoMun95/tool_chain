@@ -26,14 +26,53 @@ QUERY = text("""
 """)
 
 
-def load_sessions(since: str = "2026-01-01", refresh: bool = False, source: str = "file") -> pd.DataFrame:
-    """source='file': đọc parquet (không có thì lấy từ DB và lưu); 'db': luôn lấy từ DB (không ghi file)."""
+QUERY_ASSUME = text("""
+    SELECT gs.game_session_id, gs.stream_id, gs.road_shoe, gs.road_count, gs.created_at, COALESCE(gs.ended_at, gs.created_at) AS happened_at,
+           gs.result, COALESCE(l.lobby_name, :lobby) AS lobby_name, COALESCE(c.category_name, :category) AS category_name
+    FROM game_sessions gs
+    LEFT JOIN streams s ON s.stream_id = gs.stream_id
+    LEFT JOIN categories c ON c.category_id = s.category_id
+    LEFT JOIN lobbies l ON l.lobby_id = c.lobby_id
+    WHERE gs.result IS NOT NULL
+      AND gs.created_at >= :since
+      AND gs.status = 'FINISHED'
+    ORDER BY gs.stream_id, gs.road_shoe, gs.road_count
+""")
+
+
+def load_sessions(since: str = "2026-01-01", refresh: bool = False, source: str = "file", assume_category: tuple[str, str] | None = None) -> pd.DataFrame:
+    """source='file': đọc parquet (không có thì lấy từ DB và lưu); 'db': luôn lấy từ DB (không ghi file).
+
+    assume_category (lobby, category): chỉ dùng khi bảng streams / categories / lobbies thiếu dữ liệu (DB chép một phần): ván không nối được
+    sẽ được GÁN lobby / category này (chỉ với source='db'; không ghi parquet). Ván của stream thật vẫn dùng tên thật.
+    """
+    if assume_category:
+        if source != "db":
+            raise ValueError("assume_category chỉ dùng với source='db' (không ghi tên giả định vào file cache)")
+        df = pd.read_sql(QUERY_ASSUME, engine(), params={"since": since, "lobby": assume_category[0], "category": assume_category[1]})
+        log.warning("GÁN category giả định %r / %r cho ván không nối được streams/categories/lobbies. "
+                    "Giá trị result có trong dữ liệu: %s (phải khớp results của category đó)", *assume_category, sorted(df["result"].unique()) if len(df) else [])
+        return df
     if source == "file" and CACHE.exists() and not refresh:
         df = pd.read_parquet(CACHE)
         if {"lobby_name", "category_name", "happened_at"} <= set(df.columns):
             return df
         log.warning("File cache %s thiếu cột lobby_name / category_name / happened_at (bản cũ): lấy lại từ DB", CACHE)
     df = pd.read_sql(QUERY, engine(), params={"since": since})
+    if df.empty:
+        info = pd.read_sql(text("SELECT status, count(*) AS n, count(result) AS co_result, min(created_at) AS som_nhat, max(created_at) AS muon_nhat "
+                                "FROM game_sessions GROUP BY status"), engine())
+        steps = pd.read_sql(text("""
+            SELECT count(*) AS finished_co_result,
+                   count(s.stream_id) AS co_stream, count(c.category_id) AS co_category, count(l.lobby_id) AS co_lobby,
+                   count(*) FILTER (WHERE gs.created_at >= :since) AS tu_moc_since
+            FROM game_sessions gs
+            LEFT JOIN streams s ON s.stream_id = gs.stream_id
+            LEFT JOIN categories c ON c.category_id = s.category_id
+            LEFT JOIN lobbies l ON l.lobby_id = c.lobby_id
+            WHERE gs.result IS NOT NULL AND gs.status = 'FINISHED'"""), engine(), params={"since": since})
+        log.warning("Đếm theo từng bước JOIN (cột nào tụt về 0 là chỗ làm mất ván):\n%s", steps.to_string(index=False))
+        log.warning("Không có ván FINISHED có result từ %s. game_sessions theo status:\n%s\nDữ liệu cũ hơn thì dùng --since YYYY-MM-DD.", since, info.to_string(index=False))
     if source == "file":
         CACHE.parent.mkdir(exist_ok=True)
         df.to_parquet(CACHE, index=False)

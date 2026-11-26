@@ -1,6 +1,6 @@
 # apps/ai/main.py
 # python main.py serve              chạy service (mặc định)
-# python main.py backtest [--source file|db] [--refresh] [--half-life MINUTES] [--shoe-weight N]
+# python main.py backtest [--source file|db] [--refresh] [--since YYYY-MM-DD] [--assume-category 'lobby|category' | --infer-category] [--half-life MINUTES] [--shoe-weight N] [--rule-weights 0.1,0.3] [--rules run,repeat,mirror] [--symmetric] [--shape-model Z,Z] [--structure N] [--shapes N [--shapes-file FILE]]
 # python main.py verify             so khớp bảng đếm Redis với đếm brute-force từ DB
 # python main.py predict            in dự đoán một lần cho các stream đang hoạt động (cần DB)
 import argparse
@@ -19,6 +19,16 @@ def main() -> int:
     bt.add_argument("--refresh", action="store_true", help="với --source file: lấy lại từ DB và ghi đè file")
     bt.add_argument("--half-life", type=int, default=None, metavar="MINUTES", help="bán rã trọng số theo độ mới (phút); bỏ trống = tắt (pattern-v1)")
     bt.add_argument("--shoe-weight", type=int, default=1, metavar="N", help="hệ số shoe hiện tại (>= 1, chỉ khi có --half-life)")
+    bt.add_argument("--since", default="2026-01-01", metavar="YYYY-MM-DD", help="chỉ lấy ván tạo từ ngày này (mặc định 2026-01-01); DB cũ hơn thì lùi ngày lại")
+    bt.add_argument("--assume-category", default=None, metavar="LOBBY|CATEGORY", help='chỉ khi DB thiếu streams/categories/lobbies: gán category này cho mọi ván không nối được, vd "casino|SEXY - BACCARAT" (cần --source db)')
+    bt.add_argument("--infer-category", action="store_true", help="chỉ khi DB thiếu streams/categories/lobbies: suy category của từng stream theo tập ký hiệu result (cần --source db; không dùng cùng --assume-category)")
+    bt.add_argument("--structure", type=int, default=0, metavar="N", help="thay cho backtest: kiểm định hoán vị (N lần xáo trộn trong shoe, vd 100) xem dữ liệu có hình hơn dữ liệu ngẫu nhiên không")
+    bt.add_argument("--shapes", type=int, default=0, metavar="N", help="thay cho backtest: đo trực tiếp các hình đã nêu + cầu bệt + tuần hoàn theo độ trễ (N lần xáo trộn, vd 200)")
+    bt.add_argument("--shapes-file", default=None, metavar="FILE", help="với --shapes: file danh sách hình, mỗi dòng `đuôi>dự_đoán` (vd 1221>2); bỏ trống = 10 hình mặc định")
+    bt.add_argument("--symmetric", action="store_true", help="pattern-v1 học hình không phụ thuộc ký hiệu (BPPB→B cũng đếm là PBBP→P): gấp đôi dữ liệu mỗi hình; chỉ category 2 ký hiệu predictable")
+    bt.add_argument("--shape-model", default="", metavar="Z,Z", help="thay cho backtest: mô hình hình dạng TỰ HỌC (không hình viết sẵn), đi tới theo thời gian, chỉ tính ván có hình; Z = ngưỡng bằng chứng |z|, vd 2.5,3,3.5; trộn vào pattern-v1 theo --rule-weights")
+    bt.add_argument("--rule-weights", default="", help="thử trộn luật độ dài đoạn vào %% của pattern-v1, vd 0.1,0.3 (w = trọng số của luật, 0..1)")
+    bt.add_argument("--rules", default="run", help="luật hình thù thử nghiệm: run (độ dài đoạn), repeat (lặp lại), mirror (đối xứng); cách nhau bằng dấu phẩy")
     sub.add_parser("verify")
     pr = sub.add_parser("predict")
     pr.add_argument("--source", choices=["file", "db"], default="db")
@@ -40,7 +50,38 @@ def main() -> int:
         asyncio.run(run(registry))
     elif cmd == "backtest":
         from src.patterns.pattern_backtest import main as backtest
-        backtest(registry, source=args.source, refresh=args.refresh, half_life_minutes=args.half_life, shoe_weight=args.shoe_weight)
+        from src.patterns.run_rule import RULES
+        bad = [x for x in args.rules.split(",") if x.strip() and x.strip() not in RULES]
+        if bad:
+            print(f"--rules không hợp lệ: {bad}; chọn trong {list(RULES)}", file=sys.stderr)
+            return 1
+        if args.infer_category and (args.source != "db" or args.assume_category):
+            print("--infer-category cần --source db và không dùng cùng --assume-category", file=sys.stderr)
+            return 1
+        if args.shapes_file:
+            from pathlib import Path
+            from src.patterns.shapes_test import load_shapes
+            if not args.shapes:
+                print("--shapes-file cần đi kèm --shapes N (vd --shapes 200)", file=sys.stderr)
+                return 1
+            if not Path(args.shapes_file).is_file():
+                print(f"Không thấy file hình: {args.shapes_file} (tính từ thư mục hiện tại). Dùng file mẫu: --shapes-file shapes.example.txt", file=sys.stderr)
+                return 1
+            try:
+                load_shapes(args.shapes_file)               # kiểm tra định dạng TRƯỚC khi tải dữ liệu từ DB
+            except ValueError as e:
+                print(e, file=sys.stderr)
+                return 1
+        assume = None
+        if args.assume_category:
+            if args.source != "db" or args.assume_category.count("|") != 1:
+                print('--assume-category cần --source db và dạng "lobby|category"', file=sys.stderr)
+                return 1
+            assume = tuple(x.strip() for x in args.assume_category.split("|"))
+        backtest(registry, source=args.source, refresh=args.refresh, half_life_minutes=args.half_life, shoe_weight=args.shoe_weight, since=args.since, assume_category=assume, infer_category=args.infer_category, structure=args.structure, shapes=args.shapes, shapes_file=args.shapes_file, symmetric=args.symmetric,
+                 shape_model=tuple(float(x) for x in args.shape_model.split(",") if x.strip()),
+                 rule_weights=tuple(float(x) for x in args.rule_weights.split(",") if x.strip()),
+                 rules=tuple(x.strip() for x in args.rules.split(",") if x.strip()))
     elif cmd == "verify":
         from src.patterns.verify import main as verify
         return verify(registry)
