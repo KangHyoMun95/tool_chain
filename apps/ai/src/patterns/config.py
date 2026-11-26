@@ -17,6 +17,10 @@ SHOE_WCOUNTS_TTL_SECONDS = 6 * 60 * 60   # ai:wcounts:{stream}:{shoe}
 # Dựng lại giữa chừng (đổi AI_HALF_LIFE, gần tràn số mũ, tín hiệu ai:rebuild sau CLEAR_HISTORY): chờ ingestion ghi nốt batch cuối (tối đa ~3s) trước khi đọc DB,
 # nếu không bản dựng lại từ DB có thể thiếu những ván vừa đếm bằng đường realtime.
 REBUILD_SETTLE_SECONDS = int(os.environ.get("AI_REBUILD_DELAY_S", "5"))
+# Khi có trọng số theo độ mới, % của đuôi được chọn gần như luôn ~100% (vài lần xuất hiện gần đây, chọn "% cao nhất"). `confidence` và `chosen.pct`
+# được co tuyến tính về đều nhau: p' = (1 - c) / m + c * p (m = số ký hiệu predictable; tổng vẫn = 1). c = 0.5, m = 2 ⇒ 100% -> 75%, 50% giữ 50%:
+# trung vị confidence ~0.75 (khoảng 0.7-0.8). Chỉ áp dụng khi bật trọng số; KHÔNG ảnh hưởng việc chọn pick và `detail`.
+WEIGHTED_CONFIDENCE_SCALE = 0.5
 MAX_CONFIDENCE = 0.9    # trần của `confidence` trả ra (chỉ giá trị hiển thị; việc chọn pick vẫn theo % thật)
 MAX_GAP = pd.Timedelta(minutes=10)   # chỉ dùng khi dữ liệu thiếu road_shoe (backtest nguồn file cũ)
 WINDOW = 10                          # số kết quả trước dùng để đoán kết quả tiếp theo
