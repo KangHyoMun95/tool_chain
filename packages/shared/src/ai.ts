@@ -11,6 +11,15 @@ export const AI_RESULT_STREAM = "ai:results";               // API ghi, AI đọ
 export const PREDICT_RESULT_STREAM = "predict:results";     // AI ghi, API đọc
 export const AI_STREAM_MAXLEN = 10_000;                     // XADD MAXLEN ~ cho cả 3 stream
 
+// Pub/Sub (không phải stream): API publish sau khi CLEAR_HISTORY xóa ván, AI nghe và dựng lại bảng đếm (không restart).
+// Mất tín hiệu khi AI tắt không sao vì AI luôn dựng lại từ DB lúc khởi động. Phải khớp AI_REBUILD_CHANNEL ở contract.py.
+export const AI_REBUILD_CHANNEL = "ai:rebuild";
+export type AiRebuildSignal = {
+  schema_version: 1;
+  reason: string;                    // vd "CLEAR_HISTORY"
+  sent_at: string;                   // ISO-8601 UTC
+};
+
 // Consumer group (tên consumer cố định qua env, không dùng --scale)
 export const PREDICT_TRIGGER_GROUP = "predict-trigger";     // API, trên `ticks`
 export const PREDICT_PERSIST_GROUP = "predict-persist";     // API, trên `predict:results`
@@ -49,20 +58,24 @@ export type AiResult = {
   received_at: string;
 };
 
-/** Một đuôi k đã xét. Khóa của counts / pct = các ký hiệu `predictable` của category; pct[x] = null khi total = 0. */
+/**
+ * Một đuôi k đã xét. Khóa của counts / pct = các ký hiệu `predictable` của category; pct[x] = null khi total = 0.
+ * counts / total là số CÓ trọng số theo độ mới (đã gồm hệ số shoe hiện tại, "lần hiệu dụng": một kết quả vừa xảy ra = 1), số thực;
+ * KHÔNG chứa số lần thật. Khi tắt trọng số (`half_life_minutes = null`) chúng chính là số lần thật.
+ */
 export type PatternRow = {
   k: number;
   pattern: string;                   // chuỗi ký hiệu nối liền (vd "BPBP")
   counts: Record<string, number>;
   pct: Record<string, number | null>;
-  total: number;                     // = tổng counts
-  eligible: boolean;                 // total >= 3 và kết quả nhiều nhất là duy nhất
+  total: number;                     // = tổng counts (tổng trọng số)
+  eligible: boolean;                 // số lần THẬT >= 3 và ký hiệu nhiều nhất (theo số có trọng số) là duy nhất
 };
 
 export type ChosenPattern = {
   k: number;
   pattern: string;
-  occurrences: number;               // = total của đuôi được chọn
+  occurrences: number;               // = total (tổng trọng số) của đuôi được chọn
   pct: Record<string, number>;       // cùng khóa với counts của PatternRow
 };
 
@@ -72,6 +85,8 @@ export type PredictionDetail = {
   rows: PatternRow[];                // mọi k đã xét (3..10)
   history_used: string;              // chuỗi ký hiệu (đã bỏ ignore_in_pattern), tối đa 10 ký tự gần nhất
   missing_previous: boolean;
+  half_life_minutes: number | null;  // bán rã trọng số đã dùng; null = tắt (đúng pattern-v1)
+  shoe_weight: number | null;        // hệ số shoe hiện tại đã dùng; null khi tắt trọng số
 };
 
 /** AI → API: kết quả dự đoán. `detail` là PatternRow[]; API gói thành PredictionDetail khi lưu DB. */
@@ -89,6 +104,8 @@ export type PredictResult = {
   detail: PatternRow[];
   history_used: string;
   missing_previous: boolean;
+  half_life_minutes: number | null;  // xem PredictionDetail
+  shoe_weight: number | null;
   reason: PredictionReason;
   model_version: string;
   created_at: string;

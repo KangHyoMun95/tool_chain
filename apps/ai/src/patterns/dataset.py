@@ -13,7 +13,8 @@ log = logging.getLogger("pattern")
 CACHE = Path(__file__).parent / "data" / "sessions.parquet"
 
 QUERY = text("""
-    SELECT gs.game_session_id, gs.stream_id, gs.road_shoe, gs.road_count, gs.created_at, gs.result, l.lobby_name, c.category_name
+    SELECT gs.game_session_id, gs.stream_id, gs.road_shoe, gs.road_count, gs.created_at, COALESCE(gs.ended_at, gs.created_at) AS happened_at,
+           gs.result, l.lobby_name, c.category_name
     FROM game_sessions gs
     JOIN streams s ON s.stream_id = gs.stream_id
     JOIN categories c ON c.category_id = s.category_id
@@ -29,9 +30,9 @@ def load_sessions(since: str = "2026-01-01", refresh: bool = False, source: str 
     """source='file': đọc parquet (không có thì lấy từ DB và lưu); 'db': luôn lấy từ DB (không ghi file)."""
     if source == "file" and CACHE.exists() and not refresh:
         df = pd.read_parquet(CACHE)
-        if {"lobby_name", "category_name"} <= set(df.columns):
+        if {"lobby_name", "category_name", "happened_at"} <= set(df.columns):
             return df
-        log.warning("File cache %s thiếu cột lobby_name / category_name (bản cũ): lấy lại từ DB", CACHE)
+        log.warning("File cache %s thiếu cột lobby_name / category_name / happened_at (bản cũ): lấy lại từ DB", CACHE)
     df = pd.read_sql(QUERY, engine(), params={"since": since})
     if source == "file":
         CACHE.parent.mkdir(exist_ok=True)

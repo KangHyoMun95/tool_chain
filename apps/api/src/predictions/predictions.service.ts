@@ -99,6 +99,7 @@ export class PredictionsService {
   async insertFromResult(msg: PredictResult, participantIds: string[]): Promise<{ createdAt: Date; charge: ChargeOutcome | null } | null> {
     const detail: PredictionDetail = {
       chosen: msg.chosen, rows: msg.detail, history_used: msg.history_used, missing_previous: msg.missing_previous,
+      half_life_minutes: msg.half_life_minutes, shoe_weight: msg.shoe_weight,
     };
     return this.ds.transaction(async (m) => {
       await this.sessions.insertMany(m, [{ id: msg.game_session_id, streamId: msg.stream_id, shoe: msg.shoe, round: msg.round }]);
