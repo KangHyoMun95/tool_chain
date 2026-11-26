@@ -129,11 +129,15 @@ def _by_strength(name: str, r: pd.DataFrame) -> None:
 
 def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False,
          half_life_minutes: int | None = None, shoe_weight: int = 1, since: str = "2026-01-01", assume_category: tuple[str, str] | None = None, infer_category: bool = False,
-         rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",)) -> None:
+         rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",), structure: int = 0) -> None:
     df = load_sessions(since=since, source=source, refresh=refresh, assume_category=("?", "?") if infer_category else assume_category)
     if infer_category:
         df = infer_categories(df, registry)
     df = add_segments(df)
+    if structure:
+        from .structure_test import main as structure_test
+        structure_test(df, registry, n_perm=structure)
+        return
     r, total = run(df, registry, half_life_minutes, shoe_weight, rule_weights, rules)
     weighting = f"half-life {half_life_minutes} phút, shoe_weight {shoe_weight}" if half_life_minutes else "tắt (pattern-v1)"
     print(f"{total} ván, {df['stream_id'].nunique()} stream (nguồn: {source}); trọng số theo độ mới: {weighting}\n")
