@@ -90,6 +90,10 @@ def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False
     r, total = run(df, registry, half_life_minutes, shoe_weight, rule_weights, rules)
     weighting = f"half-life {half_life_minutes} phút, shoe_weight {shoe_weight}" if half_life_minutes else "tắt (pattern-v1)"
     print(f"{total} ván, {df['stream_id'].nunique()} stream (nguồn: {source}); trọng số theo độ mới: {weighting}\n")
+    if not total:
+        print("Không có ván nào để backtest: DB trả 0 ván FINISHED có result (từ 2026-01-01), hoặc mọi stream bị bỏ qua vì category không có file trong config/categories. "
+              "Kiểm tra DATABASE_URL_READONLY có trỏ đúng DB có dữ liệu không và log ERROR phía trên.")
+        return
     print(pd.DataFrame([_summary("pattern-v1", r, "pattern_pick", total),
                         _summary("baseline (nhiều hơn trong lịch sử)", r, "baseline_pick", total),
                         *[_summary(f"luật {n} (riêng)", r, f"rule_{n}", total) for n in rules],
