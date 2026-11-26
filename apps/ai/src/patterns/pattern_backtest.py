@@ -22,6 +22,27 @@ def _epoch(ts) -> float:
     return (t.tz_localize("UTC") if t.tzinfo is None else t).timestamp()
 
 
+def infer_categories(df: pd.DataFrame, registry: CategoryRegistry) -> pd.DataFrame:
+    """DB thiếu streams / categories / lobbies: suy category của MỖI stream từ tập ký hiệu result của nó.
+
+    Chọn category có `results` chứa tập ký hiệu của stream; nhiều category cùng chứa ⇒ lấy category có ít ký hiệu nhất,
+    vẫn hòa (cùng số ký hiệu) thì bỏ stream (log WARNING). Không category nào chứa ⇒ bỏ stream. Stream nối được DB thì giữ tên thật.
+    """
+    cfgs = list(registry._by_key.values())
+    lobby, category = df["lobby_name"].copy(), df["category_name"].copy()
+    for sid, idx in df[df["lobby_name"] == "?"].groupby("stream_id").groups.items():
+        seen = set(df.loc[idx, "result"])
+        fit = sorted((c for c in cfgs if seen <= set(c.results)), key=lambda c: len(c.results))
+        if not fit or (len(fit) > 1 and len(fit[0].results) == len(fit[1].results)):
+            log.warning("Stream %s: không suy được category từ ký hiệu %s (khớp: %s); bỏ qua", sid, sorted(seen), [c.key for c in fit])
+            lobby[idx] = category[idx] = None
+            continue
+        lobby[idx], category[idx] = fit[0].lobby, fit[0].category
+    out = df.assign(lobby_name=lobby, category_name=category).dropna(subset=["lobby_name"])
+    log.warning("Suy category theo ký hiệu: %s", out.groupby(["lobby_name", "category_name"])["stream_id"].nunique().to_dict())
+    return out
+
+
 def run(df: pd.DataFrame, registry: CategoryRegistry, half_life_minutes: int | None = None, shoe_weight: int = 1,
         rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",)) -> tuple[pd.DataFrame, int]:
     """df đã có cột segment (xem add_segments) và lobby_name / category_name. Trả (bảng mỗi ván có dự đoán, tổng số ván).
@@ -84,9 +105,12 @@ def _summary(name: str, r: pd.DataFrame, col: str, total: int) -> dict:
 
 
 def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False,
-         half_life_minutes: int | None = None, shoe_weight: int = 1, since: str = "2026-01-01", assume_category: tuple[str, str] | None = None,
+         half_life_minutes: int | None = None, shoe_weight: int = 1, since: str = "2026-01-01", assume_category: tuple[str, str] | None = None, infer_category: bool = False,
          rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",)) -> None:
-    df = add_segments(load_sessions(since=since, source=source, refresh=refresh, assume_category=assume_category))
+    df = load_sessions(since=since, source=source, refresh=refresh, assume_category=("?", "?") if infer_category else assume_category)
+    if infer_category:
+        df = infer_categories(df, registry)
+    df = add_segments(df)
     r, total = run(df, registry, half_life_minutes, shoe_weight, rule_weights, rules)
     weighting = f"half-life {half_life_minutes} phút, shoe_weight {shoe_weight}" if half_life_minutes else "tắt (pattern-v1)"
     print(f"{total} ván, {df['stream_id'].nunique()} stream (nguồn: {source}); trọng số theo độ mới: {weighting}\n")
