@@ -141,11 +141,15 @@ def _by_strength(name: str, r: pd.DataFrame) -> None:
 
 def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False,
          half_life_minutes: int | None = None, shoe_weight: int = 1, since: str = "2026-01-01", assume_category: tuple[str, str] | None = None, infer_category: bool = False,
-         rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",), structure: int = 0, shapes: int = 0, shapes_file: str | None = None, symmetric: bool = False) -> None:
+         rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",), structure: int = 0, shapes: int = 0, shapes_file: str | None = None, symmetric: bool = False, shape_model: tuple[float, ...] = ()) -> None:
     df = load_sessions(since=since, source=source, refresh=refresh, assume_category=("?", "?") if infer_category else assume_category)
     if infer_category:
         df = infer_categories(df, registry)
     df = add_segments(df)
+    if shape_model:
+        from .shape_backtest import main as shape_backtest
+        shape_backtest(add_segments(df) if "segment" not in df.columns else df, registry, shape_model, rule_weights)
+        return
     if shapes:
         from .shapes_test import load_shapes, main as shapes_test
         shapes_test(df, registry, n_perm=shapes, shapes=load_shapes(shapes_file) if shapes_file else None)
