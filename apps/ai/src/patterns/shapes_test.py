@@ -178,7 +178,7 @@ def _duplicates(cdf: pd.DataFrame, cfg, prefix: int = 30) -> None:
     dup = [v for v in seen.values() if len(v) > 1]
     n_dup = sum(len(v) for v in dup)
     cross = sum(1 for v in dup if len({sid for sid, _ in v}) > 1)
-    print(f"{total} shoe có >= {prefix} ván; {n_dup} shoe ({n_dup / total:.1%} có {prefix} ván đầu trùng hệt shoe khác "
+    print(f"{total} shoe có >= {prefix} ván; {n_dup} shoe ({n_dup / total:.1%}) có {prefix} ván đầu trùng hệt shoe khác "
           f"({len(dup)} nhóm trùng, {cross} nhóm trùng giữa các stream KHÁC nhau)." if total else f"Không shoe nào có >= {prefix} ván.")
 
 
