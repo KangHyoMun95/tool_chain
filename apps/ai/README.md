@@ -83,3 +83,16 @@ Cột của bảng: `type` (khóa), `value` (NULL = tắt với `AI_HALF_LIFE`),
 - `--shape-model 2.5,3,3.5` (thay cho backtest): mô hình hình dạng TỰ HỌC (`src/patterns/shape_model.py`, không hình nào viết sẵn): mọi đuôi 3..10 ván (gộp hai chiều ký hiệu) là một hình ứng viên, tự đếm; chỉ hình có n >= 30 và |z| >= ngưỡng mới được dùng, xác suất co về 0.5. Chạy ĐI TỚI theo thời gian toàn cục (mỗi ván chỉ dùng dữ liệu trước nó; hình học gộp mọi stream của category, pattern-v1 học riêng từng stream như service). Báo tỉ lệ đúng RIÊNG trên ván có hình (kèm pattern-v1 trên đúng những ván đó) và các hình mô hình tin nhất ở cuối; trộn vào pattern-v1 theo `--rule-weights`. Chỉ category có đúng 2 ký hiệu `predictable`.
 - File `data/sessions.parquet` cũ thiếu `road_shoe`: backtest dùng cách chia chuỗi theo khoảng cách thời gian / `road_count` giảm và in cảnh báo. Dùng `--source db` (hoặc `--refresh`) để có chia theo shoe thật.
 - Lần đo gần nhất trên file hiện có (5437 ván, 27 stream): pattern-v1 ≈ 50.0% đúng, baseline ≈ 50.3%, trong khi `% hiển thị` trung bình ≈ 74%. Nghĩa là trên dữ liệu đó mô hình chưa có khả năng dự đoán và `confidence` không phản ánh tỉ lệ đúng thực tế. Đo lại trên dữ liệu shoe thật trước khi dựa vào `confidence`.
+
+
+## Mô hình hình dạng trong service (`AI_SHAPE_*`)
+
+Service dùng `shape_model.ShapeModel` (xem `--shape-model` ở backtest) để cộng một tỉ lệ vào pattern-v1 **chỉ ở ván có hình đủ bằng chứng**:
+
+| Biến | Mặc định | Ý nghĩa |
+|---|---|---|
+| `AI_SHAPE_WEIGHT` | `0.3` | trọng số w khi trộn: `pct' = (1-w)·pct + w·[x == pick của hình]`; **`0` = tắt hẳn** (chạy đúng pattern-v1) |
+| `AI_SHAPE_Z` | `3.0` | ngưỡng bằng chứng \|z\| của một hình |
+| `AI_SHAPE_MIN_N` | `30` | số lần xuất hiện tối thiểu của một hình |
+
+Theo dõi: ván có áp dụng hình có `predictions.model_version = 'pattern-v1+shape:<dạng>'` (ván khác là `pattern-v1`), và log AI có dòng `hình <dạng> (k, n, z) => pick; pattern-v1 ... -> sau trộn ...`. So sánh đúng/sai giữa hai nhóm `model_version` để đánh giá trên dữ liệu thật.

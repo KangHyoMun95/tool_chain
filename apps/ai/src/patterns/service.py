@@ -31,6 +31,7 @@ from .contract import (
 from .counts import RedisCounts, rebuild
 from .db import engine
 from .job_config import AiTuning, TuningReader
+from .shape_model import ShapeModel, ShapeSettings, apply_shape, build_models, shape_settings
 from .pattern import choose_pick, combine_weighted, format_detail, history_before, suffix_patterns, weight_scale
 from .redis_io import consume, ensure_group
 
@@ -47,8 +48,11 @@ _HISTORY_QUERY = text("""
 
 
 class AiService:
-    def __init__(self, r: aioredis.Redis, db: Engine, registry: CategoryRegistry, tuning: AiTuning, redis_url: str = ""):
+    def __init__(self, r: aioredis.Redis, db: Engine, registry: CategoryRegistry, tuning: AiTuning, redis_url: str = "",
+                 shape_cfg: ShapeSettings | None = None, shapes: dict[str, ShapeModel] | None = None):
         self.r = r
+        self.shape_cfg = shape_cfg or ShapeSettings(0.0, 3.0, 30)     # weight 0 = tắt mô hình hình dạng
+        self.shapes: dict[str, ShapeModel] = shapes or {}             # cfg.key -> mô hình (gộp mọi stream của category)
         self.db = db
         self.registry = registry
         self.redis_url = redis_url
@@ -95,6 +99,8 @@ class AiService:
                     await asyncio.to_thread(rebuild, sync_r, self.db, self.registry, tuning.half_life_minutes)
                 finally:
                     sync_r.close()
+                if self.shape_cfg.weight > 0:
+                    self.shapes = await asyncio.to_thread(build_models, self.db, self.registry, self.shape_cfg)
                 self.tuning, self._need_rebuild = tuning, False
                 return True
             except Exception:
@@ -209,6 +215,9 @@ class AiService:
         counted, exponent = await self.counts.add_result(msg.stream_id, msg.shoe, msg.game_session_id, before, msg.result, cfg.predictable,
                                                          self._ts(msg.received_at))
         self._maybe_rebuild_for_overflow(exponent)
+        model = self.shapes.get(cfg.key)
+        if counted and model is not None:
+            model.update(before, msg.result)         # cùng điều kiện idempotent với bảng đếm (ai:counted)
         log.debug("đếm %s shoe %d round %d result=%s: %s", msg.stream_id, msg.shoe, msg.round, msg.result, "mới" if counted else "đã đếm / không predictable")
 
     async def on_request(self, msg: PredictRequest) -> None:
@@ -235,15 +244,25 @@ class AiService:
         else:
             half_life = None
         pick = choose_pick(history, lambda _patterns: table, cfg.predictable, wlookup=wlookup)
-        log.info("Dự đoán %s shoe %d round %d history=%s%s\n%s", msg.key_id, msg.shoe, msg.round, source,
-                 " (THIẾU round trước)" if missing else "", format_detail(pick))
+        model_version, shape_note = MODEL_VERSION, ""
+        model = self.shapes.get(cfg.key) if self.shape_cfg.weight > 0 else None
+        if model is not None and pick["pick"] is not None:
+            shape = model.predict(history)
+            if shape is not None:
+                final = apply_shape(pick, shape, self.shape_cfg.weight, cfg.predictable)
+                model_version = f"{MODEL_VERSION}+shape:{shape['shape']}"
+                shape_note = (f"\n  hình {shape['shape']} (k={shape['k']}, n={shape['n']}, z={shape['z']:+.2f}) => {shape['pick']} {shape['p']:.1%}; "
+                              f"pattern-v1 {pick['pick']} {pick['confidence']:.1%} -> sau trộn (w={self.shape_cfg.weight}) {final['pick']} {final['confidence']:.1%}")
+                pick = final
+        log.info("Dự đoán %s shoe %d round %d history=%s%s\n%s%s", msg.key_id, msg.shoe, msg.round, source,
+                 " (THIẾU round trước)" if missing else "", format_detail(pick), shape_note)
 
         if self.delay_s:
             await asyncio.sleep(self.delay_s)
         result = PredictResult(
             schema_version=1, prediction_id=prediction_id(msg.game_session_id),
             game_session_id=msg.game_session_id, stream_id=msg.stream_id, key_id=msg.key_id,
-            shoe=msg.shoe, round=msg.round, missing_previous=missing, model_version=MODEL_VERSION,
+            shoe=msg.shoe, round=msg.round, missing_previous=missing, model_version=model_version,
             half_life_minutes=half_life, shoe_weight=shoe_weight if half_life else None,
             created_at=datetime.now(timezone.utc).isoformat(), **pick,
         )
@@ -302,9 +321,16 @@ async def run(registry: CategoryRegistry | None = None) -> None:
     finally:
         sync_r.close()
 
-    svc = AiService(r, db, registry, tuning, url)
-    log.info("AI service sẵn sàng (consumer=%s, model=%s, half_life=%s phút, shoe_weight=%s)", consumer, MODEL_VERSION,
-             tuning.half_life_minutes or "tắt", tuning.shoe_weight)
+    shape_cfg = shape_settings()
+    shapes: dict[str, ShapeModel] = {}
+    if shape_cfg.weight > 0:
+        try:
+            shapes = await asyncio.to_thread(build_models, db, registry, shape_cfg)
+        except Exception:
+            log.exception("Dựng mô hình hình dạng THẤT BẠI: chạy pattern-v1 thuần cho tới lần dựng lại sau")
+    svc = AiService(r, db, registry, tuning, url, shape_cfg, shapes)
+    log.info("AI service sẵn sàng (consumer=%s, model=%s, half_life=%s phút, shoe_weight=%s, shape_weight=%s z>=%s n>=%s)", consumer, MODEL_VERSION,
+             tuning.half_life_minutes or "tắt", tuning.shoe_weight, shape_cfg.weight or "tắt", shape_cfg.z_gate, shape_cfg.min_n)
     await asyncio.gather(
         svc.refresh_loop(reader, stop),
         consume(r, AI_RESULT_STREAM, AI_COUNTER_GROUP, consumer, AiResult, svc.on_ai_result, stop),
