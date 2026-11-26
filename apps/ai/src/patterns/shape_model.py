@@ -2,7 +2,7 @@
 # Mô hình HÌNH DẠNG tự học (THỬ NGHIỆM; hàm thuần, không I/O; chưa dùng trong service). Không có hình nào viết sẵn.
 # Mọi đuôi độ dài kmin..kmax của chuỗi (đã bỏ ignore_in_pattern, cùng một shoe) là một "hình" ứng viên; hai chiều ký hiệu được gộp
 # (dạng chuẩn: ký hiệu đầu đuôi = 1, còn lại = 2). Mỗi hình đếm [n lần xuất hiện, h lần ván kế tiếp trùng ký hiệu đầu].
-# Dự đoán: chỉ dùng hình có n >= min_n và |z nhị thức so 50%| >= z_gate (đủ bằng chứng); nhiều hình khớp ⇒ lấy hình |z| lớn nhất.
+# Dự đoán: chỉ dùng hình có n >= min_n và |z nhị thức so 50%| >= z_gate (đủ bằng chứng); nhiều hình khớp ⇒ ưu tiên đuôi DÀI nhất (k từ kmax xuống kmin = 3), lấy hình đầu tiên đủ bằng chứng.
 # Xác suất báo ra được co về 0.5 (p = (h + a) / (n + 2a)) để hình ít dữ liệu không báo quá tự tin. Không đủ bằng chứng ⇒ None (không can thiệp).
 import math
 from typing import Sequence
@@ -36,16 +36,18 @@ class ShapeModel:
         return (h - n / 2) / math.sqrt(n / 4)
 
     def predict(self, before: str) -> dict | None:
-        """Hình có bằng chứng mạnh nhất khớp đuôi của `before`: {pick, p, shape, k, n, z}; không có hình đủ bằng chứng ⇒ None."""
+        """Hình đủ bằng chứng khớp đuôi của `before`, DUYỆT TỪ DÀI XUỐNG NGẮN (k = min(kmax, len) .. kmin) và lấy hình đầu tiên đủ bằng chứng:
+        {pick, p, shape, k, n, z}; không có hình đủ bằng chứng ⇒ None."""
         best = None
-        for k in range(self.kmin, min(self.kmax, len(before)) + 1):
+        for k in range(min(self.kmax, len(before)), self.kmin - 1, -1):
             key, first = canon(before[-k:])
             e = self.table.get(key)
             if not e or e[0] < self.min_n:
                 continue
             z = self._z(*e)
-            if abs(z) >= self.z_gate and (best is None or abs(z) > abs(best[0])):
+            if abs(z) >= self.z_gate:
                 best = (z, key, first, k, e)
+                break
         if best is None:
             return None
         z, key, first, k, (n, h) = best
@@ -77,8 +79,8 @@ class ShapeSettings:
 
 
 def shape_settings() -> ShapeSettings:
-    """AI_SHAPE_WEIGHT (mặc định 0.3; 0 = tắt), AI_SHAPE_Z (3.0), AI_SHAPE_MIN_N (30). Sai giá trị ⇒ ném ValueError lúc khởi động."""
-    s = ShapeSettings(float(os.environ.get("AI_SHAPE_WEIGHT", "0.3")), float(os.environ.get("AI_SHAPE_Z", "3.0")), int(os.environ.get("AI_SHAPE_MIN_N", "30")))
+    """AI_SHAPE_WEIGHT (mặc định 0.2; 0 = tắt), AI_SHAPE_Z (3.0), AI_SHAPE_MIN_N (30). Sai giá trị ⇒ ném ValueError lúc khởi động."""
+    s = ShapeSettings(float(os.environ.get("AI_SHAPE_WEIGHT", "0.2")), float(os.environ.get("AI_SHAPE_Z", "3.0")), int(os.environ.get("AI_SHAPE_MIN_N", "30")))
     if not 0 <= s.weight <= 1 or s.z_gate <= 0 or s.min_n < 1:
         raise ValueError(f"AI_SHAPE_WEIGHT phải trong 0..1, AI_SHAPE_Z > 0, AI_SHAPE_MIN_N >= 1 (đang {s})")
     return s

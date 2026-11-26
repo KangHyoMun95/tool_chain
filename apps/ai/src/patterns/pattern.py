@@ -4,7 +4,7 @@
 from collections import defaultdict
 from typing import Callable, Iterable, Mapping, Sequence
 
-from .config import MAX_CONFIDENCE, MAX_LEN, MAX_WEIGHT_EXPONENT, MIN_COUNT, MIN_LEN
+from .config import MAX_CONFIDENCE, MAX_LEN, MAX_WEIGHT_EXPONENT, MIN_COUNT, MIN_LEN, WEIGHTED_CONFIDENCE_SCALE
 
 # patterns -> {pattern: {ký_hiệu predictable: số lần}}; pattern / ký hiệu không có trong bảng đếm thì 0
 CountLookup = Callable[[list[str]], Mapping[str, Mapping[str, int]]]
@@ -61,7 +61,8 @@ def choose_pick(history: str, lookup: CountLookup, predictable: Sequence[str], m
     - Có wlookup (số đếm có trọng số theo độ mới, đã gồm hệ số shoe hiện tại): điều kiện số lần THẬT (`lookup`) total >= min_count giữ nguyên,
       nhưng ký hiệu nhiều nhất DUY NHẤT, %, và thứ tự ưu tiên (% cao nhất -> tổng trọng số lớn hơn -> k ngắn hơn) đều tính trên số có trọng số.
       Tổng trọng số = 0 (mọi lần xuất hiện cũ tới mức trọng số về 0) thì đuôi không hợp lệ.
-    `confidence` = % của đuôi được chọn nhưng không vượt MAX_CONFIDENCE.
+    `confidence` = % của đuôi được chọn nhưng không vượt MAX_CONFIDENCE; khi có wlookup thì % (và chosen.pct) được co về đều nhau theo
+    WEIGHTED_CONFIDENCE_SCALE (xem config.py) vì % có trọng số gần như luôn ~100%. Việc chọn pick và detail vẫn theo % chưa co.
     detail (contract predict:results): counts / total / pct là số CÓ trọng số (tắt trọng số thì chính là số lần thật); KHÔNG chứa số lần thật.
     Trả {pick, confidence, chosen, detail, history_used, reason} theo contract predict:results.
     """
@@ -101,10 +102,15 @@ def choose_pick(history: str, lookup: CountLookup, predictable: Sequence[str], m
         return out
 
     pct, total, _, pick, row = max(candidates, key=lambda c: c[:3])
+    chosen_pct = dict(row["pct"])
+    if wtable is not None:
+        c, m = WEIGHTED_CONFIDENCE_SCALE, len(predictable)
+        pct = (1 - c) / m + c * pct
+        chosen_pct = {s: round((1 - c) / m + c * v, 4) for s, v in chosen_pct.items()}
     out.update(
         pick=pick,
         confidence=round(min(pct, MAX_CONFIDENCE), 4),
-        chosen={"k": row["k"], "pattern": row["pattern"], "occurrences": row["total"], "pct": dict(row["pct"])},
+        chosen={"k": row["k"], "pattern": row["pattern"], "occurrences": row["total"], "pct": chosen_pct},
         reason="OK",
     )
     return out
