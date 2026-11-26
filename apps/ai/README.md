@@ -15,7 +15,7 @@ cp .env.example .env                 # điền REDIS_URL, DATABASE_URL(_READONLY
 # Cần config/categories/*.json (ở gốc repo, xem CLAUDE.md mục "File định nghĩa category"): thiếu / sai ⇒ mọi lệnh thoát mã 1 và in tất cả lỗi
 
 python main.py serve                 # service (mặc định)
-python main.py backtest [--source file|db] [--refresh] [--since YYYY-MM-DD] [--half-life PHÚT] [--shoe-weight N] [--rule-weights 0.1,0.3] [--rules run,repeat,mirror]   # bỏ --half-life = pattern-v1
+python main.py backtest [--source file|db] [--refresh] [--since YYYY-MM-DD] [--assume-category 'lobby|category'] [--half-life PHÚT] [--shoe-weight N] [--rule-weights 0.1,0.3] [--rules run,repeat,mirror]   # bỏ --half-life = pattern-v1
 python main.py verify                # so bảng đếm Redis với đếm brute-force từ DB
 python main.py predict               # in dự đoán một lần cho các stream đang hoạt động
 ```
@@ -74,5 +74,6 @@ Cột của bảng: `type` (khóa), `value` (NULL = tắt với `AI_HALF_LIFE`),
   - `repeat`: đuôi dài nhất của chuỗi đã xuất hiện trước đó trong shoe ⇒ dự đoán ký hiệu đứng sau lần xuất hiện gần nhất (1221→2, 12212→2, 1222→2, 12221→2).
   - `mirror`: đuôi dạng gương (nửa sau = nửa trước đảo ngược, mỗi nửa >= 2) ⇒ dự đoán ký tự đứng trước nửa trước.
   - Trộn: `pct'[x] = (1-w)·pct[x] + w·[x = ký hiệu của luật]` trên đuôi pattern-v1 đã chọn (độ phủ giữ như pattern-v1). Service KHÔNG dùng các luật này.
+- `--assume-category 'casino|SEXY - BACCARAT'` (cần `--source db`): chỉ cho DB chép thiếu bảng `streams` / `categories` / `lobbies` (ván không nối được tới category); mọi ván không nối được bị gán category này (phải đúng, vì ký hiệu result phải thuộc `results` của nó). Không ghi file cache.
 - File `data/sessions.parquet` cũ thiếu `road_shoe`: backtest dùng cách chia chuỗi theo khoảng cách thời gian / `road_count` giảm và in cảnh báo. Dùng `--source db` (hoặc `--refresh`) để có chia theo shoe thật.
 - Lần đo gần nhất trên file hiện có (5437 ván, 27 stream): pattern-v1 ≈ 50.0% đúng, baseline ≈ 50.3%, trong khi `% hiển thị` trung bình ≈ 74%. Nghĩa là trên dữ liệu đó mô hình chưa có khả năng dự đoán và `confidence` không phản ánh tỉ lệ đúng thực tế. Đo lại trên dữ liệu shoe thật trước khi dựa vào `confidence`.
