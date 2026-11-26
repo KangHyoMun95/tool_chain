@@ -37,6 +37,16 @@ def load_sessions(since: str = "2026-01-01", refresh: bool = False, source: str 
     if df.empty:
         info = pd.read_sql(text("SELECT status, count(*) AS n, count(result) AS co_result, min(created_at) AS som_nhat, max(created_at) AS muon_nhat "
                                 "FROM game_sessions GROUP BY status"), engine())
+        steps = pd.read_sql(text("""
+            SELECT count(*) AS finished_co_result,
+                   count(s.stream_id) AS co_stream, count(c.category_id) AS co_category, count(l.lobby_id) AS co_lobby,
+                   count(*) FILTER (WHERE gs.created_at >= :since) AS tu_moc_since
+            FROM game_sessions gs
+            LEFT JOIN streams s ON s.stream_id = gs.stream_id
+            LEFT JOIN categories c ON c.category_id = s.category_id
+            LEFT JOIN lobbies l ON l.lobby_id = c.lobby_id
+            WHERE gs.result IS NOT NULL AND gs.status = 'FINISHED'"""), engine(), params={"since": since})
+        log.warning("Đếm theo từng bước JOIN (cột nào tụt về 0 là chỗ làm mất ván):\n%s", steps.to_string(index=False))
         log.warning("Không có ván FINISHED có result từ %s. game_sessions theo status:\n%s\nDữ liệu cũ hơn thì dùng --since YYYY-MM-DD.", since, info.to_string(index=False))
     if source == "file":
         CACHE.parent.mkdir(exist_ok=True)
