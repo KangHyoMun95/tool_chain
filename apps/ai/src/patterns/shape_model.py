@@ -79,8 +79,8 @@ class ShapeSettings:
 
 
 def shape_settings() -> ShapeSettings:
-    """AI_SHAPE_WEIGHT (mặc định 0.3; 0 = tắt), AI_SHAPE_Z (3.0), AI_SHAPE_MIN_N (30). Sai giá trị ⇒ ném ValueError lúc khởi động."""
-    s = ShapeSettings(float(os.environ.get("AI_SHAPE_WEIGHT", "0.3")), float(os.environ.get("AI_SHAPE_Z", "3.0")), int(os.environ.get("AI_SHAPE_MIN_N", "30")))
+    """AI_SHAPE_WEIGHT (mặc định 0.2; 0 = tắt), AI_SHAPE_Z (3.0), AI_SHAPE_MIN_N (30). Sai giá trị ⇒ ném ValueError lúc khởi động."""
+    s = ShapeSettings(float(os.environ.get("AI_SHAPE_WEIGHT", "0.2")), float(os.environ.get("AI_SHAPE_Z", "3.0")), int(os.environ.get("AI_SHAPE_MIN_N", "30")))
     if not 0 <= s.weight <= 1 or s.z_gate <= 0 or s.min_n < 1:
         raise ValueError(f"AI_SHAPE_WEIGHT phải trong 0..1, AI_SHAPE_Z > 0, AI_SHAPE_MIN_N >= 1 (đang {s})")
     return s

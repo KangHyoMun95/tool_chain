@@ -91,7 +91,7 @@ Service dùng `shape_model.ShapeModel` (xem `--shape-model` ở backtest) để 
 
 | Biến | Mặc định | Ý nghĩa |
 |---|---|---|
-| `AI_SHAPE_WEIGHT` | `0.3` | trọng số w khi trộn: `pct' = (1-w)·pct + w·[x == pick của hình]; nhiều hình khớp ⇒ ưu tiên đuôi dài nhất (k = 10 → 3)`; **`0` = tắt hẳn** (chạy đúng pattern-v1) |
+| `AI_SHAPE_WEIGHT` | `0.2` | trọng số w khi trộn: `pct' = (1-w)·pct + w·[x == pick của hình]; nhiều hình khớp ⇒ ưu tiên đuôi dài nhất (k = 10 → 3)`; **`0` = tắt hẳn** (chạy đúng pattern-v1) |
 | `AI_SHAPE_Z` | `3.0` | ngưỡng bằng chứng \|z\| của một hình |
 | `AI_SHAPE_MIN_N` | `30` | số lần xuất hiện tối thiểu của một hình |
 
