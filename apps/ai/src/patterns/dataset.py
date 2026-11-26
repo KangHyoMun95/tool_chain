@@ -34,6 +34,10 @@ def load_sessions(since: str = "2026-01-01", refresh: bool = False, source: str 
             return df
         log.warning("File cache %s thiếu cột lobby_name / category_name / happened_at (bản cũ): lấy lại từ DB", CACHE)
     df = pd.read_sql(QUERY, engine(), params={"since": since})
+    if df.empty:
+        info = pd.read_sql(text("SELECT status, count(*) AS n, count(result) AS co_result, min(created_at) AS som_nhat, max(created_at) AS muon_nhat "
+                                "FROM game_sessions GROUP BY status"), engine())
+        log.warning("Không có ván FINISHED có result từ %s. game_sessions theo status:\n%s\nDữ liệu cũ hơn thì dùng --since YYYY-MM-DD.", since, info.to_string(index=False))
     if source == "file":
         CACHE.parent.mkdir(exist_ok=True)
         df.to_parquet(CACHE, index=False)

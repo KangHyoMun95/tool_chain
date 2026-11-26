@@ -84,9 +84,9 @@ def _summary(name: str, r: pd.DataFrame, col: str, total: int) -> dict:
 
 
 def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False,
-         half_life_minutes: int | None = None, shoe_weight: int = 1,
+         half_life_minutes: int | None = None, shoe_weight: int = 1, since: str = "2026-01-01",
          rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",)) -> None:
-    df = add_segments(load_sessions(source=source, refresh=refresh))
+    df = add_segments(load_sessions(since=since, source=source, refresh=refresh))
     r, total = run(df, registry, half_life_minutes, shoe_weight, rule_weights, rules)
     weighting = f"half-life {half_life_minutes} phút, shoe_weight {shoe_weight}" if half_life_minutes else "tắt (pattern-v1)"
     print(f"{total} ván, {df['stream_id'].nunique()} stream (nguồn: {source}); trọng số theo độ mới: {weighting}\n")

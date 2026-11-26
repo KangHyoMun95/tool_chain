@@ -15,7 +15,7 @@ cp .env.example .env                 # điền REDIS_URL, DATABASE_URL(_READONLY
 # Cần config/categories/*.json (ở gốc repo, xem CLAUDE.md mục "File định nghĩa category"): thiếu / sai ⇒ mọi lệnh thoát mã 1 và in tất cả lỗi
 
 python main.py serve                 # service (mặc định)
-python main.py backtest [--source file|db] [--refresh] [--half-life PHÚT] [--shoe-weight N] [--rule-weights 0.1,0.3] [--rules run,repeat,mirror]   # bỏ --half-life = pattern-v1
+python main.py backtest [--source file|db] [--refresh] [--since YYYY-MM-DD] [--half-life PHÚT] [--shoe-weight N] [--rule-weights 0.1,0.3] [--rules run,repeat,mirror]   # bỏ --half-life = pattern-v1
 python main.py verify                # so bảng đếm Redis với đếm brute-force từ DB
 python main.py predict               # in dự đoán một lần cho các stream đang hoạt động
 ```
