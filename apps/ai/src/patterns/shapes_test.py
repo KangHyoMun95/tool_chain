@@ -182,13 +182,16 @@ def _validate(timed: list[tuple[object, str]], kmin: int = 3, kmax: int = 8, min
     cut = len(timed) // 2
     train, test = [s for _, s in timed[:cut]], [s for _, s in timed[cut:]]
     chosen: dict[str, tuple[float, bool]] = {}                    # dạng -> (|z|, kế tiếp = ký hiệu đầu?)
+    learned: dict[str, tuple[int, float]] = {}                    # dạng -> (số lần ở nửa đầu, tỉ lệ kế tiếp = ký hiệu đầu)
     for key, (n, h) in _scan_counts(train, kmin, kmax).items():
         if n >= min_n:
             z = (h - n / 2) / math.sqrt(n / 4)
             if abs(z) >= min_z:
                 chosen[key] = (abs(z), h / n > 0.5)
+                learned[key] = (n, h / n)
     print(f"Học ở nửa đầu ({len(train)} shoe), đo ở nửa sau ({len(test)} shoe). Hình được chọn từ nửa đầu (n >= {min_n}, |z| >= {min_z}): {len(chosen)}.")
     n_rounds = n_shape = hit = 0
+    per: dict[str, list[int]] = {k: [0, 0] for k in chosen}        # dạng -> [số ván đo, số đúng]
     for s in test:
         for i in range(kmin, len(s)):
             n_rounds += 1
@@ -197,14 +200,20 @@ def _validate(timed: list[tuple[object, str]], kmin: int = 3, kmax: int = 8, min
                 key, first = _canon(s[i - k:i])
                 c = chosen.get(key)
                 if c and (best is None or c[0] > best[0]):
-                    best = (c[0], c[1], first)
+                    best = (c[0], c[1], first, key)
             if best:
                 n_shape += 1
-                pred_first = best[1]
-                hit += (s[i] == best[2]) == pred_first
+                ok = (s[i] == best[2]) == best[1]
+                hit += ok
+                per[best[3]][0] += 1
+                per[best[3]][1] += ok
     if not n_shape:
         print("Nửa sau không có ván nào khớp hình đã chọn.")
         return
+    print("Từng hình đã chọn (dự đoán = 'giống ký hiệu đầu' nếu tỉ lệ học > 0.5, ngược lại 'khác'):")
+    rows = [{"hình (1 = ký hiệu đầu)": k, "học: số lần": learned[k][0], "học: kế tiếp=1": f"{learned[k][1]:.3f}",
+             "đo: số ván": per[k][0], "đo: đúng": f"{per[k][1] / per[k][0]:.3f}" if per[k][0] else "-"} for k in sorted(chosen, key=lambda x: -chosen[x][0])]
+    print(pd.DataFrame(rows).to_string(index=False))
     r = hit / n_shape
     print(f"Nửa sau: {n_rounds} ván xét, {n_shape} ván CÓ HÌNH ({n_shape / n_rounds:.1%}); tỉ lệ đúng trên ván có hình = {r:.4f} "
           f"(±2se {2 * math.sqrt(r * (1 - r) / n_shape):.4f}), z so với 50% = {(hit - n_shape / 2) / math.sqrt(n_shape / 4):+.2f}")
