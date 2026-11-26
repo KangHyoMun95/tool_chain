@@ -111,6 +111,61 @@ def _lags(seqs: list[str], a: str, n_perm: int, max_lag: int, seed: int) -> pd.D
     return pd.DataFrame(rows)
 
 
+def _scan_counts(seqs: list[str], kmin: int, kmax: int) -> dict[str, list[int]]:
+    """Mọi đuôi độ dài kmin..kmax trong mọi shoe, GỘP hai chiều ký hiệu: dạng chuẩn = ký hiệu đầu đuôi là 1, còn lại là 2.
+    Kết quả kế tiếp = 1 nếu trùng ký hiệu đầu đuôi. Trả {dạng: [số lần, số lần kết quả kế = 1]}."""
+    out: dict[str, list[int]] = {}
+    for s in seqs:
+        for k in range(kmin, kmax + 1):
+            for i in range(k, len(s)):
+                tail = s[i - k:i]
+                first = tail[0]
+                key = "".join("1" if c == first else "2" for c in tail)
+                e = out.setdefault(key, [0, 0])
+                e[0] += 1
+                e[1] += s[i] == first
+    return out
+
+
+def _scan(seqs: list[str], n_perm: int, kmin: int, kmax: int, seed: int, top: int = 12) -> None:
+    """Quét MỌI hình (không giả định trước hình nào) và so từng hình với dữ liệu xáo trộn trong shoe: hình nào có tỉ lệ 'tiếp theo giống ký hiệu
+    đầu của hình' lệch khỏi xáo trộn. Với M hình, ngưỡng cần vượt ~ Bonferroni (z ≈ 3.7 cho ~250 hình)."""
+    import random
+    rng = random.Random(seed)
+    real = _scan_counts(seqs, kmin, kmax)
+    acc: dict[str, list[float]] = {k: [] for k in real}
+    for _ in range(n_perm):
+        sh = []
+        for s in seqs:
+            c = list(s)
+            rng.shuffle(c)
+            sh.append("".join(c))
+        got = _scan_counts(sh, kmin, kmax)
+        for k in real:
+            n, h = got.get(k, [0, 0])
+            acc[k].append(h / n if n else float("nan"))
+    rows = []
+    for k, (n, h) in real.items():
+        arr = np.array(acc[k], dtype=float)
+        arr = arr[~np.isnan(arr)]
+        if n < 30 or len(arr) < 10 or arr.std(ddof=1) == 0:
+            continue
+        r = h / n
+        z = (r - arr.mean()) / arr.std(ddof=1)
+        rows.append({"hình (1 = ký hiệu đầu)": k, "số lần": n, "kế tiếp = 1": f"{r:.4f}", "xáo trộn (TB)": f"{arr.mean():.4f}", "z": z})
+    if not rows:
+        print("Không đủ dữ liệu để quét hình.")
+        return
+    d = pd.DataFrame(rows)
+    thr = 3.7
+    big = int((d["z"].abs() >= thr).sum())
+    print(f"Đã quét {len(d)} hình (độ dài {kmin}..{kmax}, mỗi hình >= 30 lần). Số hình có |z| >= {thr} (ngưỡng đã tính cho nhiều phép đo): {big}. "
+          f"Nếu dữ liệu ngẫu nhiên, kỳ vọng ≈ {len(d) * 2 * 1e-4:.2f}.")
+    d = d.reindex(d["z"].abs().sort_values(ascending=False).index).head(top)
+    d["z"] = d["z"].map(lambda v: f"{v:+.2f}")
+    print(d.to_string(index=False))
+
+
 def main(df: pd.DataFrame, registry: CategoryRegistry, n_perm: int = 200, max_lag: int = 20, seed: int = 1, shapes: dict[str, str] | None = None) -> None:
     shapes = shapes or SHAPES
     for (lobby, category), cdf in df.groupby(["lobby_name", "category_name"]):
@@ -128,6 +183,8 @@ def main(df: pd.DataFrame, registry: CategoryRegistry, n_perm: int = 200, max_la
         print(pd.DataFrame(rows).to_string(index=False))
         print("\n(2) Cầu bệt: đoạn cùng ký hiệu đã dài L thì có dài thêm 1 không (50% = không thiên lệch):")
         print(_runs_table(seqs).to_string(index=False))
+        print("\n(4) QUÉT MỌI HÌNH (không giả định trước hình nào; gộp hai chiều ký hiệu):")
+        _scan(seqs, n_perm, 3, 8, seed)
         print(f"\n(3) Lặp lại / tuần hoàn: xác suất kết quả giống kết quả cách {1}..{max_lag} ván trước, so với xáo trộn ({n_perm} lần). <<< = |z| >= 3:")
         print(_lags(seqs, a, n_perm, max_lag, seed).to_string(index=False))
     print("\nLưu ý: nhiều dòng cùng lúc, chỉ tin |z| lớn (>= 3~4) và lặp lại ở dữ liệu khác / category khác.")

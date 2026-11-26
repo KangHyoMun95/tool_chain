@@ -22,6 +22,18 @@ def _epoch(ts) -> float:
     return (t.tz_localize("UTC") if t.tzinfo is None else t).timestamp()
 
 
+class SymmetricStats(PatternStats):
+    """PatternStats học hình KHÔNG phụ thuộc ký hiệu: mỗi ván mới cập nhật cả hình gốc lẫn hình đã đổi chỗ hai ký hiệu predictable
+    (BPPB→B cũng được đếm là PBBP→P). Hình có gấp đôi dữ liệu. Chỉ áp dụng khi category có đúng 2 ký hiệu predictable."""
+
+    def add_result(self, before: str, result: str, ts: float | None = None) -> None:
+        super().add_result(before, result, ts)
+        if len(self.predictable) == 2:
+            a, b = self.predictable
+            swap = str.maketrans({a: b, b: a})
+            super().add_result(before.translate(swap), result.translate(swap), ts)
+
+
 def infer_categories(df: pd.DataFrame, registry: CategoryRegistry) -> pd.DataFrame:
     """DB thiếu streams / categories / lobbies: suy category của MỖI stream từ tập ký hiệu result của nó.
 
@@ -44,7 +56,7 @@ def infer_categories(df: pd.DataFrame, registry: CategoryRegistry) -> pd.DataFra
 
 
 def run(df: pd.DataFrame, registry: CategoryRegistry, half_life_minutes: int | None = None, shoe_weight: int = 1,
-        rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",)) -> tuple[pd.DataFrame, int]:
+        rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",), symmetric: bool = False) -> tuple[pd.DataFrame, int]:
     """df đã có cột segment (xem add_segments) và lobby_name / category_name. Trả (bảng mỗi ván có dự đoán, tổng số ván).
 
     half_life_minutes: bán rã trọng số theo độ mới (None = tắt, đúng pattern-v1); shoe_weight: hệ số shoe hiện tại (chỉ khi có half_life).
@@ -58,7 +70,7 @@ def run(df: pd.DataFrame, registry: CategoryRegistry, half_life_minutes: int | N
             log.error("Bỏ qua stream %s: category %r / %r không có file định nghĩa trong config/categories",
                       sid, sdf["lobby_name"].iloc[0], sdf["category_name"].iloc[0])
             continue
-        stats = PatternStats(cfg.predictable, half_life_minutes=half_life_minutes)
+        stats = (SymmetricStats if symmetric else PatternStats)(cfg.predictable, half_life_minutes=half_life_minutes)
         seen = {s: 0 for s in cfg.predictable}                   # lịch sử cộng dồn của stream (cho baseline)
         # Các shoe/đoạn của stream theo thứ tự thời gian của ván đầu; trong đoạn theo round
         for _, seg in sorted(sdf.groupby("segment"), key=lambda kv: kv[1]["created_at"].min()):
@@ -129,7 +141,7 @@ def _by_strength(name: str, r: pd.DataFrame) -> None:
 
 def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False,
          half_life_minutes: int | None = None, shoe_weight: int = 1, since: str = "2026-01-01", assume_category: tuple[str, str] | None = None, infer_category: bool = False,
-         rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",), structure: int = 0, shapes: int = 0, shapes_file: str | None = None) -> None:
+         rule_weights: tuple[float, ...] = (), rules: tuple[str, ...] = ("run",), structure: int = 0, shapes: int = 0, shapes_file: str | None = None, symmetric: bool = False) -> None:
     df = load_sessions(since=since, source=source, refresh=refresh, assume_category=("?", "?") if infer_category else assume_category)
     if infer_category:
         df = infer_categories(df, registry)
@@ -142,14 +154,14 @@ def main(registry: CategoryRegistry, source: str = "file", refresh: bool = False
         from .structure_test import main as structure_test
         structure_test(df, registry, n_perm=structure)
         return
-    r, total = run(df, registry, half_life_minutes, shoe_weight, rule_weights, rules)
+    r, total = run(df, registry, half_life_minutes, shoe_weight, rule_weights, rules, symmetric)
     weighting = f"half-life {half_life_minutes} phút, shoe_weight {shoe_weight}" if half_life_minutes else "tắt (pattern-v1)"
     print(f"{total} ván, {df['stream_id'].nunique()} stream (nguồn: {source}); trọng số theo độ mới: {weighting}\n")
     if not total:
         print("Không có ván nào để backtest: DB trả 0 ván FINISHED có result (từ 2026-01-01), hoặc mọi stream bị bỏ qua vì category không có file trong config/categories. "
               "Kiểm tra DATABASE_URL_READONLY có trỏ đúng DB có dữ liệu không và log ERROR phía trên.")
         return
-    print(pd.DataFrame([_summary("pattern-v1", r, "pattern_pick", total),
+    print(pd.DataFrame([_summary("pattern-v1" + (" (hình không phụ thuộc ký hiệu)" if symmetric else ""), r, "pattern_pick", total),
                         _summary("baseline (nhiều hơn trong lịch sử)", r, "baseline_pick", total),
                         *[_summary(f"luật {n} (riêng)", r, f"rule_{n}", total) for n in rules],
                         *[_summary(f"pattern-v1 + {n} (w={w})", r, f"blend_{n}_{w}", total) for n in rules for w in rule_weights]]).to_string(index=False))
