@@ -56,6 +56,20 @@ def main() -> int:
         if args.infer_category and (args.source != "db" or args.assume_category):
             print("--infer-category cần --source db và không dùng cùng --assume-category", file=sys.stderr)
             return 1
+        if args.shapes_file:
+            from pathlib import Path
+            from src.patterns.shapes_test import load_shapes
+            if not args.shapes:
+                print("--shapes-file cần đi kèm --shapes N (vd --shapes 200)", file=sys.stderr)
+                return 1
+            if not Path(args.shapes_file).is_file():
+                print(f"Không thấy file hình: {args.shapes_file} (tính từ thư mục hiện tại). Dùng file mẫu: --shapes-file shapes.example.txt", file=sys.stderr)
+                return 1
+            try:
+                load_shapes(args.shapes_file)               # kiểm tra định dạng TRƯỚC khi tải dữ liệu từ DB
+            except ValueError as e:
+                print(e, file=sys.stderr)
+                return 1
         assume = None
         if args.assume_category:
             if args.source != "db" or args.assume_category.count("|") != 1:
