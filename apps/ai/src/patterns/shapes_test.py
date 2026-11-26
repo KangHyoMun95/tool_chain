@@ -166,6 +166,50 @@ def _scan(seqs: list[str], n_perm: int, kmin: int, kmax: int, seed: int, top: in
     print(d.to_string(index=False))
 
 
+def _canon(tail: str) -> tuple[str, str]:
+    first = tail[0]
+    return "".join("1" if c == first else "2" for c in tail), first
+
+
+def _validate(timed: list[tuple[object, str]], kmin: int = 3, kmax: int = 8, min_n: int = 50, min_z: float = 2.5) -> None:
+    """KIỂM CHỨNG NGOÀI MẪU, chỉ trên ván CÓ HÌNH. Chia shoe theo thời gian: nửa đầu = học, nửa sau = đo.
+
+    Học: mọi hình (gộp hai chiều, độ dài kmin..kmax) có >= min_n lần và |z nhị thức so 50%| >= min_z; ghi hướng (kế tiếp = ký hiệu đầu hay khác).
+    Đo: ở nửa sau, mỗi ván mà đuôi khớp một hình đã chọn thì dự đoán theo hướng đã học (nhiều hình cùng khớp ⇒ lấy hình |z| học lớn nhất);
+    ván không khớp hình nào KHÔNG được tính. Báo số ván có hình, tỉ lệ đúng, z so với 50%.
+    """
+    timed = sorted(timed, key=lambda t: t[0])
+    cut = len(timed) // 2
+    train, test = [s for _, s in timed[:cut]], [s for _, s in timed[cut:]]
+    chosen: dict[str, tuple[float, bool]] = {}                    # dạng -> (|z|, kế tiếp = ký hiệu đầu?)
+    for key, (n, h) in _scan_counts(train, kmin, kmax).items():
+        if n >= min_n:
+            z = (h - n / 2) / math.sqrt(n / 4)
+            if abs(z) >= min_z:
+                chosen[key] = (abs(z), h / n > 0.5)
+    print(f"Học ở nửa đầu ({len(train)} shoe), đo ở nửa sau ({len(test)} shoe). Hình được chọn từ nửa đầu (n >= {min_n}, |z| >= {min_z}): {len(chosen)}.")
+    n_rounds = n_shape = hit = 0
+    for s in test:
+        for i in range(kmin, len(s)):
+            n_rounds += 1
+            best = None
+            for k in range(kmin, min(kmax, i) + 1):
+                key, first = _canon(s[i - k:i])
+                c = chosen.get(key)
+                if c and (best is None or c[0] > best[0]):
+                    best = (c[0], c[1], first)
+            if best:
+                n_shape += 1
+                pred_first = best[1]
+                hit += (s[i] == best[2]) == pred_first
+    if not n_shape:
+        print("Nửa sau không có ván nào khớp hình đã chọn.")
+        return
+    r = hit / n_shape
+    print(f"Nửa sau: {n_rounds} ván xét, {n_shape} ván CÓ HÌNH ({n_shape / n_rounds:.1%}); tỉ lệ đúng trên ván có hình = {r:.4f} "
+          f"(±2se {2 * math.sqrt(r * (1 - r) / n_shape):.4f}), z so với 50% = {(hit - n_shape / 2) / math.sqrt(n_shape / 4):+.2f}")
+
+
 def main(df: pd.DataFrame, registry: CategoryRegistry, n_perm: int = 200, max_lag: int = 20, seed: int = 1, shapes: dict[str, str] | None = None) -> None:
     shapes = shapes or SHAPES
     for (lobby, category), cdf in df.groupby(["lobby_name", "category_name"]):
@@ -183,6 +227,10 @@ def main(df: pd.DataFrame, registry: CategoryRegistry, n_perm: int = 200, max_la
         print(pd.DataFrame(rows).to_string(index=False))
         print("\n(2) Cầu bệt: đoạn cùng ký hiệu đã dài L thì có dài thêm 1 không (50% = không thiên lệch):")
         print(_runs_table(seqs).to_string(index=False))
+        print("\n(5) KIỂM CHỨNG NGOÀI MẪU, chỉ tính ván có hình (học nửa đầu theo thời gian, đo nửa sau):")
+        timed = [(g["created_at"].min(), "".join(r for r in g.sort_values("road_count")["result"] if r in cfg.results and r not in set(cfg.ignore_in_pattern)))
+                 for _, g in cdf.groupby("segment")]
+        _validate([(t, q) for t, q in timed if len(q) > 3])
         print("\n(4) QUÉT MỌI HÌNH (không giả định trước hình nào; gộp hai chiều ký hiệu):")
         _scan(seqs, n_perm, 3, 8, seed)
         print(f"\n(3) Lặp lại / tuần hoàn: xác suất kết quả giống kết quả cách {1}..{max_lag} ván trước, so với xáo trộn ({n_perm} lần). <<< = |z| >= 3:")
