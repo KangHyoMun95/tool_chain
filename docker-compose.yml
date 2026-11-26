@@ -149,6 +149,9 @@ services:
       AI_CONSUMER_NAME: ai-worker-0
       LOG_LEVEL: ${AI_LOG_LEVEL:-INFO}
       AI_HISTORY_DB_WINDOW_HOURS: ${AI_HISTORY_DB_WINDOW_HOURS:-6}
+      AI_SHAPE_WEIGHT: ${AI_SHAPE_WEIGHT:-0.3}
+      AI_SHAPE_Z: ${AI_SHAPE_Z:-3.0}
+      AI_SHAPE_MIN_N: ${AI_SHAPE_MIN_N:-30}
     depends_on:
       redis:
         condition: service_healthy
