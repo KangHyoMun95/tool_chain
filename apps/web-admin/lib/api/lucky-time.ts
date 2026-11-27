@@ -14,7 +14,7 @@ export const TEMP_NO_HU_CATEGORIES = [
 /** Giá trị bộ lọc / dropdown: null = "Tất cả" (dùng chung cho mọi category của lobby, category_id NULL trong DB). */
 export type CategoryFilter = string | null;
 
-export interface LuckyTimeItem extends LuckyTimeRow {
+export interface LuckyTimeItem extends Omit<LuckyTimeRow, 'game'> {
   lucky_time_id: string;
   category_id: string | null;
 }
@@ -56,10 +56,11 @@ export class LuckyTimeApiNotReadyError extends Error {
 }
 
 /**
- * STUB: sẽ gọi POST import (thay lịch đang hiệu lực của category: replaced_at = now() rồi thêm dòng mới; category null = chỉ thay dòng dùng chung).
+ * STUB: sẽ gọi POST import. Mỗi dòng mang `game` (tên category, null = dùng chung); API đổi tên sang category_id và, với MỖI game có trong file,
+ * thay lịch đang hiệu lực của game đó (replaced_at = now() rồi thêm dòng mới; null = chỉ thay dòng dùng chung); game không có trong file giữ nguyên.
  * Hiện luôn ném LuckyTimeApiNotReadyError.
  */
-export async function importLuckyTimes(_category: CategoryFilter, _rows: LuckyTimeRow[]): Promise<void> {
+export async function importLuckyTimes(_rows: LuckyTimeRow[]): Promise<void> {
   throw new LuckyTimeApiNotReadyError();
 }
 

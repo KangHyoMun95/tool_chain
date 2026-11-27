@@ -5,21 +5,20 @@ import { Alert, App, Button, Space, Table, Tag, Typography, Upload } from 'antd'
 import type { ColumnsType } from 'antd/es/table';
 import { InboxOutlined } from '@ant-design/icons';
 import { LUCKY_TIME_COLUMNS, type LuckyTimeColumnKey, type LuckyTimeParsed } from '@toolhackchain/shared';
-import { importLuckyTimes, LuckyTimeApiNotReadyError, TEMP_NO_HU_CATEGORIES, type CategoryFilter } from '@/lib/api/lucky-time';
-import { CategorySelect } from './category-select';
+import { importLuckyTimes, LuckyTimeApiNotReadyError, TEMP_NO_HU_CATEGORIES } from '@/lib/api/lucky-time';
 
 type PreviewRow = LuckyTimeParsed['preview'][number];
 const KEYS = Object.keys(LUCKY_TIME_COLUMNS) as LuckyTimeColumnKey[];
+// TẠM THỜI: tên game hợp lệ lấy từ danh sách category tạm; khi có API thì lấy từ GET /categories?lobby_id=NO_HU_LOBBY_ID.
+const GAME_NAMES = TEMP_NO_HU_CATEGORIES.map((c) => c.name);
 
 export function LuckyTimeImport() {
   const { message, modal } = App.useApp();
-  const [category, setCategory] = useState<CategoryFilter>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [parsed, setParsed] = useState<LuckyTimeParsed | null>(null);
   const [reading, setReading] = useState(false);
   const [importing, setImporting] = useState(false);
 
-  const categoryLabel = category === null ? 'Tất cả (dùng chung)' : TEMP_NO_HU_CATEGORIES.find((c) => c.id === category)?.name ?? '';
   const fileIssues = parsed?.issues.filter((i) => i.row === null || parsed.preview.length === 0) ?? [];
   const blocked = !parsed || parsed.issues.length > 0 || parsed.rows.length === 0;
 
@@ -30,7 +29,7 @@ export function LuckyTimeImport() {
     try {
       // Tải thư viện đọc bảng tính khi cần (không đưa vào bundle trang khác).
       const { readLuckyTimeFile } = await import('@toolhackchain/shared/lucky-time-file');
-      setParsed(readLuckyTimeFile(await file.arrayBuffer()));
+      setParsed(readLuckyTimeFile(await file.arrayBuffer(), GAME_NAMES));
     } finally {
       setReading(false);
     }
@@ -38,16 +37,16 @@ export function LuckyTimeImport() {
 
   function confirmImport() {
     if (!parsed || blocked) return;
+    const games = [...new Set(parsed.rows.map((r) => r.data.game ?? 'Tất cả (dùng chung)'))];
     modal.confirm({
-      title: `Thay thế lịch của "${categoryLabel}"?`,
-      content: `Import sẽ THAY THẾ lịch lucky time đang hiệu lực của "${categoryLabel}" bằng ${parsed.rows.length} dòng trong file ${fileName}.`
-        + (category === null ? ' Chỉ lịch dùng chung bị thay; lịch riêng của từng category giữ nguyên.' : ''),
+      title: `Thay thế lịch của ${games.length} game?`,
+      content: `Import sẽ THAY THẾ lịch lucky time đang hiệu lực của: ${games.join(', ')} bằng ${parsed.rows.length} dòng trong file ${fileName}. Game không có trong file giữ nguyên.`,
       okText: 'Import',
       cancelText: 'Hủy',
       onOk: async () => {
         setImporting(true);
         try {
-          await importLuckyTimes(category, parsed.rows.map((r) => r.data));
+          await importLuckyTimes(parsed.rows.map((r) => r.data));
           message.success('Đã import lịch.');
         } catch (e) {
           if (e instanceof LuckyTimeApiNotReadyError) message.warning(e.message);
@@ -81,17 +80,11 @@ export function LuckyTimeImport() {
 
   return (
     <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-      <Space wrap>
-        <span>Category:</span>
-        <CategorySelect value={category} onChange={setCategory} />
-      </Space>
       <Alert
         type="warning"
         showIcon
-        message={`Import sẽ THAY THẾ lịch hiện tại của "${categoryLabel}".`}
-        description={category === null
-          ? 'Chọn "Tất cả" chỉ thay lịch dùng chung; lịch riêng của từng category không bị đụng tới. Lịch cũ không bị xóa, chỉ được đánh dấu đã thay thế.'
-          : 'Lịch cũ của category này không bị xóa, chỉ được đánh dấu đã thay thế. Lịch dùng chung không bị đụng tới.'}
+        message="Import sẽ THAY THẾ lịch hiện tại của MỌI game có trong file."
+        description={`Cột "Game" của mỗi dòng là tên category (${GAME_NAMES.join(', ')}) hoặc "Tất cả" (lịch dùng chung). Game không có trong file giữ nguyên. Lịch cũ không bị xóa, chỉ được đánh dấu đã thay thế.`}
       />
       <Upload.Dragger
         accept=".xlsx,.xls,.csv,.ods,.xlsm"

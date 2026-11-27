@@ -3,8 +3,9 @@
 // (dòng đầu là header) và trả các dòng đã tách giá trị + danh sách lỗi (số dòng, cột, lý do). Đọc file thành bảng: `lucky-time-file.ts`.
 // Dùng ở trình duyệt (web-admin, xem trước) và sẽ dùng lại ở API (import thật).
 
-/** Tên cột trong file = tên cột của trang danh sách (so khớp không phân biệt hoa / thường và khoảng trắng thừa). Cả 6 cột bắt buộc có mặt. */
+/** Tên cột trong file = tên cột của trang danh sách (so khớp không phân biệt hoa / thường và khoảng trắng thừa). Cả 7 cột bắt buộc có mặt. Cột "Game" = TÊN category (so khớp sau chuẩn hóa), hoặc "Tất cả" = lịch dùng chung. */
 export const LUCKY_TIME_COLUMNS = {
+  game: "Game",
   time: "Thời gian dự đoán",
   confidence: "Khả năng nổ hũ",
   indicator: "Xu hướng hiện tại",
@@ -16,6 +17,8 @@ export type LuckyTimeColumnKey = keyof typeof LUCKY_TIME_COLUMNS;
 
 /** Một dòng đã tách, các trường trùng tên cột của bảng `lucky_time`. */
 export interface LuckyTimeRow {
+  /** Tên game (category) như trong danh sách `games` truyền vào parser; null = "Tất cả" (dùng chung, category_id NULL). Khi không truyền `games` là chữ gốc của file. */
+  game: string | null;
   time_lucky: string; // "HH:MM"
   confidence: number; // 0..100, số nguyên
   indicator: string | null;
@@ -124,14 +127,19 @@ function parseRtp(raw: string): { ok: true; value: number } | { ok: false; reaso
   return { ok: true, value: v };
 }
 
+/** Giá trị cột Game nghĩa là lịch dùng chung. */
+export const LUCKY_TIME_ALL_GAMES = "Tất cả";
+
 const KEYS = Object.keys(LUCKY_TIME_COLUMNS) as LuckyTimeColumnKey[];
 
 /**
  * Tách bảng text thành các dòng lucky time. `table[0]` là header (dòng đầu tiên có ô không trống; dòng trống phía trên được bỏ qua nhưng vẫn tính vào số dòng).
  * firstRow: số dòng (trong file) của `table[0]`, mặc định 1.
+ * games: tên các category hợp lệ (nguồn: API / danh sách category). Có truyền ⇒ cột Game phải khớp một tên (không phân biệt hoa / thường, khoảng trắng thừa) hoặc "Tất cả", `data.game` là tên chuẩn trong danh sách; không khớp ⇒ lỗi dòng.
+ * Trùng giờ được xét RIÊNG cho từng game.
  * Dòng trống hoàn toàn bị bỏ qua. Hai dòng trùng giờ ⇒ dòng sau báo lỗi. Thiếu cột bắt buộc ⇒ lỗi cả file (rows rỗng).
  */
-export function parseLuckyTimeTable(table: string[][], firstRow = 1): LuckyTimeParsed {
+export function parseLuckyTimeTable(table: string[][], firstRow = 1, games?: readonly string[]): LuckyTimeParsed {
   const out: LuckyTimeParsed = { rows: [], issues: [], preview: [] };
   const blank = (r: string[]) => r.every((c) => (c ?? "").toString().trim() === "");
   const headerAt = table.findIndex((r) => !blank(r));
@@ -157,7 +165,8 @@ export function parseLuckyTimeTable(table: string[][], firstRow = 1): LuckyTimeP
     return out;
   }
 
-  const seenTime = new Map<string, number>();
+  const gameByNorm = new Map((games ?? []).map((g) => [norm(g), g]));
+  const seenTime = new Map<string, number>(); // khóa: game + giờ
   let dataRows = 0;
   for (let i = headerAt + 1; i < table.length; i++) {
     const cells = table[i];
@@ -182,14 +191,33 @@ export function parseLuckyTimeTable(table: string[][], firstRow = 1): LuckyTimeP
     }
 
     const data: Partial<LuckyTimeRow> = { indicator: raw.indicator === "" ? null : raw.indicator };
+    let gameKey: string | null = null;
+    if (raw.game !== "") {
+      const g = norm(raw.game);
+      if (g === norm(LUCKY_TIME_ALL_GAMES)) {
+        data.game = null;
+        gameKey = "";
+      } else if (!games) {
+        data.game = raw.game;
+        gameKey = g;
+      } else if (gameByNorm.has(g)) {
+        data.game = gameByNorm.get(g)!;
+        gameKey = g;
+      } else {
+        fail("game", `Game không tồn tại: "${raw.game}" (hợp lệ: ${[...games, LUCKY_TIME_ALL_GAMES].map((x) => `"${x}"`).join(", ")})`);
+      }
+    }
     if (raw.time !== "") {
       const r = parseTime(raw.time);
       if (!r.ok) fail("time", r.reason);
       else {
         data.time_lucky = r.value;
-        const prev = seenTime.get(r.value);
-        if (prev !== undefined) fail("time", `Trùng giờ ${r.value} với dòng ${prev}`);
-        else seenTime.set(r.value, rowNo);
+        if (gameKey !== null) {
+          const key = `${gameKey}|${r.value}`;
+          const prev = seenTime.get(key);
+          if (prev !== undefined) fail("time", `Trùng giờ ${r.value} (cùng game) với dòng ${prev}`);
+          else seenTime.set(key, rowNo);
+        }
       }
     }
     if (raw.confidence !== "") {
