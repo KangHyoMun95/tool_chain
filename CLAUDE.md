@@ -58,9 +58,11 @@ tool_chain/
 │   └── web-portal/          # Next.js — CHỈ UI (User)
 ├── config/categories/       # file định nghĩa kết quả của từng category (*.json), api + ai nạp lúc khởi động, đóng vào image (xem mục File định nghĩa category)
 ├── db/migrations/           # Flyway SQL migration (nguồn sự thật của schema)
+├── vendor/                  # tarball thư viện cài từ file: (xlsx-0.20.3.tgz); Dockerfile api / web-admin / web-portal COPY vendor trước khi pnpm install
 ├── packages/shared/src/     # type/contract dùng chung TS
 │   ├── realtime.ts          # schema event realtime + RedisKeys
 │   ├── ai.ts                # contract 3 stream dự đoán (predict:requests, ai:results, predict:results)
+│   ├── lucky-time.ts        # parse thuần lịch lucky time (NỔ HŨ); lucky-time-file.ts = đọc file xlsx/xls/csv (subpath, dùng SheetJS ở vendor/)
 │   └── settle.ts            # contract stream settle:requests (api → api, hoàn tiền)
 ├── docker-compose.yml
 └── .env
@@ -220,6 +222,26 @@ Mỗi category một file (tên file tùy ý), nằm trong repo và **đóng và
 
 ---
 
+## Lobby NỔ HŨ (lucky time, không có crawler / stream)
+
+Lobby thứ hai kiểu khác: **không có stream, không có AI / crawler**. HOST import lịch "lucky time" từ file Excel, user chọn category rồi vào trang chi tiết riêng. **Mới có migration, portal (khung trang), web-admin (dữ liệu giả); API (đọc lịch, import, trừ phí) CHƯA làm.**
+- **Migration `V6__no_hu_lobby.sql`** (idempotent: `IF NOT EXISTS` / `ON CONFLICT DO NOTHING`, an toàn khi chạy out-of-order): lobby "NỔ HŨ" với `lobby_id` cố định `NO_HU_LOBBY_ID = 7e475c64-eec2-4efc-997d-877dd4b53d0b` (`packages/shared/src/auth.ts`, **phải khớp migration**, không đổi), 2 category "Phi công" và "Mèo may mắn", bảng `lucky_time` và `prediction_user_lucky` (xem **Data model**). Tên lobby đã có với UUID khác ⇒ migration dừng bằng `RAISE EXCEPTION` (không để hằng số lệch DB âm thầm). Không có file `config/categories/*.json` cho category của lobby này (không có tick nên không cần).
+- **Portal:** nhận diện bằng `NO_HU_LOBBY_ID` (không so tên). Thẻ category của lobby này (`LobbyView`) dẫn thẳng tới `/no-hu/[categoryId]` (`NoHuCategoryView`: header + drawer như mọi trang, nội dung hiện là placeholder), không hiện số bàn; `/categories/:id` của category thuộc lobby này tự chuyển sang `/no-hu/:id`, và `/no-hu/:id` của category lobby khác chuyển về `/categories/:id`. Luồng các lobby khác không đổi.
+- **Web-admin (chỉ HOST):** menu "Nổ hũ" gồm `/host/no-hu` (danh sách lịch, cột: Thời gian dự đoán (tăng dần mặc định) | Khả năng nổ hũ | Xu hướng hiện tại | Chu kỳ dự kiến | Thời điểm đẹp | Biến động RTP; lọc category, "Tất cả" = dùng chung) và `/host/no-hu/import` (chọn category, chọn file, đọc ngay ở trình duyệt, bảng xem trước đánh dấu dòng lỗi; nút Import bị chặn khi còn dòng lỗi). **`apps/web-admin/lib/api/lucky-time.ts` là dữ liệu giả + hàm stub** (`fetchLuckyTimes`, `importLuckyTimes` ném `LuckyTimeApiNotReadyError`); danh sách category của bộ lọc (`TEMP_NO_HU_CATEGORIES`) là dữ liệu tạm, sẽ lấy từ API và khóa theo `category_id`, **không dùng tên làm khóa**.
+- **Quy tắc import (phần thực thi nằm ở API, chưa làm):** import cho category X ⇒ các dòng đang hiệu lực của X (`category_id = X AND replaced_at IS NULL`) được `UPDATE ... SET replaced_at = now()` rồi thêm dòng mới; **KHÔNG `DELETE`**. Import với category NULL ("Tất cả") ⇒ chỉ thay các dòng dùng chung (`category_id IS NULL`), không đụng dòng riêng của category nào. Một lần import = một transaction. Lịch có hiệu lực trong ngày và lặp lại hằng ngày cho tới lần import tiếp theo (`time_lucky` là giờ trong ngày, không có ngày).
+- **Định dạng file import** (parser `packages/shared/src/lucky-time.ts`, hàm thuần `parseLuckyTimeTable`; đọc file `lucky-time-file.ts` → `readLuckyTimeFile`, subpath `@toolhackchain/shared/lucky-time-file`, **không** export từ index để nơi không đọc file không bị kéo SheetJS): xlsx, xls, csv (UTF-8, tự nhận `,` / `;`; csv giữ nguyên chuỗi gốc), ods / xlsm theo khả năng của thư viện; sheet đầu tiên, tối đa 5MB và 2000 dòng dữ liệu. Dòng header (dòng đầu có ô không trống) có đủ 6 cột sau, so khớp không phân biệt hoa / thường và khoảng trắng thừa; thiếu cột hoặc lặp cột ⇒ lỗi cả file:
+  - `Thời gian dự đoán`: `0:00`, `00:00`, `1:15` (ô giờ kiểu số của Excel cũng được) → `time_lucky` (HH:MM, giây phải là 00); hai dòng trùng giờ ⇒ dòng sau lỗi.
+  - `Khả năng nổ hũ`: `99%` hoặc `99` → `confidence` (số nguyên 0..100; `99.5` là lỗi).
+  - `Xu hướng hiện tại`: text giữ nguyên → `indicator` (được để trống ⇒ NULL).
+  - `Chu kỳ dự kiến`: `20 - 30 vòng` → `circle_est_from / to`; dấu `-`, `–`, `—`, `~`, `đến`, có / không khoảng trắng quanh dấu (`20-30`, `20 ~ 30`); "đầu" > "sau" ⇒ lỗi.
+  - `Thời điểm đẹp`: `1 - 4 phút` → `range_lucky_time_from / to` (`trace_next_circle` NULL); `5 vòng tiếp theo` → `trace_next_circle` (range NULL); đơn vị khác ⇒ lỗi.
+  - `Biến động RTP`: `99.2%`, `99,2`, `99.2` → `fluctuations_rtp` (0..999.99, làm tròn 2 chữ số thập phân).
+  - Mọi dòng lỗi được giữ lại kèm **số dòng trong file + tên cột + lý do** (không bỏ qua im lặng); dòng trống hoàn toàn bỏ qua. Ô Excel đọc theo chuỗi ĐÃ ĐỊNH DẠNG (ô `99%` ra `99%`).
+- **Thư viện đọc file: SheetJS `xlsx` 0.20.3** (Apache-2.0, không có dependency runtime, không có install script). **KHÔNG dùng bản npm `xlsx` 0.18.5** (bản cuối trên registry, dính CVE-2023-30533 prototype pollution và CVE-2024-22363 ReDoS; sửa ở 0.19.3 / 0.20.2, chỉ phát hành ở cdn.sheetjs.com). Tarball nằm trong repo: `vendor/xlsx-0.20.3.tgz` (sha256 `8dc73fc3b00203e72d176e85b50938627c7b086e607c682e8d3c22c02bb99fe8`, nguồn `https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz`), khai báo `"xlsx": "file:../../vendor/xlsx-0.20.3.tgz"` ở `packages/shared`; Dockerfile api / web-admin / web-portal `COPY vendor vendor` trước `pnpm install` nên build không phụ thuộc CDN. Nâng cấp = tải bản mới, kiểm tra hash / CVE, thay file + dependency + lockfile.
+- **Chưa chốt (KHÔNG tự quyết khi làm API):** khi category X có **cả dòng riêng và dòng dùng chung** thì user thấy gì (chỉ dòng riêng? gộp cả hai, trùng giờ thì ưu tiên bên nào? chỉ dùng chung khi X chưa có dòng riêng?). Chưa chốt thêm: cách trừ `PREDICTION_FEE` cho `prediction_user_lucky` (user nào được xem lucky time nào, lúc nào bị trừ, có hoàn tiền không), và giới hạn quyền của ADMIN (hiện chỉ HOST).
+
+---
+
 ## Vai trò & điểm
 
 | Vai trò | Quyền với cấp dưới | Điểm |
@@ -248,6 +270,8 @@ Mỗi category một file (tên file tùy ý), nằm trong repo và **đóng và
 | `stream_connections` | stream_connection_id, user_id, stream_id, opened_at, last_ping_at, closed_at, close_reason | nhật ký kết nối SSE tham gia stream (V10); close_reason: `CLIENT_CLOSED` \| `PING_FAILED` \| `INSUFFICIENT_BALANCE` \| `SESSION_REVOKED` \| `SERVER_SHUTDOWN` \| `SERVER_RESTART`. Bảng `stream_participants` đã xóa (V11) |
 | `prediction_subscriptions` | prediction_subscription_id, user_id, prediction_id, fee_amount, delivered_at, refunded_at, refund_waived_at, created_at | unique (user_id, prediction_id); `delivered_at` = đẩy pick thành công (best effort) |
 | `job_configs` | type (PK, text), value (integer, nullable), unit (text), updated_at | V4 (dòng AI + tắt job dọn dữ liệu: V5): cấu hình chạy đọc lại định kỳ, dùng CHUNG cho mọi job / service (cùng schema với job dọn dữ liệu); không có CHECK, sai thì người đọc log WARN và dùng mặc định. AI: `AI_HALF_LIFE` (unit `minute`\|`hour`, NULL = tắt trọng số, mặc định khi thiếu / sai 60 phút), `AI_SHOE_WEIGHT` (unit `times`, số nguyên ≥ 1, mặc định 5), đọc mỗi 60s. **User DB chỉ đọc của AI cần `GRANT SELECT ON job_configs TO ai_readonly;`** |
+| `lucky_time` | lucky_time_id, category_id (NULL = dùng chung), time_lucky (`time`), confidence (0..100), indicator, circle_est_from / to, range_lucky_time_from / to (phút, cùng NULL hoặc cùng có), trace_next_circle, fluctuations_rtp (`numeric(5,2)`), replaced_at, created_at, updated_at | V6, lobby NỔ HŨ: lịch lucky time do HOST import. `replaced_at IS NULL` = đang hiệu lực; index `(category_id, time_lucky) WHERE replaced_at IS NULL` |
+| `prediction_user_lucky` | prediction_user_lucky_id, user_id, lucky_time_id, fee_amount (BIGINT > 0, cùng kiểu `prediction_subscriptions.fee_amount`), created_at | V6: user đã trả phí xem một lucky time; unique (user_id, lucky_time_id). Phí lấy từ `PREDICTION_FEE`; phần trừ tiền làm cùng API (chưa có) |
 | `transaction_daily_summaries` | user_id, transaction_type (`CHARGE` \| `REFUND`), day, tx_count, total_amount, created_at, updated_at | PK (user_id, transaction_type, day); tổng hợp giao dịch đã bị CLEAR_HISTORY xóa |
 | `transactions` | transaction_id, user_id, predictions_subscriptions_id (nullable), transaction_type, amount, balance_before, balance_after, created_by, created_at | |
 

@@ -6,6 +6,7 @@ import { App, Dropdown, Spin, Tag } from 'antd';
 import {
   DashboardOutlined,
   DollarOutlined,
+  GiftOutlined,
   KeyOutlined,
   LogoutOutlined,
   SafetyCertificateOutlined,
@@ -25,6 +26,15 @@ function menuForRole(role: Role): MenuDataItem[] {
     return [
       { path: '/host/dashboard', name: 'Dashboard', icon: <DashboardOutlined /> },
       { path: '/host/admins', name: 'Quản lý người dùng', icon: <TeamOutlined /> },
+      {
+        path: '/host/no-hu-group',
+        name: 'Nổ hũ',
+        icon: <GiftOutlined />,
+        children: [
+          { path: '/host/no-hu', name: 'Lịch lucky time' },
+          { path: '/host/no-hu/import', name: 'Import lịch' },
+        ],
+      },
     ];
   }
   if (role === ROLE.ADMIN) {

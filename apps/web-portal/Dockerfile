@@ -15,6 +15,8 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL \
     NEXT_TELEMETRY_DISABLED=1
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/shared/package.json packages/shared/
+# SheetJS (xlsx) cài từ tarball trong repo (khai báo file: ở packages/shared): build không phụ thuộc CDN
+COPY vendor vendor
 COPY apps/web-portal/package.json apps/web-portal/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter @toolhackchain/web-portal...

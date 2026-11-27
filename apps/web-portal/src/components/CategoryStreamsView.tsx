@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { NO_HU_LOBBY_ID } from "@toolhackchain/shared";
 import { useApi } from "@/src/hooks/use-api";
 import { useI18n } from "@/src/i18n/provider";
 import { getCategory, listStreams } from "@/src/lib/api/catalog";
@@ -16,7 +18,13 @@ import { AppShell } from "./shell/AppShell";
 
 export function CategoryStreamsView({ categoryId }: { categoryId: string }) {
   const { t } = useI18n();
+  const router = useRouter();
   const category = useApi(() => getCategory(categoryId), [categoryId]);
+  // Category của lobby NỔ HŨ không có bàn: link /categories/:id gõ tay cũng đưa sang trang chi tiết riêng.
+  const noHu = category.status === "success" && category.data.lobbyId === NO_HU_LOBBY_ID;
+  useEffect(() => {
+    if (noHu) router.replace(`/no-hu/${categoryId}`);
+  }, [noHu, categoryId, router]);
   const streams = useApi(() => listStreams(categoryId), [categoryId]);
   const stats = useApi(() => fetchCategoryStreamStats(categoryId), [categoryId]);
   const me = useApi(getMe, []);
@@ -50,7 +58,7 @@ export function CategoryStreamsView({ categoryId }: { categoryId: string }) {
   }, [streams, stats]);
 
   let body;
-  if (category.status === "loading") body = <><PageBannerSkeleton /><StreamGridSkeleton /></>;
+  if (category.status === "loading" || noHu) body = <><PageBannerSkeleton /><StreamGridSkeleton /></>;
   else if (category.status === "error") {
     body = category.error.status === 404 || category.error.status === 400
       ? <NotFoundView />

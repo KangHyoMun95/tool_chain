@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./lucky-time-file": {
+      "types": "./dist/lucky-time-file.d.ts",
+      "default": "./dist/lucky-time-file.js"
     }
   },
   "files": ["dist"],
@@ -18,5 +22,8 @@
   },
   "devDependencies": {
     "typescript": "^5.4.5"
+  },
+  "dependencies": {
+    "xlsx": "file:../../vendor/xlsx-0.20.3.tgz"
   }
 }

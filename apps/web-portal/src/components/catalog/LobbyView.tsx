@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { NO_HU_LOBBY_ID } from "@toolhackchain/shared";
 import { useApi } from "@/src/hooks/use-api";
 import { useI18n } from "@/src/i18n/provider";
 import { listCategories, listLobbies } from "@/src/lib/api/catalog";
@@ -40,8 +41,9 @@ export function LobbyView({ lobbyId }: { lobbyId: string }) {
                     key={category.id}
                     kind="categories"
                     name={category.name}
-                    subtitle={t("categories.tableCount", { count: category.streamCount })}
-                    href={`/categories/${category.id}`}
+                    // Lobby NỔ HŨ không có bàn: vào thẳng trang chi tiết riêng, không hiện số bàn.
+                    subtitle={lobbyId === NO_HU_LOBBY_ID ? t("categories.noHuSubtitle") : t("categories.tableCount", { count: category.streamCount })}
+                    href={lobbyId === NO_HU_LOBBY_ID ? `/no-hu/${category.id}` : `/categories/${category.id}`}
                     index={i}
                     total={categories.data.length}
                     clicked={clicked === category.id}

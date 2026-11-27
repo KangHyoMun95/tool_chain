@@ -7,6 +7,8 @@ WORKDIR /repo
 FROM base AS build
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
 COPY packages/shared/package.json packages/shared/
+# SheetJS (xlsx) cài từ tarball trong repo (khai báo file: ở packages/shared): build không phụ thuộc CDN
+COPY vendor vendor
 COPY apps/api/package.json apps/api/
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile --filter @toolhackchain/api...
