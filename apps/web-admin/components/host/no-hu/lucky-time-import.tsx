@@ -84,7 +84,7 @@ export function LuckyTimeImport() {
         type="warning"
         showIcon
         message="Import sẽ THAY THẾ lịch hiện tại của MỌI game có trong file."
-        description={`Cột "Game" của mỗi dòng là tên category (${GAME_NAMES.join(', ')}) hoặc "Tất cả" (lịch dùng chung). Game không có trong file giữ nguyên. Lịch cũ không bị xóa, chỉ được đánh dấu đã thay thế.`}
+        description={`Cột "Tên game" của mỗi dòng là tên category (${GAME_NAMES.join(', ')}) hoặc "Tất cả" (lịch dùng chung). Game không có trong file giữ nguyên. Lịch cũ không bị xóa, chỉ được đánh dấu đã thay thế.`}
       />
       <Upload.Dragger
         accept=".xlsx,.xls,.csv,.ods,.xlsm"

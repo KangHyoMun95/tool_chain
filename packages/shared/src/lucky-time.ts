@@ -3,9 +3,9 @@
 // (dòng đầu là header) và trả các dòng đã tách giá trị + danh sách lỗi (số dòng, cột, lý do). Đọc file thành bảng: `lucky-time-file.ts`.
 // Dùng ở trình duyệt (web-admin, xem trước) và sẽ dùng lại ở API (import thật).
 
-/** Tên cột trong file = tên cột của trang danh sách (so khớp không phân biệt hoa / thường và khoảng trắng thừa). Cả 7 cột bắt buộc có mặt. Cột "Game" = TÊN category (so khớp sau chuẩn hóa), hoặc "Tất cả" = lịch dùng chung. */
+/** Tên cột trong file = tên cột của trang danh sách (so khớp không phân biệt hoa / thường và khoảng trắng thừa). Cả 7 cột bắt buộc có mặt. Cột "Tên game" = TÊN category (so khớp sau chuẩn hóa), hoặc "Tất cả" = lịch dùng chung. */
 export const LUCKY_TIME_COLUMNS = {
-  game: "Game",
+  game: "Tên game",
   time: "Thời gian dự đoán",
   confidence: "Khả năng nổ hũ",
   indicator: "Xu hướng hiện tại",
