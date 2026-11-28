@@ -15,12 +15,12 @@ import { LuckyTrendChart } from "./LuckyTrendChart";
 import { NextRoundCountdown } from "./NextRoundCountdown";
 
 /** Phần phân tích của MỘT dòng lucky time: key theo dòng nên sang dòng mới thì trạng thái "đã phân tích" tự reset. */
-function Board({ categoryId, win }: { categoryId: string; win: LuckyWindow }) {
+function Board({ categoryId, win, onStale }: { categoryId: string; win: LuckyWindow; onStale: () => void }) {
   const [details, setDetails] = useState<LuckyDetails | null>(win.details);
   return (
     <div className="grid w-full grid-cols-1 gap-3.5 lg:grid-cols-12">
       <HudCard glow className="p-5 sm:p-6 lg:col-span-5">
-        <LuckyAnalyzePanel categoryId={categoryId} luckyTimeId={win.luckyTimeId} details={details} scheduleEmpty={win.scheduleEmpty} onUnlocked={setDetails} />
+        <LuckyAnalyzePanel categoryId={categoryId} luckyTimeId={win.luckyTimeId} details={details} scheduleEmpty={win.scheduleEmpty} onUnlocked={setDetails} onStale={onStale} />
       </HudCard>
       <HudCard glow className="p-5 lg:col-span-7">
         <LuckyTrendChart history={win.history} current={details?.confidence ?? null} />
@@ -31,7 +31,7 @@ function Board({ categoryId, win }: { categoryId: string; win: LuckyWindow }) {
 
 /**
  * Trang chi tiết category của lobby NỔ HŨ theo Stitch "Dự đoán Nổ Hũ". Danh sách game ở dropdown là category thật (API có sẵn);
- * lịch lucky time, phân tích và trừ phí hiện là mock (`lib/api/no-hu.ts`, API chưa làm), khóa theo `category.id`.
+ * lịch lucky time, phân tích và trừ phí lấy từ API (`lib/api/no-hu.ts`), khóa theo `category.id`.
  */
 export function NoHuDetail({ category }: { category: Category }) {
   const { t } = useI18n();
@@ -59,7 +59,7 @@ export function NoHuDetail({ category }: { category: Category }) {
       {win.status === "error" && !shown ? (
         <ErrorState error={win.error} onRetry={win.reload} />
       ) : shown ? (
-        <Board key={`${gameId}|${shown.luckyTimeId ?? "none"}`} categoryId={gameId} win={shown} />
+        <Board key={`${gameId}|${shown.luckyTimeId ?? "none"}`} categoryId={gameId} win={shown} onStale={win.reload} />
       ) : (
         <div className="flex justify-center py-16"><Spinner className="h-8 w-8 border-neon/30 border-t-neon" /></div>
       )}

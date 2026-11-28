@@ -12,6 +12,7 @@ import { RedisThrottlerStorage } from "./common/redis-throttler.storage.js";
 import { validateEnv } from "./config/env.validation.js";
 import { RolesGuard } from "./auth/roles.guard.js";
 import { SessionGuard } from "./auth/session.guard.js";
+import { NoHuModule } from "./no-hu/no-hu.module.js";
 import { UsersModule } from "./users/users.module.js";
 import { RegistrationModule } from "./registration/registration.module.js";
 import { AuthModule } from "./auth/auth.module.js";
@@ -63,6 +64,7 @@ export const { ObserveModule, ObserveInstrument } = createObserveModule();
     }),
     AuthModule,
     UsersModule,
+    NoHuModule,
     RegistrationModule,
     // ticks/ giữ lại để so sánh, KHÔNG đăng ký: cùng group "persist" + cùng consumer sẽ tranh tin với IngestionModule.
     IngestionModule,

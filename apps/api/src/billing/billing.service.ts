@@ -117,6 +117,45 @@ export class BillingService {
   }
 
   /**
+   * Trừ phí xem một khung giờ lucky time (lobby NỔ HŨ) trong MỘT transaction. KHÔNG BAO GIỜ HOÀN TIỀN (không tạo prediction_subscriptions).
+   * Khóa users FOR UPDATE trước nên bấm đúp / hai tab cùng lúc được tuần tự hóa: lần sau thấy bản ghi đã có và không trừ nữa.
+   * Đã có bản ghi cho (user, category, time_lucky, lucky_date) ⇒ `charged: false` (xem lại miễn phí). Không đủ điểm ⇒ 402, không ghi gì.
+   */
+  async chargeLucky(p: { userId: string; categoryId: string; luckyTimeId: string; timeLucky: string; luckyDate: string }): Promise<{ charged: boolean }> {
+    return this.ds.transaction(async (m) => {
+      await m.query(`SELECT user_id FROM users WHERE user_id = $1 FOR UPDATE`, [p.userId]);
+      const seen: unknown[] = await m.query(
+        `SELECT 1 FROM prediction_user_lucky WHERE user_id = $1 AND category_id = $2 AND time_lucky = $3::time AND lucky_date = $4::date`,
+        [p.userId, p.categoryId, p.timeLucky, p.luckyDate]);
+      if (seen.length > 0) return { charged: false };
+
+      const fee = this.fee;
+      const charged = await updateReturning<{ balance_before: string; balance_after: string }>(
+        m,
+        `UPDATE users SET balance = balance - $2::bigint
+         WHERE user_id = $1 AND balance >= $2::bigint AND status = 'ACTIVE'
+           AND role_id = (SELECT role_id FROM roles WHERE role_name = $3)
+         RETURNING balance + $2::bigint AS balance_before, balance AS balance_after`,
+        [p.userId, fee, USER_ROLE]);
+      if (charged.length !== 1) throw new InsufficientBalanceException();
+
+      const rows: { prediction_user_lucky_id: string }[] = await m.query(
+        `INSERT INTO prediction_user_lucky (user_id, category_id, time_lucky, lucky_date, lucky_time_id, fee_amount)
+         VALUES ($1, $2, $3::time, $4::date, $5, $6::bigint)
+         ON CONFLICT (user_id, category_id, time_lucky, lucky_date) DO NOTHING
+         RETURNING prediction_user_lucky_id`,
+        [p.userId, p.categoryId, p.timeLucky, p.luckyDate, p.luckyTimeId, fee]);
+      // Đã trừ mà không ghi được lượt xem ⇒ rollback cả transaction.
+      if (rows.length !== 1) throw new Error(`chargeLucky ${p.userId}: đã trừ tiền nhưng không tạo prediction_user_lucky, rollback`);
+      await m.query(
+        `INSERT INTO transactions (user_id, prediction_user_lucky_id, transaction_type, amount, balance_before, balance_after)
+         VALUES ($1, $2, 'CHARGE', $3::bigint, $4::bigint, $5::bigint)`,
+        [p.userId, rows[0].prediction_user_lucky_id, fee, charged[0].balance_before, charged[0].balance_after]);
+      return { charged: true };
+    });
+  }
+
+  /**
    * Settlement một ván: subscription còn chờ quyết định (refunded_at IS NULL AND refund_waived_at IS NULL) của ván CANCELLED,
    * hoặc của ván FINISHED có result khác pick (kể cả T).
    * - HAS_REFUND=true: hoàn tiền (cả user đã DEACTIVE / DELETED).
