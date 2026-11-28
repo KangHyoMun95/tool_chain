@@ -5,10 +5,14 @@ import { Alert, Button, Space, Table, Tag } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import Link from 'next/link';
 import { UploadOutlined } from '@ant-design/icons';
-import { fetchLuckyTimes, formatCircle, formatConfidence, formatRange, formatRtp, type CategoryFilter, type LuckyTimeItem } from '@/lib/api/lucky-time';
+import { fetchLuckyTimes, formatCircle, formatConfidence, formatRange, formatRtp, TEMP_NO_HU_CATEGORIES, type CategoryFilter, type LuckyTimeItem } from '@/lib/api/lucky-time';
 import { CategorySelect } from './category-select';
 
+/** Tên game của dòng: category_id NULL = lịch dùng chung ("Tất cả"). Khi có API lấy tên từ category theo id. */
+const gameName = (r: LuckyTimeItem) => (r.category_id === null ? 'Tất cả' : TEMP_NO_HU_CATEGORIES.find((c) => c.id === r.category_id)?.name ?? '—');
+
 const columns: ColumnsType<LuckyTimeItem> = [
+  { title: 'Tên game', key: 'game', width: 160, ellipsis: true, render: (_, r) => gameName(r) },
   { title: 'Thời gian dự đoán', dataIndex: 'time_lucky', width: 160, sorter: (a, b) => a.time_lucky.localeCompare(b.time_lucky), defaultSortOrder: 'ascend' },
   { title: 'Khả năng nổ hũ', dataIndex: 'confidence', width: 150, render: formatConfidence, sorter: (a, b) => a.confidence - b.confidence },
   { title: 'Xu hướng hiện tại', dataIndex: 'indicator', render: (v: string | null) => v ?? '—' },

@@ -26,15 +26,7 @@ function menuForRole(role: Role): MenuDataItem[] {
     return [
       { path: '/host/dashboard', name: 'Dashboard', icon: <DashboardOutlined /> },
       { path: '/host/admins', name: 'Quản lý người dùng', icon: <TeamOutlined /> },
-      {
-        path: '/host/no-hu-group',
-        name: 'Nổ hũ',
-        icon: <GiftOutlined />,
-        children: [
-          { path: '/host/no-hu', name: 'Lịch lucky time' },
-          { path: '/host/no-hu/import', name: 'Import lịch' },
-        ],
-      },
+      { path: '/host/no-hu', name: 'Nổ hũ', icon: <GiftOutlined /> },
     ];
   }
   if (role === ROLE.ADMIN) {
