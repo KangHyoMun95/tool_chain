@@ -12,6 +12,8 @@
 
 `<slug>` = tên lobby/category bỏ dấu, chữ thường, ký tự lạ thành `_` (đuôi `.jpeg` được thử trước, rồi `.png`) (hàm `slugify` ở `src/lib/slug.ts`).
 Ví dụ lobby "Casino" → `lobbies/casino.jpeg`, category "Baccarat" → `categories/baccarat.jpeg`.
+
+**Lobby NỔ HŨ:** `category_name` trong DB là MÃ game (UPPER_SNAKE_CASE) nên `<slug>` = MÃ viết thường: `GATES_OF_OLYMPUS` → `categories/gates_of_olympus.jpeg`. 11 file: gates_of_olympus, fortune_tiger, aviator, mahjong_ways, fortune_gems_2, wild_bounty_showdown, fortune_gems_3, lucky_neko, golden_empire, super_ace, treasures_of_aztec (bảng `NO_HU_GAMES`). Game thiếu ảnh hiện ô chữ cái đầu.
 Chưa có ảnh thì UI hiện ô placeholder (chữ cái đầu), không cần sửa code khi thêm ảnh.
 
 ## Còn thiếu (chưa lấy được từ Stitch, cần copy tay nếu muốn đúng thiết kế)

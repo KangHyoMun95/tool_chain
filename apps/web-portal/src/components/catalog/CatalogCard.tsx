@@ -10,6 +10,8 @@ import { SlugImage } from "../ui/SlugImage";
 type Props = {
   kind: "lobbies" | "categories";
   name: string;
+  /** Tên hiển thị khi khác `name` (vd lobby NỔ HŨ: `name` là MÃ game dùng cho ảnh, tên hiển thị theo ngôn ngữ). */
+  displayName?: string;
   subtitle: string;
   href: string;
   index: number;
@@ -20,7 +22,7 @@ type Props = {
 };
 
 /** Thẻ lobby (trang chủ) / category (trang lobby): ảnh theo slug tên, tên IN HOA, dòng phụ là số liệu thật. */
-export function CatalogCard({ kind, name, subtitle, href, index, total, clicked, onClick }: Props) {
+export function CatalogCard({ kind, name, displayName, subtitle, href, index, total, clicked, onClick }: Props) {
   const { leaving, go } = useShellExit();
 
   return (
@@ -42,7 +44,7 @@ export function CatalogCard({ kind, name, subtitle, href, index, total, clicked,
       <span className="flex min-w-0 items-center gap-3">
         <SlugImage kind={kind} name={name} className="h-14 w-14 shrink-0 transition-transform group-hover:scale-105" />
         <span className="min-w-0">
-          <span className="block truncate font-display text-base font-extrabold uppercase tracking-wide text-white transition-colors group-hover:text-red-400">{name}</span>
+          <span className="block truncate font-display text-base font-extrabold uppercase tracking-wide text-white transition-colors group-hover:text-red-400">{displayName ?? name}</span>
           <span className="mt-0.5 block text-xs text-gray-400">{subtitle}</span>
         </span>
       </span>

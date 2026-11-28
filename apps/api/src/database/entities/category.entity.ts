@@ -5,6 +5,7 @@ import { CatalogStatus } from "@toolhackchain/shared";
 export class CategoryEntity {
   @PrimaryGeneratedColumn("uuid", { name: "category_id" }) categoryId!: string;
   @Column({ name: "category_name", length: 255 }) categoryName!: string;
+  @Column({ name: "sort_order", type: "int", nullable: true }) sortOrder!: number | null;   // thứ tự hiển thị (NỔ HŨ); NULL xếp sau
   @Column({ name: "lobby_id", type: "uuid" }) lobbyId!: string;
   @CreateDateColumn({ name: "created_at", type: "timestamptz" }) createdAt!: Date;
   @Column({ length: 20, default: CatalogStatus.ACTIVE }) status!: CatalogStatus;

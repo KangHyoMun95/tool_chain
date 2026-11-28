@@ -9,13 +9,13 @@ import { CategoryEntity, LobbyEntity } from "../database/entities/index.js";
 import type { CategoryListQueryDto } from "./dto/category-list-query.dto.js";
 
 export type CategoryItem = {
-  category_id: string; category_name: string; lobby_id: string; lobby_name: string; status: string; created_at: Date;
+  category_id: string; category_name: string; sort_order: number | null; lobby_id: string; lobby_name: string; status: string; created_at: Date;
   stream_count: number;   // số stream của category (USER chỉ đếm ACTIVE)
 };
 type RawCategory = Omit<CategoryItem, "stream_count"> & { stream_count: string };
 
 const CATEGORY_COLUMNS = [
-  "c.categoryId AS category_id", "c.categoryName AS category_name",
+  "c.categoryId AS category_id", "c.categoryName AS category_name", "c.sortOrder AS sort_order",
   "c.lobbyId AS lobby_id", "l.lobbyName AS lobby_name",
   "c.status AS status", "c.createdAt AS created_at",
 ];
@@ -58,7 +58,7 @@ export class CategoriesService {
 
     const total = await qb.getCount();
     const rows = await this.select(qb, role)
-      .orderBy("l.lobbyName", "ASC").addOrderBy("c.categoryName", "ASC").addOrderBy("c.categoryId", "ASC")
+      .orderBy("l.lobbyName", "ASC").addOrderBy("c.sortOrder", "ASC", "NULLS LAST").addOrderBy("c.categoryName", "ASC").addOrderBy("c.categoryId", "ASC")
       .offset((dto.page - 1) * dto.limit).limit(dto.limit)
       .getRawMany<RawCategory>();
     return { items: rows.map((r) => ({ ...r, stream_count: Number(r.stream_count) })), total, page: dto.page, limit: dto.limit };
