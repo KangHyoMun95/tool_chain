@@ -14,7 +14,11 @@
   },
   "categories": {
     "empty": "Sảnh này chưa có loại trò chơi nào.",
-    "tableCount": "{count} bàn"
+    "tableCount": "{count} bàn",
+    "noHuSubtitle": "Lịch nổ hũ"
+  },
+  "noHu": {
+    "placeholder": "Nội dung đang được xây dựng."
   },
   "streams": {
     "session": "Shoe #{shoe} · Ván #{round}",

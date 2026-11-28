@@ -14,7 +14,11 @@
   },
   "categories": {
     "empty": "This lobby has no games yet.",
-    "tableCount": "{count} tables"
+    "tableCount": "{count} tables",
+    "noHuSubtitle": "Jackpot schedule"
+  },
+  "noHu": {
+    "placeholder": "Content is under construction."
   },
   "streams": {
     "session": "Shoe #{shoe} · Round #{round}",
