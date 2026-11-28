@@ -5,15 +5,17 @@ import { Alert, App, Button, Space, Table, Tag, Typography, Upload } from 'antd'
 import type { ColumnsType } from 'antd/es/table';
 import { InboxOutlined } from '@ant-design/icons';
 import { LUCKY_TIME_COLUMNS, type LuckyTimeColumnKey, type LuckyTimeParsed } from '@toolhackchain/shared';
-import { importLuckyTimes, LuckyTimeApiNotReadyError, TEMP_NO_HU_CATEGORIES } from '@/lib/api/lucky-time';
+import { importLuckyTimeFile, LuckyTimeImportError, useNoHuCategories } from '@/lib/api/lucky-time';
 
 type PreviewRow = LuckyTimeParsed['preview'][number];
 const KEYS = Object.keys(LUCKY_TIME_COLUMNS) as LuckyTimeColumnKey[];
-// TẠM THỜI: tên game hợp lệ lấy từ danh sách category tạm; khi có API thì lấy từ GET /categories?lobby_id=NO_HU_LOBBY_ID.
-const GAME_NAMES = TEMP_NO_HU_CATEGORIES.map((c) => c.name);
 
 export function LuckyTimeImport() {
   const { message, modal } = App.useApp();
+  const { data: categories, isError: categoriesFailed } = useNoHuCategories();
+  const gameNames = (categories ?? []).map((c) => c.name);
+  const [file, setFile] = useState<File | null>(null);
+  const [serverIssues, setServerIssues] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
   const [parsed, setParsed] = useState<LuckyTimeParsed | null>(null);
   const [reading, setReading] = useState(false);
@@ -25,19 +27,21 @@ export function LuckyTimeImport() {
   async function readFile(file: File) {
     setReading(true);
     setFileName(file.name);
+    setFile(file);
+    setServerIssues([]);
     setParsed(null);
     try {
       // Tải thư viện đọc bảng tính khi cần (không đưa vào bundle trang khác).
       const { readLuckyTimeFile } = await import('@toolhackchain/shared/lucky-time-file');
-      setParsed(readLuckyTimeFile(await file.arrayBuffer(), GAME_NAMES));
+      setParsed(readLuckyTimeFile(await file.arrayBuffer(), gameNames));
     } finally {
       setReading(false);
     }
   }
 
   function confirmImport() {
-    if (!parsed || blocked) return;
-    const games = [...new Set(parsed.rows.map((r) => r.data.game ?? 'Tất cả (dùng chung)'))];
+    if (!parsed || blocked || !file) return;
+    const games = [...new Set(parsed.rows.map((r) => r.data.game))];
     modal.confirm({
       title: `Thay thế lịch của ${games.length} game?`,
       content: `Import sẽ THAY THẾ lịch lucky time đang hiệu lực của: ${games.join(', ')} bằng ${parsed.rows.length} dòng trong file ${fileName}. Game không có trong file giữ nguyên.`,
@@ -46,11 +50,15 @@ export function LuckyTimeImport() {
       onOk: async () => {
         setImporting(true);
         try {
-          await importLuckyTimes(parsed.rows.map((r) => r.data));
-          message.success('Đã import lịch.');
+          const res = await importLuckyTimeFile(file);
+          setServerIssues([]);
+          message.success(`Đã import ${res.rows} dòng cho ${res.categories} game (thay thế ${res.replaced} dòng cũ).`);
         } catch (e) {
-          if (e instanceof LuckyTimeApiNotReadyError) message.warning(e.message);
-          else message.error('Import thất bại. Vui lòng thử lại.');
+          if (e instanceof LuckyTimeImportError) {
+            // Server đọc lại file và vẫn thấy lỗi: chưa ghi gì.
+            setServerIssues(e.issues.map((i) => (i.row === null ? i.reason : `Dòng ${i.row}${i.column ? ` (${i.column})` : ''}: ${i.reason}`)));
+            message.error('Server từ chối file: còn dòng lỗi, chưa ghi gì.');
+          } else message.error('Import thất bại. Vui lòng thử lại.');
         } finally {
           setImporting(false);
         }
@@ -84,7 +92,7 @@ export function LuckyTimeImport() {
         type="warning"
         showIcon
         message="Import sẽ THAY THẾ lịch hiện tại của MỌI game có trong file."
-        description={`Cột "Tên game" của mỗi dòng là tên category (${GAME_NAMES.join(', ')}) hoặc "Tất cả" (lịch dùng chung). Game không có trong file giữ nguyên. Lịch cũ không bị xóa, chỉ được đánh dấu đã thay thế.`}
+        description={`Cột "Tên game" của mỗi dòng bắt buộc là tên một category của lobby NỔ HŨ (${gameNames.join(', ') || 'đang tải...'}). Game không có trong file giữ nguyên. Lịch cũ không bị xóa, chỉ được đánh dấu đã thay thế.`}
       />
       <Upload.Dragger
         accept=".xlsx,.xls,.csv,.ods,.xlsm"
@@ -94,13 +102,15 @@ export function LuckyTimeImport() {
           void readFile(file);
           return false;
         }}
-        disabled={reading}
+        disabled={reading || !categories}
       >
         <p className="ant-upload-drag-icon"><InboxOutlined /></p>
         <p className="ant-upload-text">{reading ? 'Đang đọc file...' : (fileName ?? 'Chọn hoặc kéo thả file (xlsx, xls, csv)')}</p>
         <p className="ant-upload-hint">Dòng đầu là header: {KEYS.map((k) => LUCKY_TIME_COLUMNS[k]).join(' | ')}</p>
       </Upload.Dragger>
 
+      {categoriesFailed && <Alert type="error" showIcon message="Không tải được danh sách game. Tải lại trang để thử lại." />}
+      {serverIssues.map((t, n) => <Alert key={`s${n}`} type="error" showIcon message={t} />)}
       {fileIssues.map((i, n) => (
         <Alert key={n} type="error" showIcon message={i.row === null ? i.reason : `Dòng ${i.row}: ${i.reason}`} />
       ))}
@@ -127,7 +137,6 @@ export function LuckyTimeImport() {
       <Button type="primary" disabled={blocked} loading={importing} onClick={confirmImport}>
         Import
       </Button>
-      <Typography.Text type="secondary">Chưa có API: nút Import hiện chỉ báo chưa hỗ trợ (stub).</Typography.Text>
     </Space>
   );
 }

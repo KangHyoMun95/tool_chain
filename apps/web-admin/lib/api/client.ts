@@ -157,7 +157,8 @@ async function authFetch(path: string, init: RequestInit = {}): Promise<Response
       ...init,
       credentials: 'include',
       headers: {
-        'Content-Type': 'application/json',
+        // FormData (upload file) phải để trình duyệt tự đặt Content-Type kèm boundary.
+        ...(init.body instanceof FormData ? {} : { 'Content-Type': 'application/json' }),
         ...init.headers,
         Authorization: `Bearer ${accessToken ?? ''}`,
       },
@@ -173,7 +174,7 @@ async function authFetch(path: string, init: RequestInit = {}): Promise<Response
 
 /** Lỗi API có mã máy đọc được (body.code, vd "TRANSFER_REQUIRED") và HTTP status. */
 export class ApiError extends Error {
-  constructor(message: string, readonly status: number, readonly code?: string) {
+  constructor(message: string, readonly status: number, readonly code?: string, readonly body?: unknown) {
     super(message);
   }
 }
@@ -185,7 +186,7 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
     if (res.status === 401) redirectToLogin();
     const body = await res.json().catch(() => ({}));
     const { message, code } = body as { message?: string | string[]; code?: string };
-    throw new ApiError(Array.isArray(message) ? message.join(', ') : (message ?? `HTTP ${res.status}`), res.status, code);
+    throw new ApiError(Array.isArray(message) ? message.join(', ') : (message ?? `HTTP ${res.status}`), res.status, code, body);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

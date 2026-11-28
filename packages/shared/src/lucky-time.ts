@@ -1,9 +1,9 @@
 // packages/shared/src/lucky-time.ts
 // Parse bảng lịch "lucky time" của lobby NỔ HŨ (import từ file Excel / csv). HÀM THUẦN, không phụ thuộc thư viện: nhận bảng ô dạng text
 // (dòng đầu là header) và trả các dòng đã tách giá trị + danh sách lỗi (số dòng, cột, lý do). Đọc file thành bảng: `lucky-time-file.ts`.
-// Dùng ở trình duyệt (web-admin, xem trước) và sẽ dùng lại ở API (import thật).
+// Dùng ở trình duyệt (web-admin, xem trước) và ở API (import thật, đọc lại và kiểm tra toàn bộ file).
 
-/** Tên cột trong file = tên cột của trang danh sách (so khớp không phân biệt hoa / thường và khoảng trắng thừa). Cả 7 cột bắt buộc có mặt. Cột "Tên game" = TÊN category (so khớp sau chuẩn hóa), hoặc "Tất cả" = lịch dùng chung. */
+/** Tên cột trong file = tên cột của trang danh sách (so khớp không phân biệt hoa / thường và khoảng trắng thừa). Cả 7 cột bắt buộc có mặt. Cột "Tên game" = TÊN category của lobby NỔ HŨ (so khớp sau chuẩn hóa), bắt buộc; không có lịch dùng chung. */
 export const LUCKY_TIME_COLUMNS = {
   game: "Tên game",
   time: "Thời gian dự đoán",
@@ -17,8 +17,8 @@ export type LuckyTimeColumnKey = keyof typeof LUCKY_TIME_COLUMNS;
 
 /** Một dòng đã tách, các trường trùng tên cột của bảng `lucky_time`. */
 export interface LuckyTimeRow {
-  /** Tên game (category) như trong danh sách `games` truyền vào parser; null = "Tất cả" (dùng chung, category_id NULL). Khi không truyền `games` là chữ gốc của file. */
-  game: string | null;
+  /** Tên game (category) như trong danh sách `games` truyền vào parser. Khi không truyền `games` là chữ gốc của file. Luôn có giá trị. */
+  game: string;
   time_lucky: string; // "HH:MM"
   confidence: number; // 0..100, số nguyên
   indicator: string | null;
@@ -127,15 +127,12 @@ function parseRtp(raw: string): { ok: true; value: number } | { ok: false; reaso
   return { ok: true, value: v };
 }
 
-/** Giá trị cột Game nghĩa là lịch dùng chung. */
-export const LUCKY_TIME_ALL_GAMES = "Tất cả";
-
 const KEYS = Object.keys(LUCKY_TIME_COLUMNS) as LuckyTimeColumnKey[];
 
 /**
  * Tách bảng text thành các dòng lucky time. `table[0]` là header (dòng đầu tiên có ô không trống; dòng trống phía trên được bỏ qua nhưng vẫn tính vào số dòng).
  * firstRow: số dòng (trong file) của `table[0]`, mặc định 1.
- * games: tên các category hợp lệ (nguồn: API / danh sách category). Có truyền ⇒ cột Game phải khớp một tên (không phân biệt hoa / thường, khoảng trắng thừa) hoặc "Tất cả", `data.game` là tên chuẩn trong danh sách; không khớp ⇒ lỗi dòng.
+ * games: tên các category hợp lệ (nguồn: API / danh sách category). Có truyền ⇒ cột Game phải khớp một tên (không phân biệt hoa / thường, khoảng trắng thừa), `data.game` là tên chuẩn trong danh sách; trống / không khớp ⇒ lỗi dòng.
  * Trùng giờ được xét RIÊNG cho từng game.
  * Dòng trống hoàn toàn bị bỏ qua. Hai dòng trùng giờ ⇒ dòng sau báo lỗi. Thiếu cột bắt buộc ⇒ lỗi cả file (rows rỗng).
  */
@@ -194,17 +191,14 @@ export function parseLuckyTimeTable(table: string[][], firstRow = 1, games?: rea
     let gameKey: string | null = null;
     if (raw.game !== "") {
       const g = norm(raw.game);
-      if (g === norm(LUCKY_TIME_ALL_GAMES)) {
-        data.game = null;
-        gameKey = "";
-      } else if (!games) {
+      if (!games) {
         data.game = raw.game;
         gameKey = g;
       } else if (gameByNorm.has(g)) {
         data.game = gameByNorm.get(g)!;
         gameKey = g;
       } else {
-        fail("game", `Game không tồn tại: "${raw.game}" (hợp lệ: ${[...games, LUCKY_TIME_ALL_GAMES].map((x) => `"${x}"`).join(", ")})`);
+        fail("game", `Game không tồn tại: "${raw.game}" (hợp lệ: ${games.map((x) => `"${x}"`).join(", ")})`);
       }
     }
     if (raw.time !== "") {

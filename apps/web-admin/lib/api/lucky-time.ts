@@ -1,76 +1,66 @@
-// Lịch lucky time của lobby NỔ HŨ (HOST). CHƯA CÓ API: dữ liệu giả + hàm stub. Khi API xong chỉ thay phần thân các hàm / hook ở file này.
-import type { LuckyTimeRow } from '@toolhackchain/shared';
+'use client';
 
-/**
- * TẠM THỜI: danh sách category của lobby NỔ HŨ viết cứng để dựng giao diện.
- * Sẽ lấy từ API (GET /categories?lobby_id=NO_HU_LOBBY_ID). `id` ở đây là GIÁ TRỊ GIẢ, KHÔNG phải category_id thật:
- * không dùng tên làm khóa lâu dài, khi có API phải khóa theo category_id (UUID).
- */
-export const TEMP_NO_HU_CATEGORIES = [
-  { id: 'temp-kho-bau-aztec', name: 'Kho báu Aztec' },
-  { id: 'temp-sieu-at', name: 'Siêu át' },
-  { id: 'temp-de-quoc-hoang-gia', name: 'Đế quốc hoàng gia' },
-  { id: 'temp-meo-may-man', name: 'Mèo may mắn' },
-  { id: 'temp-ngoc-may-man-3', name: 'Ngọc may mắn 3' },
-  { id: 'temp-quyet-chien-tien-thuong', name: 'Quyết chiến tiền thưởng' },
-  { id: 'temp-ngoc-may-man-2', name: 'Ngọc may mắn 2' },
-  { id: 'temp-duong-mat-chuoc', name: 'Đường mạt chược' },
-  { id: 'temp-phi-cong', name: 'Phi công' },
-  { id: 'temp-fortune-tiger', name: 'Fortune Tiger' },
-  { id: 'temp-gates-of-olympus', name: 'Gates of Olympus' },
-] as const;
+// Lịch lucky time của lobby NỔ HŨ (HOST): GET /lucky-time, POST /lucky-time/import, danh sách game = GET /categories?lobby_id=NO_HU_LOBBY_ID.
+// Mỗi dòng thuộc đúng một category (không có lịch dùng chung). Khóa theo category_id, tên chỉ để hiển thị / nhập trong file.
+import { useQuery } from '@tanstack/react-query';
+import { NO_HU_LOBBY_ID, type LuckyTimeIssue, type LuckyTimeRow } from '@toolhackchain/shared';
+import { ApiError, apiFetch } from './client';
 
-/** Giá trị bộ lọc / dropdown: null = "Tất cả" (dùng chung cho mọi category của lobby, category_id NULL trong DB). */
+export interface NoHuCategory { id: string; name: string }
+
+/** Giá trị bộ lọc: null = "Tất cả" = xem mọi category của lobby (không phải dữ liệu dùng chung). */
 export type CategoryFilter = string | null;
 
 export interface LuckyTimeItem extends Omit<LuckyTimeRow, 'game'> {
   lucky_time_id: string;
-  category_id: string | null;
+  category_id: string;
+  category_name: string;
 }
 
-// ---- Dữ liệu giả (xác định, không ngẫu nhiên) ----
-const INDICATORS = ['Đang tăng', 'Ổn định', 'Đang giảm', 'Biến động mạnh'];
-
-function fakeRows(categoryId: string | null, count: number, seed: number): LuckyTimeItem[] {
-  return Array.from({ length: count }, (_, i) => {
-    const minutes = (i * 97 + seed * 31) % 1440;
-    const next = (i + seed) % 3 === 0;
-    return {
-      lucky_time_id: `fake-${categoryId ?? 'all'}-${i}`,
-      category_id: categoryId,
-      time_lucky: `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`,
-      confidence: 55 + ((i * 7 + seed) % 45),
-      indicator: INDICATORS[(i + seed) % INDICATORS.length],
-      circle_est_from: 10 + (i % 4) * 5,
-      circle_est_to: 20 + (i % 4) * 5,
-      range_lucky_time_from: next ? null : 1 + (i % 3),
-      range_lucky_time_to: next ? null : 4 + (i % 3),
-      trace_next_circle: next ? 3 + (i % 5) : null,
-      fluctuations_rtp: Number((55.4 + ((i * 13 + seed * 7) % 450) / 10).toFixed(2)),
-    };
+/** Category của lobby NỔ HŨ (dropdown lọc, tên hợp lệ của cột "Tên game" trong file import). */
+export function useNoHuCategories() {
+  return useQuery({
+    queryKey: ['no-hu-categories'],
+    staleTime: 5 * 60_000,
+    queryFn: async (): Promise<NoHuCategory[]> => {
+      const res = await apiFetch<{ items: { category_id: string; category_name: string }[] }>(
+        `/categories?lobby_id=${NO_HU_LOBBY_ID}&limit=100`);
+      return res.items.map((c) => ({ id: c.category_id, name: c.category_name }));
+    },
   });
 }
 
-/** TẠM THỜI: thay bằng GET lịch đang hiệu lực (replaced_at IS NULL) của category. */
+/** Lịch đang hiệu lực (replaced_at IS NULL) của một category, hoặc của mọi category khi `category` = null. */
 export async function fetchLuckyTimes(category: CategoryFilter): Promise<LuckyTimeItem[]> {
-  const seed = category === null ? 1 : TEMP_NO_HU_CATEGORIES.findIndex((c) => c.id === category) + 2;
-  return fakeRows(category, 14, seed);
+  const q = category ? `?category_id=${category}` : '';
+  return (await apiFetch<{ items: LuckyTimeItem[] }>(`/lucky-time${q}`)).items;
 }
 
-export class LuckyTimeApiNotReadyError extends Error {
-  constructor() {
-    super('Chưa có API import lucky time. Chức năng sẽ hoạt động khi API được triển khai.');
-    this.name = 'LuckyTimeApiNotReadyError';
+export interface ImportResult { categories: number; rows: number; replaced: number }
+
+/** Lỗi 400 IMPORT_INVALID: server đọc lại file và còn dòng lỗi; chưa ghi gì. */
+export class LuckyTimeImportError extends Error {
+  constructor(readonly issues: LuckyTimeIssue[], readonly totalIssues: number) {
+    super('File lịch lucky time không hợp lệ');
   }
 }
 
 /**
- * STUB: sẽ gọi POST import. Mỗi dòng mang `game` (tên category, null = dùng chung); API đổi tên sang category_id và, với MỖI game có trong file,
- * thay lịch đang hiệu lực của game đó (replaced_at = now() rồi thêm dòng mới; null = chỉ thay dòng dùng chung); game không có trong file giữ nguyên.
- * Hiện luôn ném LuckyTimeApiNotReadyError.
+ * Gửi chính file đã chọn; server tự đọc và kiểm tra lại (không tin kết quả xem trước ở trình duyệt). Với MỖI game có trong file, lịch đang
+ * hiệu lực của game đó được thay (replaced_at = now() rồi thêm dòng mới); game không có trong file giữ nguyên.
  */
-export async function importLuckyTimes(_rows: LuckyTimeRow[]): Promise<void> {
-  throw new LuckyTimeApiNotReadyError();
+export async function importLuckyTimeFile(file: File): Promise<ImportResult> {
+  const form = new FormData();
+  form.append('file', file);
+  try {
+    return await apiFetch<ImportResult>('/lucky-time/import', { method: 'POST', body: form });
+  } catch (e) {
+    if (e instanceof ApiError && e.code === 'IMPORT_INVALID') {
+      const b = e.body as { issues?: LuckyTimeIssue[]; total_issues?: number };
+      throw new LuckyTimeImportError(b.issues ?? [], b.total_issues ?? b.issues?.length ?? 0);
+    }
+    throw e;
+  }
 }
 
 // ---- Định dạng hiển thị (dùng chung hai trang) ----
