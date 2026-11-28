@@ -7,11 +7,11 @@
 | `hud-frame.png` | nền đăng nhập mobile | khung HUD neon đỏ |
 | `pedestal-bg.png` | nền các khối của chi tiết bàn | `mix-blend-screen` |
 | `win.png`, `lose.png`, `tie.png`, `triple.png` | `ResultOverlay` (giữa màn hình khi có kết quả so với dự đoán); `triple.png` thay `tie.png` khi kết quả là `B` thuộc `draw` (Tài xỉu: bộ ba) | PNG nền trong suốt, được nạp sẵn khi mở trang chi tiết |
-| `lobbies/<slug>.png` | thẻ lobby, sidebar | ảnh 112×112 (hiển thị 56×56), PNG/WebP nền trong suốt |
-| `categories/<slug>.png` | thẻ category | như trên |
+| `lobbies/<slug>.jpeg` / `.png` | thẻ lobby, sidebar | ảnh 112×112 (hiển thị 56×56), PNG/WebP nền trong suốt |
+| `categories/<slug>.jpeg` / `.png` | thẻ category | như trên |
 
-`<slug>` = tên lobby/category bỏ dấu, chữ thường, ký tự lạ thành `-` (hàm `slugify` ở `src/lib/slug.ts`).
-Ví dụ lobby "Casino" → `lobbies/casino.png`, category "Baccarat" → `categories/baccarat.png`.
+`<slug>` = tên lobby/category bỏ dấu, chữ thường, ký tự lạ thành `_` (đuôi `.jpeg` được thử trước, rồi `.png`) (hàm `slugify` ở `src/lib/slug.ts`).
+Ví dụ lobby "Casino" → `lobbies/casino.jpeg`, category "Baccarat" → `categories/baccarat.jpeg`.
 Chưa có ảnh thì UI hiện ô placeholder (chữ cái đầu), không cần sửa code khi thêm ảnh.
 
 ## Còn thiếu (chưa lấy được từ Stitch, cần copy tay nếu muốn đúng thiết kế)

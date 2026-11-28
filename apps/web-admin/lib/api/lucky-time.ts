@@ -7,8 +7,17 @@ import type { LuckyTimeRow } from '@toolhackchain/shared';
  * không dùng tên làm khóa lâu dài, khi có API phải khóa theo category_id (UUID).
  */
 export const TEMP_NO_HU_CATEGORIES = [
-  { id: 'temp-phi-cong', name: 'Phi công' },
+  { id: 'temp-kho-bau-aztec', name: 'Kho báu Aztec' },
+  { id: 'temp-sieu-at', name: 'Siêu át' },
+  { id: 'temp-de-quoc-hoang-gia', name: 'Đế quốc hoàng gia' },
   { id: 'temp-meo-may-man', name: 'Mèo may mắn' },
+  { id: 'temp-ngoc-may-man-3', name: 'Ngọc may mắn 3' },
+  { id: 'temp-quyet-chien-tien-thuong', name: 'Quyết chiến tiền thưởng' },
+  { id: 'temp-ngoc-may-man-2', name: 'Ngọc may mắn 2' },
+  { id: 'temp-duong-mat-chuoc', name: 'Đường mạt chược' },
+  { id: 'temp-phi-cong', name: 'Phi công' },
+  { id: 'temp-fortune-tiger', name: 'Fortune Tiger' },
+  { id: 'temp-gates-of-olympus', name: 'Gates of Olympus' },
 ] as const;
 
 /** Giá trị bộ lọc / dropdown: null = "Tất cả" (dùng chung cho mọi category của lobby, category_id NULL trong DB). */
