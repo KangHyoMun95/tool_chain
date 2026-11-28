@@ -9,6 +9,7 @@ import {
 import { Skeleton, Tag } from 'antd';
 import { AccountStatus } from '@/lib/legacy-types';
 import type { SubAdminRow } from '@/lib/api/sub-admin';
+import { UserPredictionHistory } from './user-prediction-history';
 import {
   fetchPointTransactions,
   fetchSubAdminUsers,
@@ -97,6 +98,8 @@ export function SubAdminDetail({ id }: { id: string }) {
           }}
         />
       </ProCard>
+
+      {subAdmin?.role === 'USER' && <UserPredictionHistory userId={id} />}
     </>
   );
 }
