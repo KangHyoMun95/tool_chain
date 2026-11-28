@@ -16,6 +16,8 @@ type Props = {
   /** Category không có lịch: nút phân tích bị khóa. */
   scheduleEmpty: boolean;
   onUnlocked: (d: LuckyDetails) => void;
+  /** 409: dòng hiện tại đã đổi (sang khung mới / HOST import lại) ⇒ tải lại lịch. */
+  onStale: () => void;
 };
 
 const INNER = "flex min-h-[220px] w-full flex-1 flex-col rounded-xl border border-neon/25 bg-module/85 p-3 shadow-[inset_0_0_15px_rgba(255,20,60,0.06)] backdrop-blur-xl";
@@ -30,7 +32,7 @@ function Row({ icon, label, children, index }: { icon: string; label: string; ch
 }
 
 /** Khung trái: nút phân tích (vàng) → radar → vòng tròn + kết quả. Mọi ô rỗng (null) để trống. */
-export function LuckyAnalyzePanel({ categoryId, luckyTimeId, details, scheduleEmpty, onUnlocked }: Props) {
+export function LuckyAnalyzePanel({ categoryId, luckyTimeId, details, scheduleEmpty, onUnlocked, onStale }: Props) {
   const { t } = useI18n();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<"insufficient" | "failed" | null>(null);
@@ -42,6 +44,7 @@ export function LuckyAnalyzePanel({ categoryId, luckyTimeId, details, scheduleEm
     try {
       onUnlocked(await unlockLucky(categoryId, luckyTimeId));
     } catch (e) {
+      if (e instanceof ApiError && e.status === 409) { onStale(); return; }
       setError(e instanceof ApiError && e.status === 402 && e.code === "INSUFFICIENT_BALANCE" ? "insufficient" : "failed");
     } finally {
       setBusy(false);
