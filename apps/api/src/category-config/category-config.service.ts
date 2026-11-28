@@ -49,6 +49,11 @@ export class CategoryConfigService {
     return this.configs.get(categoryConfigKey(lobby, category));
   }
 
+  /** Mọi cấu hình đã nạp (cho truy vấn cần tra `draw` theo category). */
+  all(): CategoryConfig[] {
+    return [...this.configs.values()];
+  }
+
   /** key_id = `<lobby>|<category>|<stream>` đã chuẩn hóa. */
   getByKeyId(keyId: string): CategoryConfig | undefined {
     const [lobby, category] = keyId.split("|");
