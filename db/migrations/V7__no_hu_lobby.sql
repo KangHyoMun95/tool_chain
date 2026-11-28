@@ -14,19 +14,27 @@ BEGIN
     END IF;
 END $$;
 
-INSERT INTO categories (category_name, lobby_id, status) VALUES
-    ('Kho báu Aztec', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
-    ('Siêu át', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
-    ('Đế quốc hoàng gia', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
-    ('Mèo may mắn', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
-    ('Ngọc may mắn 3', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
-    ('Quyết chiến tiền thưởng', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
-    ('Ngọc may mắn 2', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
-    ('Đường mạt chược', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
-    ('Phi công', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
-    ('Fortune Tiger', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
-    ('Gates of Olympus', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE')
+-- category_name lưu MÃ game (UPPER_SNAKE_CASE); tên hiển thị vi / en và ảnh nằm ở NO_HU_GAMES (packages/shared/src/no-hu-games.ts).
+-- sort_order = thứ tự hiển thị (NULL = category của lobby khác, xếp sau theo tên).
+ALTER TABLE categories ADD COLUMN IF NOT EXISTS sort_order INTEGER;
+
+INSERT INTO categories (category_name, lobby_id, status, sort_order) VALUES
+    ('GATES_OF_OLYMPUS', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE', 1),
+    ('FORTUNE_TIGER', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE', 2),
+    ('AVIATOR', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE', 3),
+    ('MAHJONG_WAYS', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE', 4),
+    ('FORTUNE_GEMS_2', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE', 5),
+    ('WILD_BOUNTY_SHOWDOWN', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE', 6),
+    ('FORTUNE_GEMS_3', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE', 7),
+    ('LUCKY_NEKO', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE', 8),
+    ('GOLDEN_EMPIRE', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE', 9),
+    ('SUPER_ACE', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE', 10),
+    ('TREASURES_OF_AZTEC', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE', 11)
 ON CONFLICT DO NOTHING;
+-- Chạy lại (hoặc category đã có từ trước): bảo đảm sort_order đúng theo MÃ.
+UPDATE categories c SET sort_order = v.n
+FROM (VALUES ('GATES_OF_OLYMPUS', 1), ('FORTUNE_TIGER', 2), ('AVIATOR', 3), ('MAHJONG_WAYS', 4), ('FORTUNE_GEMS_2', 5), ('WILD_BOUNTY_SHOWDOWN', 6), ('FORTUNE_GEMS_3', 7), ('LUCKY_NEKO', 8), ('GOLDEN_EMPIRE', 9), ('SUPER_ACE', 10), ('TREASURES_OF_AZTEC', 11)) AS v(code, n)
+WHERE c.lobby_id = '7e475c64-eec2-4efc-997d-877dd4b53d0b' AND c.category_name = v.code AND c.sort_order IS DISTINCT FROM v.n;
 
 -- Lịch lucky time: mỗi dòng thuộc đúng một category (không có lịch dùng chung). time_lucky = giờ trong ngày, lặp lại hằng ngày.
 -- Import KHÔNG xóa: dòng cũ được đánh dấu replaced_at (NULL = đang hiệu lực).

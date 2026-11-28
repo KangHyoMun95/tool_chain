@@ -2,10 +2,10 @@
 // Lobby NỔ HŨ phía USER. "Ván" = một dòng lucky_time. Dòng hiện tại = dòng có time_lucky GẦN NHẤT TRƯỚC giờ hiện tại (theo TZ hệ thống,
 // quay vòng qua nửa đêm); dòng kế sau nó (cũng quay vòng) là đích của countdown.
 // Chi tiết (details) của khung hiện tại CHỈ trả khi user đã trả phí cho (category, time_lucky, lucky_date); history chỉ có confidence.
-import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, Logger, NotFoundException, type OnModuleInit } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
-import { NO_HU_LOBBY_ID } from "@toolhackchain/shared";
+import { NO_HU_GAMES, NO_HU_LOBBY_ID, validateNoHuGames } from "@toolhackchain/shared";
 import { BillingService } from "../billing/billing.service.js";
 import { appTimeZone } from "../common/timezone.js";
 
@@ -38,8 +38,26 @@ type Located = { rows: Row[]; cur: number; nextAt: number; luckyDate: string; se
 const hhmm = (t: string) => t.slice(0, 5);
 
 @Injectable()
-export class NoHuService {
+export class NoHuService implements OnModuleInit {
+  private readonly log = new Logger(NoHuService.name);
+
   constructor(@InjectDataSource() private ds: DataSource, private billing: BillingService) {}
+
+  /** Bảng game (NO_HU_GAMES) sai / trùng tên ⇒ API KHÔNG khởi động. Category trong DB không có trong bảng ⇒ chỉ log WARN (portal hiển thị MÃ). */
+  async onModuleInit(): Promise<void> {
+    const errors = validateNoHuGames();
+    if (errors.length > 0) throw new Error(`NO_HU_GAMES không hợp lệ:\n  ${errors.join("\n  ")}`);
+    try {
+      const rows: { category_name: string }[] = await this.ds.query(`SELECT category_name FROM categories WHERE lobby_id = $1`, [NO_HU_LOBBY_ID]);
+      for (const r of rows) {
+        if (!Object.hasOwn(NO_HU_GAMES, r.category_name)) {
+          this.log.warn(`Category "${r.category_name}" của lobby NỔ HŨ không có trong NO_HU_GAMES: hiển thị MÃ, dùng ảnh mặc định`);
+        }
+      }
+    } catch (e) {
+      this.log.warn(`Không kiểm tra được category của lobby NỔ HŨ: ${(e as Error).message}`);
+    }
+  }
 
   /** Category phải thuộc lobby NỔ HŨ và ACTIVE (cả lobby); ngoài phạm vi ⇒ 404. */
   private async assertCategory(categoryId: string): Promise<void> {
