@@ -26,15 +26,7 @@ function menuForRole(role: Role): MenuDataItem[] {
     return [
       { path: '/host/dashboard', name: 'Dashboard', icon: <DashboardOutlined /> },
       { path: '/host/admins', name: 'Quản lý người dùng', icon: <TeamOutlined /> },
-      {
-        path: '/host/no-hu-group',
-        name: 'Nổ hũ',
-        icon: <GiftOutlined />,
-        children: [
-          { path: '/host/no-hu', name: 'Lịch lucky time' },
-          { path: '/host/no-hu/import', name: 'Import lịch' },
-        ],
-      },
+      { path: '/host/no-hu', name: 'Nổ hũ', icon: <GiftOutlined /> },
     ];
   }
   if (role === ROLE.ADMIN) {
@@ -74,12 +66,6 @@ export function AppProLayout({ children }: { children: React.ReactNode }) {
 
   const role = user?.role ?? ROLE.USER;
 
-  // ProLayout chọn menu theo tiền tố đường dẫn nên /host/no-hu/import làm sáng cả "Lịch lucky time" (/host/no-hu).
-  // Với nhóm Nổ hũ chọn đúng một mục; các trang khác giữ cách chọn mặc định (vd trang chi tiết vẫn sáng mục danh sách).
-  const noHuSelected = pathname === '/host/no-hu/import' || pathname.startsWith('/host/no-hu/import/')
-    ? '/host/no-hu/import'
-    : pathname === '/host/no-hu' || pathname.startsWith('/host/no-hu/') ? '/host/no-hu' : null;
-
   return (
     <ProLayout
       title="ToolHackChain"
@@ -96,7 +82,6 @@ export function AppProLayout({ children }: { children: React.ReactNode }) {
         header: { colorBgHeader: '#0B0F16' },
       }}
       fixSiderbar
-      menuProps={noHuSelected ? { selectedKeys: [noHuSelected] } : undefined}
       location={{ pathname }}
       route={{ path: '/', routes: menuForRole(role) }}
       menuItemRender={(item, dom) =>
