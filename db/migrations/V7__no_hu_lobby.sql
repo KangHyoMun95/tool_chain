@@ -15,8 +15,17 @@ BEGIN
 END $$;
 
 INSERT INTO categories (category_name, lobby_id, status) VALUES
-    ('Phi công',     '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
-    ('Mèo may mắn',  '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE')
+    ('Kho báu Aztec', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
+    ('Siêu át', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
+    ('Đế quốc hoàng gia', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
+    ('Mèo may mắn', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
+    ('Ngọc may mắn 3', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
+    ('Quyết chiến tiền thưởng', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
+    ('Ngọc may mắn 2', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
+    ('Đường mạt chược', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
+    ('Phi công', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
+    ('Fortune Tiger', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE'),
+    ('Gates of Olympus', '7e475c64-eec2-4efc-997d-877dd4b53d0b', 'ACTIVE')
 ON CONFLICT DO NOTHING;
 
 -- Lịch lucky time. category_id NULL = dùng chung cho mọi category của lobby. time_lucky = giờ trong ngày, lặp lại hằng ngày.
