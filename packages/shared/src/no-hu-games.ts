@@ -78,3 +78,16 @@ export function resolveNoHuGame(raw: string): string | null {
 export function noHuGameName(code: string, locale: NoHuGameLocale): string {
   return NO_HU_GAMES[code]?.[locale] ?? code;
 }
+
+/**
+ * Bộ đổi chữ → MÃ cho parser import (dùng chung trình duyệt và server): `resolveNoHuGame`, thêm khớp bằng đúng MÃ cho category có trong DB
+ * mà chưa có trong NO_HU_GAMES. Kết quả phải là một MÃ có trong `dbCodes` (category của lobby có thật), ngược lại null.
+ */
+export function createGameResolver(dbCodes: readonly string[]): (raw: string) => string | null {
+  const known = new Set(dbCodes);
+  const byNorm = new Map(dbCodes.map((c) => [normalizeGameName(c), c]));
+  return (raw) => {
+    const code = resolveNoHuGame(raw) ?? byNorm.get(normalizeGameName(raw)) ?? null;
+    return code !== null && known.has(code) ? code : null;
+  };
+}

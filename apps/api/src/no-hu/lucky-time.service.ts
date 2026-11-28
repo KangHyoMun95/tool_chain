@@ -3,7 +3,7 @@
 import { BadRequestException, Injectable } from "@nestjs/common";
 import { InjectDataSource } from "@nestjs/typeorm";
 import { DataSource } from "typeorm";
-import { NO_HU_LOBBY_ID } from "@toolhackchain/shared";
+import { NO_HU_LOBBY_ID, createGameResolver } from "@toolhackchain/shared";
 import { readLuckyTimeFile } from "@toolhackchain/shared/lucky-time-file";
 import { updateReturning } from "../common/update-returning.js";
 
@@ -12,7 +12,7 @@ const IMPORT_LOCK_KEY = 7_340_001;
 const MAX_ISSUES_RETURNED = 200;
 
 export type LuckyTimeItem = {
-  lucky_time_id: string; category_id: string; category_name: string; time_lucky: string;
+  lucky_time_id: string; category_id: string; category_name: string; /* MÃ game; tên hiển thị tra ở NO_HU_GAMES */ time_lucky: string;
   confidence: number | null; indicator: string | null; circle_est_from: number | null; circle_est_to: number | null;
   range_lucky_time_from: number | null; range_lucky_time_to: number | null; trace_next_circle: number | null; fluctuations_rtp: number | null;
 };
@@ -29,21 +29,23 @@ export class LuckyTimeService {
               lt.fluctuations_rtp::text AS fluctuations_rtp
        FROM lucky_time lt JOIN categories c ON c.category_id = lt.category_id
        WHERE lt.replaced_at IS NULL AND c.lobby_id = $1 AND ($2::uuid IS NULL OR lt.category_id = $2::uuid)
-       ORDER BY c.category_name, lt.time_lucky`,
+       ORDER BY c.sort_order NULLS LAST, c.category_name, lt.time_lucky`,
       [NO_HU_LOBBY_ID, categoryId ?? null]);
     return { items: rows.map((r) => ({ ...r, fluctuations_rtp: r.fluctuations_rtp === null ? null : Number(r.fluctuations_rtp) })) };
   }
 
   /**
-   * Đọc + kiểm tra file; mỗi dòng bắt buộc thuộc một category của lobby NỔ HŨ (cột "Tên game"). Một transaction: với MỖI category có mặt
+   * Đọc + kiểm tra file; mỗi dòng bắt buộc thuộc một category của lobby NỔ HŨ (cột "Tên game" khớp BẰNG NHAU sau chuẩn hóa với tên vi / en / MÃ). Một transaction: với MỖI category có mặt
    * trong file, đánh dấu replaced_at các dòng đang hiệu lực của nó rồi thêm dòng mới; category không có trong file giữ nguyên.
    */
   async importFile(data: Buffer): Promise<{ categories: number; rows: number; replaced: number }> {
     const cats: { category_id: string; category_name: string }[] = await this.ds.query(
       `SELECT category_id, category_name FROM categories WHERE lobby_id = $1 AND status <> 'ARCHIVE' ORDER BY category_name`, [NO_HU_LOBBY_ID]);
     const idByName = new Map(cats.map((c) => [c.category_name, c.category_id]));
+    // Chữ trong file → MÃ game (tên vi / en / MÃ, so khớp bằng nhau), game phải có category trong DB; cùng hàm với trình duyệt.
+    const resolveGame = createGameResolver(cats.map((c) => c.category_name));
 
-    const parsed = readLuckyTimeFile(data, cats.map((c) => c.category_name));
+    const parsed = readLuckyTimeFile(data, resolveGame);
     if (parsed.issues.length > 0 || parsed.rows.length === 0) {
       throw new BadRequestException({
         code: "IMPORT_INVALID", message: "File không hợp lệ, chưa ghi gì",
@@ -54,7 +56,7 @@ export class LuckyTimeService {
     const byCategory = new Map<string, typeof parsed.rows>();
     for (const r of parsed.rows) {
       const id = idByName.get(r.data.game);
-      if (!id) throw new Error(`import: không tìm thấy category "${r.data.game}" dù parser đã khớp`);   // không xảy ra
+      if (!id) throw new Error(`import: không tìm thấy category "${r.data.game}" dù đã khớp`);   // không xảy ra
       (byCategory.get(id) ?? byCategory.set(id, []).get(id)!).push(r);
     }
 

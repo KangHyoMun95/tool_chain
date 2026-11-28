@@ -3,10 +3,11 @@
 // Lịch lucky time của lobby NỔ HŨ (HOST): GET /lucky-time, POST /lucky-time/import, danh sách game = GET /categories?lobby_id=NO_HU_LOBBY_ID.
 // Mỗi dòng thuộc đúng một category (không có lịch dùng chung). Khóa theo category_id, tên chỉ để hiển thị / nhập trong file.
 import { useQuery } from '@tanstack/react-query';
-import { NO_HU_LOBBY_ID, type LuckyTimeIssue, type LuckyTimeRow } from '@toolhackchain/shared';
+import { NO_HU_LOBBY_ID, noHuGameName, type LuckyTimeIssue, type LuckyTimeRow } from '@toolhackchain/shared';
 import { ApiError, apiFetch } from './client';
 
-export interface NoHuCategory { id: string; name: string }
+/** `code` = MÃ game (category_name trong DB); `name` = tên hiển thị tiếng Việt (web-admin chỉ có tiếng Việt), thứ tự theo sort_order do API trả. */
+export interface NoHuCategory { id: string; code: string; name: string }
 
 /** Giá trị bộ lọc: null = "Tất cả" = xem mọi category của lobby (không phải dữ liệu dùng chung). */
 export type CategoryFilter = string | null;
@@ -14,10 +15,14 @@ export type CategoryFilter = string | null;
 export interface LuckyTimeItem extends Omit<LuckyTimeRow, 'game'> {
   lucky_time_id: string;
   category_id: string;
+  /** MÃ game; hiển thị bằng `gameLabel`. */
   category_name: string;
 }
 
-/** Category của lobby NỔ HŨ (dropdown lọc, tên hợp lệ của cột "Tên game" trong file import). */
+/** Tên hiển thị của game theo MÃ (tiếng Việt); MÃ lạ ⇒ chính MÃ. */
+export const gameLabel = (code: string): string => noHuGameName(code, 'vi');
+
+/** Category của lobby NỔ HŨ (dropdown lọc, bộ đổi tên → MÃ của cột "Tên game" trong file import). */
 export function useNoHuCategories() {
   return useQuery({
     queryKey: ['no-hu-categories'],
@@ -25,7 +30,7 @@ export function useNoHuCategories() {
     queryFn: async (): Promise<NoHuCategory[]> => {
       const res = await apiFetch<{ items: { category_id: string; category_name: string }[] }>(
         `/categories?lobby_id=${NO_HU_LOBBY_ID}&limit=100`);
-      return res.items.map((c) => ({ id: c.category_id, name: c.category_name }));
+      return res.items.map((c) => ({ id: c.category_id, code: c.category_name, name: noHuGameName(c.category_name, 'vi') }));
     },
   });
 }

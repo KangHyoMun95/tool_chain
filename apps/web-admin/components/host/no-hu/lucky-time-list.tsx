@@ -5,11 +5,11 @@ import { Alert, Button, Space, Table } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import Link from 'next/link';
 import { UploadOutlined } from '@ant-design/icons';
-import { fetchLuckyTimes, formatCircle, formatConfidence, formatRange, formatRtp, type CategoryFilter, type LuckyTimeItem } from '@/lib/api/lucky-time';
+import { fetchLuckyTimes, formatCircle, formatConfidence, formatRange, formatRtp, gameLabel, type CategoryFilter, type LuckyTimeItem } from '@/lib/api/lucky-time';
 import { CategorySelect } from './category-select';
 
 const columns: ColumnsType<LuckyTimeItem> = [
-  { title: 'Tên game', key: 'game', width: 160, ellipsis: true, render: (_, r) => r.category_name },
+  { title: 'Tên game', key: 'game', width: 160, ellipsis: true, render: (_, r) => gameLabel(r.category_name) },
   { title: 'Thời gian dự đoán', dataIndex: 'time_lucky', width: 160, sorter: (a, b) => a.time_lucky.localeCompare(b.time_lucky), defaultSortOrder: 'ascend' },
   { title: 'Khả năng nổ hũ', dataIndex: 'confidence', width: 150, render: formatConfidence, sorter: (a, b) => a.confidence - b.confidence },
   { title: 'Xu hướng hiện tại', dataIndex: 'indicator', render: (v: string | null) => v ?? '—' },

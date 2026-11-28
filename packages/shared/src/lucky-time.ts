@@ -17,7 +17,7 @@ export type LuckyTimeColumnKey = keyof typeof LUCKY_TIME_COLUMNS;
 
 /** Một dòng đã tách, các trường trùng tên cột của bảng `lucky_time`. */
 export interface LuckyTimeRow {
-  /** Tên game (category) như trong danh sách `games` truyền vào parser. Khi không truyền `games` là chữ gốc của file. Luôn có giá trị. */
+  /** Game của dòng: MÃ do `resolveGame` trả về (vd "AVIATOR"). Khi parser không nhận `resolveGame` là chữ gốc của file. Luôn có giá trị. */
   game: string;
   time_lucky: string; // "HH:MM"
   confidence: number; // 0..100, số nguyên
@@ -132,11 +132,11 @@ const KEYS = Object.keys(LUCKY_TIME_COLUMNS) as LuckyTimeColumnKey[];
 /**
  * Tách bảng text thành các dòng lucky time. `table[0]` là header (dòng đầu tiên có ô không trống; dòng trống phía trên được bỏ qua nhưng vẫn tính vào số dòng).
  * firstRow: số dòng (trong file) của `table[0]`, mặc định 1.
- * games: tên các category hợp lệ (nguồn: API / danh sách category). Có truyền ⇒ cột Game phải khớp một tên (không phân biệt hoa / thường, khoảng trắng thừa), `data.game` là tên chuẩn trong danh sách; trống / không khớp ⇒ lỗi dòng.
+ * resolveGame: đổi chữ trong cột Game thành MÃ game (xem `resolveNoHuGame`: so khớp BẰNG NHAU sau chuẩn hóa với tên vi / en / MÃ, không contains); null ⇒ lỗi dòng (kèm giá trị gốc). Trình duyệt và server dùng CHUNG hàm này. Không truyền ⇒ giữ chữ gốc.
  * Trùng giờ được xét RIÊNG cho từng game.
  * Dòng trống hoàn toàn bị bỏ qua. Hai dòng trùng giờ ⇒ dòng sau báo lỗi. Thiếu cột bắt buộc ⇒ lỗi cả file (rows rỗng).
  */
-export function parseLuckyTimeTable(table: string[][], firstRow = 1, games?: readonly string[]): LuckyTimeParsed {
+export function parseLuckyTimeTable(table: string[][], firstRow = 1, resolveGame?: (raw: string) => string | null): LuckyTimeParsed {
   const out: LuckyTimeParsed = { rows: [], issues: [], preview: [] };
   const blank = (r: string[]) => r.every((c) => (c ?? "").toString().trim() === "");
   const headerAt = table.findIndex((r) => !blank(r));
@@ -162,7 +162,6 @@ export function parseLuckyTimeTable(table: string[][], firstRow = 1, games?: rea
     return out;
   }
 
-  const gameByNorm = new Map((games ?? []).map((g) => [norm(g), g]));
   const seenTime = new Map<string, number>(); // khóa: game + giờ
   let dataRows = 0;
   for (let i = headerAt + 1; i < table.length; i++) {
@@ -190,15 +189,12 @@ export function parseLuckyTimeTable(table: string[][], firstRow = 1, games?: rea
     const data: Partial<LuckyTimeRow> = { indicator: raw.indicator === "" ? null : raw.indicator };
     let gameKey: string | null = null;
     if (raw.game !== "") {
-      const g = norm(raw.game);
-      if (!games) {
-        data.game = raw.game;
-        gameKey = g;
-      } else if (gameByNorm.has(g)) {
-        data.game = gameByNorm.get(g)!;
-        gameKey = g;
+      const code = resolveGame ? resolveGame(raw.game) : raw.game;
+      if (code === null) {
+        fail("game", `Game không khớp: "${raw.game}" (dùng đúng tên tiếng Việt, tiếng Anh hoặc mã của game)`);
       } else {
-        fail("game", `Game không tồn tại: "${raw.game}" (hợp lệ: ${games.map((x) => `"${x}"`).join(", ")})`);
+        data.game = code;
+        gameKey = code;
       }
     }
     if (raw.time !== "") {

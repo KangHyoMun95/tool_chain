@@ -11,7 +11,7 @@ function failed(reason: string): LuckyTimeParsed {
 }
 
 /** Đọc `data` (nội dung file) thành bảng text của sheet đầu tiên rồi parse. Lỗi đọc file ⇒ một lỗi cả file (không ném). */
-export function readLuckyTimeFile(data: ArrayBuffer | Uint8Array, games?: readonly string[]): LuckyTimeParsed {
+export function readLuckyTimeFile(data: ArrayBuffer | Uint8Array, resolveGame?: (raw: string) => string | null): LuckyTimeParsed {
   const bytes = data instanceof Uint8Array ? data : new Uint8Array(data);
   if (bytes.byteLength === 0) return failed("File trống");
   if (bytes.byteLength > LUCKY_TIME_MAX_FILE_BYTES) return failed(`File quá lớn (tối đa ${LUCKY_TIME_MAX_FILE_BYTES / 1024 / 1024}MB)`);
@@ -32,7 +32,7 @@ export function readLuckyTimeFile(data: ArrayBuffer | Uint8Array, games?: readon
     const firstRow = XLSX.utils.decode_range(ws["!ref"]).s.r + 1; // sheet có thể bắt đầu ở dòng > 1
     // raw:false ⇒ dùng chuỗi ĐÃ ĐỊNH DẠNG của ô (ô "99%" ra "99%", ô giờ ra "1:15") thay vì số thô.
     const table = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, raw: false, blankrows: true, defval: "" }).map((r) => r.map((c) => String(c ?? "")));
-    return parseLuckyTimeTable(table, firstRow, games);
+    return parseLuckyTimeTable(table, firstRow, resolveGame);
   } catch (e) {
     return failed(`Không đọc được file: ${e instanceof Error ? e.message : String(e)}`);
   }

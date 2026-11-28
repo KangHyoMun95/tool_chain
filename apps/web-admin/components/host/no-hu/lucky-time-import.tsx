@@ -4,8 +4,8 @@ import { useState } from 'react';
 import { Alert, App, Button, Space, Table, Tag, Typography, Upload } from 'antd';
 import type { ColumnsType } from 'antd/es/table';
 import { InboxOutlined } from '@ant-design/icons';
-import { LUCKY_TIME_COLUMNS, type LuckyTimeColumnKey, type LuckyTimeParsed } from '@toolhackchain/shared';
-import { importLuckyTimeFile, LuckyTimeImportError, useNoHuCategories } from '@/lib/api/lucky-time';
+import { createGameResolver, LUCKY_TIME_COLUMNS, type LuckyTimeColumnKey, type LuckyTimeParsed } from '@toolhackchain/shared';
+import { gameLabel, importLuckyTimeFile, LuckyTimeImportError, useNoHuCategories } from '@/lib/api/lucky-time';
 
 type PreviewRow = LuckyTimeParsed['preview'][number];
 const KEYS = Object.keys(LUCKY_TIME_COLUMNS) as LuckyTimeColumnKey[];
@@ -14,6 +14,7 @@ export function LuckyTimeImport() {
   const { message, modal } = App.useApp();
   const { data: categories, isError: categoriesFailed } = useNoHuCategories();
   const gameNames = (categories ?? []).map((c) => c.name);
+  const resolveGame = createGameResolver((categories ?? []).map((c) => c.code));
   const [file, setFile] = useState<File | null>(null);
   const [serverIssues, setServerIssues] = useState<string[]>([]);
   const [fileName, setFileName] = useState<string | null>(null);
@@ -33,7 +34,7 @@ export function LuckyTimeImport() {
     try {
       // Tải thư viện đọc bảng tính khi cần (không đưa vào bundle trang khác).
       const { readLuckyTimeFile } = await import('@toolhackchain/shared/lucky-time-file');
-      setParsed(readLuckyTimeFile(await file.arrayBuffer(), gameNames));
+      setParsed(readLuckyTimeFile(await file.arrayBuffer(), resolveGame));
     } finally {
       setReading(false);
     }
@@ -41,7 +42,7 @@ export function LuckyTimeImport() {
 
   function confirmImport() {
     if (!parsed || blocked || !file) return;
-    const games = [...new Set(parsed.rows.map((r) => r.data.game))];
+    const games = [...new Set(parsed.rows.map((r) => gameLabel(r.data.game)))];
     modal.confirm({
       title: `Thay thế lịch của ${games.length} game?`,
       content: `Import sẽ THAY THẾ lịch lucky time đang hiệu lực của: ${games.join(', ')} bằng ${parsed.rows.length} dòng trong file ${fileName}. Game không có trong file giữ nguyên.`,
@@ -92,7 +93,7 @@ export function LuckyTimeImport() {
         type="warning"
         showIcon
         message="Import sẽ THAY THẾ lịch hiện tại của MỌI game có trong file."
-        description={`Cột "Tên game" của mỗi dòng bắt buộc là tên một category của lobby NỔ HŨ (${gameNames.join(', ') || 'đang tải...'}). Game không có trong file giữ nguyên. Lịch cũ không bị xóa, chỉ được đánh dấu đã thay thế.`}
+        description={`Cột "Tên game" của mỗi dòng bắt buộc là một game của lobby NỔ HŨ (tên tiếng Việt, tiếng Anh hoặc mã; không phân biệt hoa / thường / dấu): ${gameNames.join(', ') || 'đang tải...'}. Game không có trong file giữ nguyên. Lịch cũ không bị xóa, chỉ được đánh dấu đã thay thế.`}
       />
       <Upload.Dragger
         accept=".xlsx,.xls,.csv,.ods,.xlsm"
